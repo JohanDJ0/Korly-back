@@ -1,0 +1,71 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    # Postgres real, no un mock: las políticas RLS son SQL de verdad y
+    # solo un Postgres real las evalúa (ver ADR-005).
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      # Rol de administración (equivalente al "postgres" de Supabase):
+      # solo lo usan las migraciones.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/postgres
+      # Rol de runtime sin BYPASSRLS: el que corren tanto el servidor
+      # como estas pruebas, para que RLS se evalúe de verdad.
+      APP_DATABASE_URL: postgresql://app_backend:app_backend_ci@localhost:5432/postgres
+      SUPABASE_URL: https://ci-placeholder.supabase.co
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - run: npm ci
+
+      - name: Instalar cliente psql
+        run: sudo apt-get update && sudo apt-get install --yes postgresql-client
+
+      - name: Crear rol app_backend (equivalente CI de scripts/bootstrap-roles.sql)
+        run: psql "$DATABASE_URL" -f scripts/bootstrap-roles-ci.sql
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Aplicar migraciones (incluye ENABLE ROW LEVEL SECURITY + políticas)
+        run: npm run db:migrate
+
+      - name: Test de aislamiento por tenant (regla derivada de ADR-005)
+        run: npm test

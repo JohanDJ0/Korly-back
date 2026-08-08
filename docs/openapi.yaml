@@ -1,0 +1,952 @@
+openapi: 3.0.3
+info:
+  title: API — Gestión Financiera por Periodos (MVP)
+  version: "1.0.0"
+  description: >
+    Contrato del ciclo central: crear periodo, registrar ingreso, registrar
+    gasto, consultar disponible, cerrar periodo, decidir sobrante.
+    Alcance limitado al MVP definido en docs/documento-maestro-v2.md
+    y docs/modelo-dominio.md. No incluye Business, metas avanzadas,
+    ni agregación bancaria.
+
+servers:
+  - url: https://api.curly-back.mx/v1
+    description: Producción (placeholder)
+
+tags:
+  - name: Periodos
+  - name: Ingresos
+  - name: Gastos
+  - name: Disponible
+  - name: Cierre
+  - name: Metas
+  - name: Categorías
+
+# ============================================================
+# SEGURIDAD
+# ============================================================
+security:
+  - bearerAuth: []
+
+# ============================================================
+# RUTAS
+# ============================================================
+paths:
+
+  # ---------- PERIODOS ----------
+  /periodos:
+    post:
+      tags: [Periodos]
+      summary: Crear un periodo (queda en estado Borrador)
+      description: >
+        Si ya existe un periodo Activo, la creación es válida pero el nuevo
+        periodo permanece en Borrador hasta que el activo cierre
+        (invariante 9 y 10 del modelo de dominio).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearPeriodoRequest'
+      responses:
+        '201':
+          description: Periodo creado en estado Borrador
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Periodo'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '409':
+          description: Ya existe un periodo Borrador pendiente de activar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags: [Periodos]
+      summary: Listar periodos del usuario (historial)
+      parameters:
+        - name: estado
+          in: query
+          schema:
+            $ref: '#/components/schemas/EstadoPeriodo'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+          description: Cursor de paginación (paginación por cursor, no offset — ver ADR sobre móvil futuro)
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Lista paginada de periodos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PeriodoListaPaginada'
+
+  /periodos/activo:
+    get:
+      tags: [Periodos]
+      summary: Obtener el periodo activo del usuario
+      description: >
+        Si no hay periodo activo (el usuario aún no ha creado ninguno, o el
+        único existente sigue en Borrador), responde 404.
+      responses:
+        '200':
+          description: Periodo activo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Periodo'
+        '404':
+          description: No hay periodo activo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /periodos/{periodoId}:
+    get:
+      tags: [Periodos]
+      summary: Obtener un periodo por id
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Periodo encontrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Periodo'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /periodos/{periodoId}/cerrar:
+    post:
+      tags: [Cierre]
+      summary: Forzar el cierre manual de un periodo activo
+      description: >
+        El cierre normalmente ocurre de forma perezosa (ver ADR-004 y
+        modelo de dominio §3). Este endpoint permite al usuario cerrar
+        antes de la fecha de fin si así lo decide. Operación idempotente:
+        cerrar un periodo ya cerrado devuelve 200 sin efecto adicional
+        (invariante 8).
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Periodo cerrado, incluye el resumen generado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenPeriodo'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /periodos/{periodoId}/resumen:
+    get:
+      tags: [Cierre]
+      summary: Consultar el resumen inmutable de un periodo cerrado
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Resumen del periodo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenPeriodo'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: El periodo aún no está cerrado, no existe resumen todavía
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /periodos/{periodoId}/sobrante/decision:
+    post:
+      tags: [Cierre]
+      summary: Decidir qué hacer con el sobrante de un periodo cerrado
+      description: >
+        Solo válido si el periodo está Cerrado y tiene sobrante positivo
+        sin decisión previa. Si el usuario no decide en el plazo definido
+        por producto, el sistema aplica el default: arrastrar
+        (modelo de dominio §3, estado Cerrado).
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionSobranteRequest'
+      responses:
+        '200':
+          description: Decisión aplicada; genera el asiento correspondiente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DecisionSobranteResultado'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: El periodo no está en condición de recibir una decisión (no cerrado, sin sobrante, o ya decidido)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ---------- INGRESOS ----------
+  /periodos/{periodoId}/ingresos:
+    post:
+      tags: [Ingresos]
+      summary: Registrar un ingreso asociado al periodo
+      description: >
+        El ingreso pertenece al periodo que financia, no necesariamente
+        al periodo en el que cae su fecha real (ADR-007). El periodo
+        destino debe estar Activo.
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearIngresoRequest'
+      responses:
+        '201':
+          description: Ingreso registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ingreso'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '409':
+          description: El periodo no está Activo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags: [Ingresos]
+      summary: Listar ingresos de un periodo
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Lista de ingresos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ingreso'
+
+  # ---------- GASTOS ----------
+  /periodos/{periodoId}/gastos:
+    post:
+      tags: [Gastos]
+      summary: Registrar un gasto (captura rápida)
+      description: >
+        Endpoint de mayor frecuencia de uso del sistema. Diseñado para
+        captura en ≤2 toques desde el cliente: monto es el único campo
+        obligatorio, categoría y nota son opcionales
+        (Documento Maestro §13.2). El periodo destino debe estar Activo.
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearGastoRequest'
+      responses:
+        '201':
+          description: Gasto registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Gasto'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '409':
+          description: El periodo no está Activo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    get:
+      tags: [Gastos]
+      summary: Listar gastos de un periodo
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+        - name: cursor
+          in: query
+          schema:
+            type: string
+        - name: limite
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        '200':
+          description: Lista paginada de gastos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GastoListaPaginada'
+
+  /gastos/{gastoId}:
+    patch:
+      tags: [Gastos]
+      summary: Editar un gasto
+      description: >
+        Si el periodo del gasto sigue Activo, la edición es directa.
+        Si el periodo ya está Cerrado, el servidor genera automáticamente
+        un asiento de reversión más uno nuevo en el periodo activo actual
+        — el cliente no gestiona esa diferencia (modelo de dominio §3).
+      parameters:
+        - $ref: '#/components/parameters/GastoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditarGastoRequest'
+      responses:
+        '200':
+          description: >
+            Gasto actualizado. Si el gasto pertenecía a un periodo cerrado,
+            la respuesta incluye el ajuste generado en el periodo activo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditarGastoResultado'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+    delete:
+      tags: [Gastos]
+      summary: Eliminar un gasto
+      description: >
+        Nunca es un hard delete (Documento Maestro §7.6). Sobre un periodo
+        Activo, el asiento se revierte directamente. Sobre un periodo
+        Cerrado, se genera un asiento de reversión en el periodo activo.
+      parameters:
+        - $ref: '#/components/parameters/GastoId'
+      responses:
+        '204':
+          description: Gasto revertido (soft delete vía asiento de reversión)
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  # ---------- DISPONIBLE (el motor de flujo de caja) ----------
+  /periodos/activo/disponible:
+    get:
+      tags: [Disponible]
+      summary: Obtener la cifra de disponible del periodo activo
+      description: >
+        Endpoint central del producto — implementa el motor de flujo de
+        caja descrito en modelo-dominio.md §5. La cifra se recalcula en
+        cada llamada, nunca se almacena. Si el periodo activo no tiene
+        ingreso registrado, responde con estado sin_ingreso y sin cifra
+        numérica confiable: el cliente NUNCA debe inventar un valor en
+        ese caso ni mostrar un $0 como si fuera un cálculo real.
+      responses:
+        '200':
+          description: Estado del disponible del periodo activo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disponible'
+        '404':
+          description: No hay periodo activo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ---------- METAS DE AHORRO (básico) ----------
+  /metas:
+    post:
+      tags: [Metas]
+      summary: Crear una meta de ahorro
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearMetaRequest'
+      responses:
+        '201':
+          description: Meta creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meta'
+
+    get:
+      tags: [Metas]
+      summary: Listar metas de ahorro del usuario
+      responses:
+        '200':
+          description: Lista de metas
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Meta'
+
+  /metas/{metaId}/aportes:
+    post:
+      tags: [Metas]
+      summary: Registrar un aporte a una meta
+      description: >
+        Reduce el disponible del periodo activo — decisión confirmada en
+        modelo-dominio.md §6: el aporte se trata como un gasto más para
+        efectos del motor de flujo de caja.
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearAporteRequest'
+      responses:
+        '201':
+          description: Aporte registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Aporte'
+        '409':
+          description: No hay periodo activo del cual descontar el aporte
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /metas/{metaId}/retiros:
+    post:
+      tags: [Metas]
+      summary: Registrar un retiro de una meta
+      description: El motivo es obligatorio (requisito original del producto).
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearRetiroRequest'
+      responses:
+        '201':
+          description: Retiro registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Retiro'
+
+  # ---------- CATEGORÍAS ----------
+  /categorias:
+    get:
+      tags: [Categorías]
+      summary: Listar categorías disponibles (predeterminadas + personalizadas del usuario)
+      description: >
+        Disponible en el plan gratuito sin restricción de acceso
+        (Documento Maestro §9.1) — el límite, si existe, es de cantidad
+        de categorías personalizadas, nunca de acceso a la funcionalidad.
+      responses:
+        '200':
+          description: Lista de categorías
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Categoria'
+
+    post:
+      tags: [Categorías]
+      summary: Crear una categoría personalizada
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearCategoriaRequest'
+      responses:
+        '201':
+          description: Categoría creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Categoria'
+        '403':
+          description: Límite de categorías personalizadas alcanzado para el plan actual
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+# ============================================================
+# COMPONENTES
+# ============================================================
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        Token emitido por Supabase Auth (ADR-003). El servidor resuelve
+        el user_id interno a partir de la tabla de identidades externas —
+        el token nunca se usa directamente como identificador de dominio.
+
+  parameters:
+    PeriodoId:
+      name: periodoId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    GastoId:
+      name: gastoId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MetaId:
+      name: metaId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    ErrorValidacion:
+      description: Solicitud inválida (campos faltantes o fuera de rango)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ErrorNoEncontrado:
+      description: Recurso no encontrado
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  schemas:
+
+    # ---------- Tipos base ----------
+
+    Monto:
+      type: object
+      description: >
+        Representación monetaria según ADR-002: entero en unidades
+        mínimas, siempre acompañado de su moneda. El cliente nunca
+        envía ni recibe decimales.
+      required: [valorMinimo, moneda]
+      properties:
+        valorMinimo:
+          type: integer
+          description: Monto en la unidad mínima de la moneda (centavos para MXN)
+          example: 124000
+        moneda:
+          type: string
+          example: MXN
+          description: Código ISO 4217
+
+    Error:
+      type: object
+      required: [codigo, mensaje]
+      properties:
+        codigo:
+          type: string
+          example: PERIODO_NO_ACTIVO
+        mensaje:
+          type: string
+          example: El periodo especificado no está en estado Activo
+
+    EstadoPeriodo:
+      type: string
+      enum: [borrador, activo, cerrado, archivado]
+
+    TipoPeriodo:
+      type: string
+      enum: [quincenal, semanal, mensual, personalizado]
+
+    # ---------- Periodo ----------
+
+    CrearPeriodoRequest:
+      type: object
+      required: [tipo]
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TipoPeriodo'
+        fechaInicio:
+          type: string
+          format: date
+          description: >
+            Requerida solo si tipo = personalizado. Para quincenal/semanal/
+            mensual, la fecha de inicio se deriva de la regla de anclaje
+            a calendario (ADR-004), no se especifica manualmente.
+        fechaFin:
+          type: string
+          format: date
+          description: Requerida solo si tipo = personalizado
+
+    Periodo:
+      type: object
+      required: [id, tipo, estado, fechaInicio, fechaFin]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tipo:
+          $ref: '#/components/schemas/TipoPeriodo'
+        estado:
+          $ref: '#/components/schemas/EstadoPeriodo'
+        fechaInicio:
+          type: string
+          format: date
+        fechaFin:
+          type: string
+          format: date
+        tieneIngresoRegistrado:
+          type: boolean
+          description: Ver Disponible — determina si la cifra es confiable
+
+    PeriodoListaPaginada:
+      type: object
+      properties:
+        datos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Periodo'
+        siguienteCursor:
+          type: string
+          nullable: true
+
+    ResumenPeriodo:
+      type: object
+      description: Snapshot inmutable generado al cierre (invariante 15).
+      required: [periodoId, totalIngresos, totalGastado, sobrante, generadoEn]
+      properties:
+        periodoId:
+          type: string
+          format: uuid
+        totalIngresos:
+          $ref: '#/components/schemas/Monto'
+        totalGastado:
+          $ref: '#/components/schemas/Monto'
+        sobrante:
+          $ref: '#/components/schemas/Monto'
+          description: Puede ser negativo si hubo sobregiro
+        porcentajeUtilizado:
+          type: number
+          format: float
+        decisionSobrante:
+          type: string
+          enum: [pendiente, ahorrado, arrastrado]
+        generadoEn:
+          type: string
+          format: date-time
+
+    DecisionSobranteRequest:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [ahorrar, arrastrar]
+        metaId:
+          type: string
+          format: uuid
+          description: Requerido si decision = ahorrar
+
+    DecisionSobranteResultado:
+      type: object
+      properties:
+        periodoId:
+          type: string
+          format: uuid
+        decision:
+          type: string
+          enum: [ahorrado, arrastrado]
+        montoAplicado:
+          $ref: '#/components/schemas/Monto'
+
+    # ---------- Ingreso ----------
+
+    CrearIngresoRequest:
+      type: object
+      required: [monto, fechaEfectiva]
+      properties:
+        monto:
+          $ref: '#/components/schemas/Monto'
+        fechaEfectiva:
+          type: string
+          format: date
+          description: Fecha real en que llegó el dinero (puede diferir del inicio del periodo, ver ADR-007)
+        nota:
+          type: string
+          maxLength: 200
+
+    Ingreso:
+      type: object
+      required: [id, periodoId, monto, fechaEfectiva, fechaRegistro]
+      properties:
+        id:
+          type: string
+          format: uuid
+        periodoId:
+          type: string
+          format: uuid
+        monto:
+          $ref: '#/components/schemas/Monto'
+        fechaEfectiva:
+          type: string
+          format: date
+        fechaRegistro:
+          type: string
+          format: date-time
+        nota:
+          type: string
+
+    # ---------- Gasto ----------
+
+    CrearGastoRequest:
+      type: object
+      required: [monto]
+      description: Monto es el único campo obligatorio — captura en ≤2 toques.
+      properties:
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+        nota:
+          type: string
+          maxLength: 200
+        fechaEfectiva:
+          type: string
+          format: date
+          description: Por defecto, la fecha/hora actual del servidor resuelta a la zona del usuario
+
+    Gasto:
+      type: object
+      required: [id, periodoId, monto, fechaEfectiva, fechaRegistro]
+      properties:
+        id:
+          type: string
+          format: uuid
+        periodoId:
+          type: string
+          format: uuid
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+        nota:
+          type: string
+        fechaEfectiva:
+          type: string
+          format: date
+        fechaRegistro:
+          type: string
+          format: date-time
+
+    EditarGastoRequest:
+      type: object
+      properties:
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+        nota:
+          type: string
+
+    EditarGastoResultado:
+      type: object
+      properties:
+        gasto:
+          $ref: '#/components/schemas/Gasto'
+        ajusteGenerado:
+          type: boolean
+          description: true si el gasto original pertenecía a un periodo cerrado
+        periodoDelAjuste:
+          type: string
+          format: uuid
+          nullable: true
+
+    GastoListaPaginada:
+      type: object
+      properties:
+        datos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Gasto'
+        siguienteCursor:
+          type: string
+          nullable: true
+
+    # ---------- Disponible (motor de flujo de caja) ----------
+
+    Disponible:
+      type: object
+      required: [estado, periodoId]
+      description: >
+        Ver modelo-dominio.md §5. El campo estado determina cómo debe
+        presentarse: si es sin_ingreso, el cliente muestra el llamado a
+        registrar ingreso en lugar de cualquier cifra numérica.
+      properties:
+        estado:
+          type: string
+          enum: [ok, sin_ingreso]
+        periodoId:
+          type: string
+          format: uuid
+        disponible:
+          $ref: '#/components/schemas/Monto'
+          description: Presente solo si estado = ok. Puede ser negativo (sobregiro)
+        diasRestantes:
+          type: integer
+          description: Incluye el día de hoy. Presente solo si estado = ok
+        cifraDiaria:
+          $ref: '#/components/schemas/Monto'
+          description: piso(disponible / diasRestantes). Presente solo si estado = ok
+        calculadoEn:
+          type: string
+          format: date-time
+          description: Nunca se almacena — se recalcula en cada consulta
+
+    # ---------- Metas de ahorro ----------
+
+    CrearMetaRequest:
+      type: object
+      required: [nombre, montoObjetivo]
+      properties:
+        nombre:
+          type: string
+          maxLength: 100
+        montoObjetivo:
+          $ref: '#/components/schemas/Monto'
+
+    Meta:
+      type: object
+      required: [id, nombre, montoObjetivo, montoAcumulado]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        montoObjetivo:
+          $ref: '#/components/schemas/Monto'
+        montoAcumulado:
+          $ref: '#/components/schemas/Monto'
+        porcentajeAvance:
+          type: number
+          format: float
+
+    CrearAporteRequest:
+      type: object
+      required: [monto]
+      properties:
+        monto:
+          $ref: '#/components/schemas/Monto'
+
+    Aporte:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        metaId:
+          type: string
+          format: uuid
+        monto:
+          $ref: '#/components/schemas/Monto'
+        periodoOrigenId:
+          type: string
+          format: uuid
+        fechaRegistro:
+          type: string
+          format: date-time
+
+    CrearRetiroRequest:
+      type: object
+      required: [monto, motivo]
+      properties:
+        monto:
+          $ref: '#/components/schemas/Monto'
+        motivo:
+          type: string
+          maxLength: 200
+          description: Obligatorio — requisito original del producto
+
+    Retiro:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        metaId:
+          type: string
+          format: uuid
+        monto:
+          $ref: '#/components/schemas/Monto'
+        motivo:
+          type: string
+        fechaRegistro:
+          type: string
+          format: date-time
+
+    # ---------- Categorías ----------
+
+    CrearCategoriaRequest:
+      type: object
+      required: [nombre]
+      properties:
+        nombre:
+          type: string
+          maxLength: 50
+
+    Categoria:
+      type: object
+      required: [id, nombre, esPredeterminada]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        esPredeterminada:
+          type: boolean

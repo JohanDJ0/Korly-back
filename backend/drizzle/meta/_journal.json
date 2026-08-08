@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1786210904651,
+      "tag": "0000_sudden_mongu",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1786214920922,
+      "tag": "0001_big_lilith",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786214938157,
+      "tag": "0002_ledger_triggers_integridad",
+      "breakpoints": true
+    }
+  ]
+}
