@@ -58,6 +58,11 @@ export const cuentas = pgTable(
  * Inmutable a nivel de base de datos: ver migración 0002 (trigger que
  * bloquea UPDATE/DELETE). Una corrección es un `movimientoRevertidoId`
  * apuntando al movimiento original, nunca una edición.
+ *
+ * PENDIENTE: la columna existe pero ningún código la genera todavía —
+ * es preparación de estructura, no el mecanismo de reversión completo.
+ * Ver el comentario sobre `movimientoRevertidoId` en
+ * modulos/ledger/registrar-movimiento.ts.
  */
 export const movimientos = pgTable(
   'movimientos',

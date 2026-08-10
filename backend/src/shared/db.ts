@@ -18,6 +18,16 @@ const client = postgres(connectionString, { prepare: false });
 export const db = drizzle(client, { schema });
 
 /**
+ * `db` en sí, o una transacción abierta sobre él. Los módulos de dominio
+ * (ledger, periodos, ...) exponen funciones que aceptan este tipo cuando
+ * necesitan poder componerse dentro de la transacción de otro módulo
+ * (p. ej. periodos crea su cuenta de ledger y su fila de periodo en una
+ * sola transacción atómica), además de una variante de nivel superior que
+ * abre su propia transacción con `conTenant` para quien las llama sola.
+ */
+export type Ejecutor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
  * Ejecuta `fn` dentro de una transacción con `app.tenant_id` fijado para
  * esa transacción (ADR-005: "el contexto de tenant se establece en un
  * único punto del ciclo de request, nunca por consulta individual").
@@ -27,10 +37,7 @@ export const db = drizzle(client, { schema });
  * pasar tenantId como parámetro (no interpolado en el texto SQL) se evita
  * inyección SQL en el nombre del tenant.
  */
-export async function conTenant<T>(
-  tenantId: string,
-  fn: (tx: Parameters<Parameters<typeof db.transaction>[0]>[0]) => Promise<T>
-): Promise<T> {
+export async function conTenant<T>(tenantId: string, fn: (tx: Ejecutor) => Promise<T>): Promise<T> {
   return db.transaction(async (tx) => {
     await tx.execute(sql`select set_config('app.tenant_id', ${tenantId}, true)`);
     return fn(tx);

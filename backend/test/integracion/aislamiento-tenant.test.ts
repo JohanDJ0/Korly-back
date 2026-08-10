@@ -3,7 +3,11 @@ import { eq, sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { tenants } from '../../src/db/schema/tenants.js';
 import { usuarios } from '../../src/db/schema/identidad.js';
+import { asientos, cuentas, movimientos } from '../../src/db/schema/ledger.js';
+import { periodos } from '../../src/db/schema/periodos.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
+import { crearCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { conTenant, db } from '../../src/shared/db.js';
 
 /**
@@ -53,6 +57,46 @@ describe('aislamiento por tenant (RLS)', () => {
     const filas = await conTenant(identidadA.tenantId, (tx) =>
       tx.select().from(tenants).where(eq(tenants.id, identidadB.tenantId))
     );
+
+    expect(filas).toHaveLength(0);
+  });
+
+  it('un tenant no puede leer las cuentas, movimientos ni asientos de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-ledger-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-ledger-b-${randomUUID()}`);
+
+    const cuentaB = await crearCuenta(identidadB.tenantId, 'periodo');
+    const { movimientoId: movimientoIdB } = await registrarMovimiento({
+      tenantId: identidadB.tenantId,
+      tipo: 'ingreso',
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      partidas: [
+        { cuentaId: cuentaB.id, montoValorMinimo: 1000n },
+        { cuentaId: null, montoValorMinimo: -1000n },
+      ],
+    });
+
+    const [cuentasVistas, movimientosVistos, asientosVistos] = await conTenant(identidadA.tenantId, (tx) =>
+      Promise.all([
+        tx.select().from(cuentas).where(eq(cuentas.tenantId, identidadB.tenantId)),
+        tx.select().from(movimientos).where(eq(movimientos.id, movimientoIdB)),
+        tx.select().from(asientos).where(eq(asientos.tenantId, identidadB.tenantId)),
+      ])
+    );
+
+    expect(cuentasVistas).toHaveLength(0);
+    expect(movimientosVistos).toHaveLength(0);
+    expect(asientosVistos).toHaveLength(0);
+  });
+
+  it('un tenant no puede leer el periodo de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-periodos-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-periodos-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+
+    const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(periodos).where(eq(periodos.id, periodoB.id)));
 
     expect(filas).toHaveLength(0);
   });

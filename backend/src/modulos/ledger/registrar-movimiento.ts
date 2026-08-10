@@ -1,6 +1,6 @@
 import { eq, sql } from 'drizzle-orm';
 import { asientos, cuentas, movimientos, type TipoCuenta, type TipoMovimiento } from '../../db/schema/ledger.js';
-import { conTenant } from '../../shared/db.js';
+import { conTenant, type Ejecutor } from '../../shared/db.js';
 
 export interface Partida {
   /** `null` = contraparte externa al sistema (ver comentario en db/schema/ledger.ts). */
@@ -17,15 +17,33 @@ export interface RegistrarMovimientoEntrada {
   fechaEfectiva: string;
   partidas: Partida[];
   nota?: string;
+  /**
+   * PENDIENTE: el campo y la columna existen (ver movimientoRevertidoId en
+   * db/schema/ledger.ts), pero ninguna función de este archivo lo genera
+   * todavía. No hay un `revertirMovimiento()` que lea los asientos de un
+   * movimiento original y cree los inversos — eso llega con el módulo que
+   * edita/elimina gastos de un periodo cerrado (ADR-001, modelo-dominio.md
+   * §3), fuera del alcance actual del walking skeleton. Hoy este campo solo
+   * sirve si un caller arma la reversión a mano y pasa el id aquí.
+   */
   movimientoRevertidoId?: string;
 }
 
+/**
+ * Variante componible: recibe una transacción ya abierta (con
+ * `app.tenant_id` ya fijado) en vez de abrir la suya. La usan otros
+ * módulos que necesitan crear una cuenta como parte de una operación más
+ * grande y atómica (p. ej. periodos crea su cuenta y su fila de periodo
+ * juntas). `crearCuenta` es el atajo para cuando no hace falta eso.
+ */
+export async function crearCuentaTx(tx: Ejecutor, tenantId: string, tipo: TipoCuenta): Promise<{ id: string }> {
+  const [cuenta] = await tx.insert(cuentas).values({ tenantId, tipo }).returning({ id: cuentas.id });
+  if (!cuenta) throw new Error('No se pudo crear la cuenta');
+  return cuenta;
+}
+
 export async function crearCuenta(tenantId: string, tipo: TipoCuenta): Promise<{ id: string }> {
-  return conTenant(tenantId, async (tx) => {
-    const [cuenta] = await tx.insert(cuentas).values({ tenantId, tipo }).returning({ id: cuentas.id });
-    if (!cuenta) throw new Error('No se pudo crear la cuenta');
-    return cuenta;
-  });
+  return conTenant(tenantId, (tx) => crearCuentaTx(tx, tenantId, tipo));
 }
 
 /**

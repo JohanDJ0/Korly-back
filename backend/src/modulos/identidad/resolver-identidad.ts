@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
-import type { PgTransaction } from 'drizzle-orm/pg-core';
-import { db } from '../../shared/db.js';
+import { db, type Ejecutor } from '../../shared/db.js';
 import { identidadesExternas } from '../../db/schema/identidad.js';
 import { tenants } from '../../db/schema/tenants.js';
 import { usuarios } from '../../db/schema/identidad.js';
@@ -12,8 +11,6 @@ export interface IdentidadResuelta {
   usuarioId: string;
   tenantId: string;
 }
-
-type Ejecutor = typeof db | PgTransaction<any, any, any>;
 
 /**
  * Encuentra el usuario interno asociado a un id de Supabase Auth, o lo

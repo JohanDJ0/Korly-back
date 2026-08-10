@@ -9,6 +9,10 @@ movimientos y asientos (ADR-001) que usarán periodos, ingresos, gastos
 y metas. Todavía no existen esos módulos ni sus endpoints HTTP — el
 ledger se prueba directamente, sin pasar por la API.
 
+**Punto 3 — periodos:** creación anclada a calendario (ADR-004, solo
+quincenal) y el invariante de un solo periodo activo por tenant.
+Tampoco tiene endpoints HTTP todavía.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -155,6 +159,50 @@ punto se necesita distinguir el origen de varias contrapartes externas
 (por ejemplo, para reportes), esa es la señal de que sí hace falta una
 cuenta real y este atajo debe revisarse.
 
+**Pendiente explícito — reversión de movimientos.** `movimientos` tiene
+la columna `movimientoRevertidoId` y el tipo `'reversion'` existe en el
+vocabulario de `TIPOS_MOVIMIENTO`, pero es solo preparación de
+estructura: **ningún código genera hoy un movimiento de reversión**.
+No hay un `revertirMovimiento()` que lea los asientos de un movimiento
+original y cree los inversos. Eso llega con el módulo que edite o
+elimine gastos de un periodo cerrado (ADR-001, modelo-dominio.md §3),
+que todavía no existe en el walking skeleton.
+
+## Periodos (anclaje a calendario)
+
+`src/db/schema/periodos.ts` define `periodos`.
+`src/modulos/periodos/crear-periodo.ts` expone `crearPeriodo` y
+`obtenerPeriodoActivo`. `src/modulos/periodos/calcular-quincena.ts` es
+la función pura del anclaje a calendario (ADR-004: 1–15 y 16–fin de
+mes, nunca "inicio + N días") — probada sin base de datos en
+`test/unidad/calcular-quincena.test.ts` contra los casos frontera que
+el ADR pide explícitamente (meses de 30/31 días, febrero bisiesto y
+no bisiesto, fin de año).
+
+**Alcance deliberadamente reducido:** ADR-004 define cuatro tipos de
+periodo (quincenal, semanal, mensual, personalizado). Solo
+**quincenal** está implementado — es el caso dominante y el default
+del producto. El `CHECK` de la tabla y `crearPeriodo` rechazan
+explícitamente cualquier otro tipo (`TipoPeriodoSoportado` en el
+schema); ampliarlo es trabajo pendiente, no un bug.
+
+**Invariante de un solo periodo activo (invariante 9).** Un índice
+único parcial (`WHERE estado = 'activo'`) es la autoridad real, no
+solo la comprobación en `crearPeriodo`: si dos requests de "crear
+periodo" del mismo tenant compiten, el índice rechaza al segundo
+intento de activarse y el código lo reintenta como `'borrador'` dentro
+de un `SAVEPOINT` (así no se pierde la cuenta de ledger ya creada en la
+misma transacción). `test/integracion/periodos.test.ts` prueba esto
+con dos llamadas concurrentes reales, no solo secuenciales.
+
+**Pendiente explícito.** Este punto solo cubre borrador → activo. La
+transición activo → cerrado, el resumen inmutable y la decisión de
+sobrante son del módulo de cierre (siguiente en el orden acordado): un
+periodo puede quedar `'activo'` más allá de su `fechaFin` sin que nada
+lo detecte todavía — no hay cron ni cálculo perezoso de cierre. Tampoco
+existe resolución a la zona horaria IANA del usuario (CLAUDE.md): "hoy"
+es la fecha de calendario UTC del servidor.
+
 ## Qué valida este punto
 
 - El backend nunca usa el `id` de Supabase Auth como `usuario_id` de
@@ -173,9 +221,12 @@ cuenta real y este atajo debe revisarse.
 - El ledger no puede descuadrarse: un movimiento desbalanceado o con
   monedas mezcladas lo rechaza la base de datos, no solo la
   aplicación; ningún asiento se edita ni se borra (ADR-001).
+- Un tenant nunca tiene dos periodos activos, ni siquiera bajo
+  solicitudes concurrentes (invariante 9), y el anclaje a calendario
+  quincenal no tiene drift ni bugs de fin de mes (ADR-004).
 
 ## Qué falta (siguientes puntos)
 
-Periodos, ingresos, gastos, disponible, cierre — ver el orden de
-construcción acordado en la conversación de diseño. El ledger de este
-punto todavía no tiene endpoints HTTP: los expondrán esos módulos.
+Ingresos, gastos, disponible, cierre — ver el orden de construcción
+acordado en la conversación de diseño. Periodos y ledger todavía no
+tienen endpoints HTTP: los expondrán esos módulos.

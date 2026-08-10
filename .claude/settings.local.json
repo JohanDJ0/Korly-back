@@ -52,7 +52,13 @@
       "Bash(npx tsx *)",
       "Bash(rm -f prueba-camino-feliz.ts limpiar-prueba.ts server-real.log)",
       "Bash(tasklist //FI \"IMAGENAME eq node.exe\")",
-      "Bash(taskkill //F //PID 15092)"
+      "Bash(taskkill //F //PID 15092)",
+      "Bash(sleep 3 && tail -5 \"/c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check3/pg.log\")",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5435/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5435/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5436/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5436/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check4/**)"
     ]
   }
 }
