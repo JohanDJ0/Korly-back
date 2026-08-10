@@ -5,9 +5,11 @@ import { tenants } from '../../src/db/schema/tenants.js';
 import { usuarios } from '../../src/db/schema/identidad.js';
 import { asientos, cuentas, movimientos } from '../../src/db/schema/ledger.js';
 import { periodos } from '../../src/db/schema/periodos.js';
+import { ingresos } from '../../src/db/schema/ingresos.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { crearCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
+import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { conTenant, db } from '../../src/shared/db.js';
 
 /**
@@ -97,6 +99,24 @@ describe('aislamiento por tenant (RLS)', () => {
     const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
 
     const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(periodos).where(eq(periodos.id, periodoB.id)));
+
+    expect(filas).toHaveLength(0);
+  });
+
+  it('un tenant no puede leer el ingreso de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-ingresos-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-ingresos-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const { id: ingresoIdB } = await registrarIngreso({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+    });
+
+    const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(ingresos).where(eq(ingresos.id, ingresoIdB)));
 
     expect(filas).toHaveLength(0);
   });

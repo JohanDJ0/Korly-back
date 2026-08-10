@@ -13,6 +13,10 @@ ledger se prueba directamente, sin pasar por la API.
 quincenal) y el invariante de un solo periodo activo por tenant.
 Tampoco tiene endpoints HTTP todavía.
 
+**Punto 4 — ingresos:** registrar un ingreso contra el periodo activo,
+generando su asiento de ledger. Primer módulo que compone periodos +
+ledger en una sola transacción.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -203,6 +207,40 @@ lo detecte todavía — no hay cron ni cálculo perezoso de cierre. Tampoco
 existe resolución a la zona horaria IANA del usuario (CLAUDE.md): "hoy"
 es la fecha de calendario UTC del servidor.
 
+## Ingresos
+
+`src/db/schema/ingresos.ts` define `ingresos`.
+`src/modulos/ingresos/registrar-ingreso.ts` expone `registrarIngreso`.
+
+**Deliberadamente delgada:** la tabla `ingresos` solo guarda
+`periodoId` + `movimientoId` — monto, moneda, fecha efectiva y nota
+viven en `movimientos` (que el ingreso genera vía
+`registrarMovimientoTx`), no se duplican. Leer un ingreso completo
+implica un `JOIN` a `movimientos`; no hay una consulta así todavía
+porque no hay endpoint que la necesite.
+
+**Refactor que esto forzó en el ledger.** `registrarMovimiento` (y
+`crearCuenta`, desde periodos) abrían su propia transacción, lo que
+hacía imposible que otro módulo los compusiera atómicamente con su
+propia lógica. Ambos ahora tienen una variante `*Tx` que recibe una
+transacción ya abierta — `registrarIngreso` valida el periodo,
+registra el movimiento y crea la fila de `ingresos` en una sola
+transacción real, no en tres esperando que ninguna falle a la mitad.
+
+**BOLA por `periodoId`, verificado, no solo asumido.**
+`obtenerPeriodoPorId` filtra por `tenantId` en el `WHERE`, pero la
+defensa real es la política RLS de `periodos`: pedir el periodo activo
+de otro tenant por id devuelve `null` — el mismo resultado que un id
+inexistente — porque RLS oculta la fila antes de que el código de
+aplicación la vea. `test/integracion/ingresos.test.ts` prueba
+exactamente ese caso (el periodo de otro tenant, no solo un UUID al
+azar) contra `PERIODO_NO_ENCONTRADO`.
+
+`ingresos` reutiliza el trigger de inmutabilidad del ledger
+(`ledger_bloquear_mutacion`, migración 0002) en vez de definir uno
+nuevo — ver
+[`drizzle/0005_ingresos_inmutable.sql`](drizzle/0005_ingresos_inmutable.sql).
+
 ## Qué valida este punto
 
 - El backend nunca usa el `id` de Supabase Auth como `usuario_id` de
@@ -224,9 +262,13 @@ es la fecha de calendario UTC del servidor.
 - Un tenant nunca tiene dos periodos activos, ni siquiera bajo
   solicitudes concurrentes (invariante 9), y el anclaje a calendario
   quincenal no tiene drift ni bugs de fin de mes (ADR-004).
+- Un ingreso solo se registra contra un periodo Activo del mismo
+  tenant; intentarlo contra un periodo ajeno falla igual que contra
+  uno que no existe (RLS, no una comprobación aparte), y el registro
+  es atómico (periodo validado + asiento + vínculo, todo o nada).
 
 ## Qué falta (siguientes puntos)
 
-Ingresos, gastos, disponible, cierre — ver el orden de construcción
-acordado en la conversación de diseño. Periodos y ledger todavía no
-tienen endpoints HTTP: los expondrán esos módulos.
+Gastos, disponible, cierre — ver el orden de construcción acordado en
+la conversación de diseño. Periodos y ledger todavía no tienen
+endpoints HTTP: los expondrán esos módulos.

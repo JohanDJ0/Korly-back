@@ -6,6 +6,7 @@ import { calcularQuincenaDeCalendario } from './calcular-quincena.js';
 
 export interface Periodo {
   id: string;
+  cuentaId: string;
   estado: EstadoPeriodo;
   fechaInicio: string;
   fechaFin: string;
@@ -13,6 +14,7 @@ export interface Periodo {
 
 const COLUMNAS_PERIODO = {
   id: periodos.id,
+  cuentaId: periodos.cuentaId,
   estado: periodos.estado,
   fechaInicio: periodos.fechaInicio,
   fechaFin: periodos.fechaFin,
@@ -78,6 +80,29 @@ async function obtenerPeriodoActivoTx(tx: Ejecutor, tenantId: string): Promise<P
     .select(COLUMNAS_PERIODO)
     .from(periodos)
     .where(and(eq(periodos.tenantId, tenantId), eq(periodos.estado, 'activo')))
+    .limit(1);
+
+  return fila ? { ...fila, estado: fila.estado as EstadoPeriodo } : null;
+}
+
+export async function obtenerPeriodoPorId(tenantId: string, periodoId: string): Promise<Periodo | null> {
+  return conTenant(tenantId, (tx) => obtenerPeriodoPorIdTx(tx, tenantId, periodoId));
+}
+
+/**
+ * `tenantId` en el `WHERE` es cinturón y tirantes, no la defensa real:
+ * la política RLS de `periodos` ya filtra por `app.tenant_id` de la
+ * transacción, así que pedir el periodo de otro tenant por id devuelve
+ * `null` (RLS oculta la fila) en vez de exponer que existe en otro
+ * estado — es la defensa en profundidad que promete ADR-005 funcionando
+ * en este caso concreto: un intento de BOLA vía `periodoId` no distingue
+ * "no existe" de "existe pero no es tuyo".
+ */
+export async function obtenerPeriodoPorIdTx(tx: Ejecutor, tenantId: string, periodoId: string): Promise<Periodo | null> {
+  const [fila] = await tx
+    .select(COLUMNAS_PERIODO)
+    .from(periodos)
+    .where(and(eq(periodos.tenantId, tenantId), eq(periodos.id, periodoId)))
     .limit(1);
 
   return fila ? { ...fila, estado: fila.estado as EstadoPeriodo } : null;

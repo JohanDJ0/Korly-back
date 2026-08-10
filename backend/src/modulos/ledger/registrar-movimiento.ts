@@ -47,7 +47,10 @@ export async function crearCuenta(tenantId: string, tipo: TipoCuenta): Promise<{
 }
 
 /**
- * Registra un movimiento y sus asientos en una sola transacción.
+ * Variante componible — ver el comentario de `crearCuentaTx`. La usan
+ * módulos que necesitan registrar un movimiento como parte de una
+ * operación más grande (p. ej. ingresos valida el periodo y registra su
+ * movimiento en la misma transacción).
  *
  * La validación de "las partidas suman cero" ocurre aquí en JS Y en un
  * trigger de la base de datos (drizzle/0002_ledger_triggers_integridad.sql).
@@ -56,35 +59,37 @@ export async function crearCuenta(tenantId: string, tipo: TipoCuenta): Promise<{
  * importa, porque protege contra cualquier otro camino de escritura que
  * este archivo no haya previsto (ADR-001).
  */
-export async function registrarMovimiento(entrada: RegistrarMovimientoEntrada): Promise<{ movimientoId: string }> {
+export async function registrarMovimientoTx(tx: Ejecutor, entrada: RegistrarMovimientoEntrada): Promise<{ movimientoId: string }> {
   validarPartidasBalanceadas(entrada.partidas);
 
-  return conTenant(entrada.tenantId, async (tx) => {
-    const [movimiento] = await tx
-      .insert(movimientos)
-      .values({
-        tenantId: entrada.tenantId,
-        tipo: entrada.tipo,
-        moneda: entrada.moneda,
-        fechaEfectiva: entrada.fechaEfectiva,
-        nota: entrada.nota,
-        movimientoRevertidoId: entrada.movimientoRevertidoId,
-      })
-      .returning({ id: movimientos.id });
-    if (!movimiento) throw new Error('No se pudo crear el movimiento');
+  const [movimiento] = await tx
+    .insert(movimientos)
+    .values({
+      tenantId: entrada.tenantId,
+      tipo: entrada.tipo,
+      moneda: entrada.moneda,
+      fechaEfectiva: entrada.fechaEfectiva,
+      nota: entrada.nota,
+      movimientoRevertidoId: entrada.movimientoRevertidoId,
+    })
+    .returning({ id: movimientos.id });
+  if (!movimiento) throw new Error('No se pudo crear el movimiento');
 
-    await tx.insert(asientos).values(
-      entrada.partidas.map((partida) => ({
-        tenantId: entrada.tenantId,
-        movimientoId: movimiento.id,
-        cuentaId: partida.cuentaId,
-        montoValorMinimo: partida.montoValorMinimo,
-        moneda: entrada.moneda,
-      }))
-    );
+  await tx.insert(asientos).values(
+    entrada.partidas.map((partida) => ({
+      tenantId: entrada.tenantId,
+      movimientoId: movimiento.id,
+      cuentaId: partida.cuentaId,
+      montoValorMinimo: partida.montoValorMinimo,
+      moneda: entrada.moneda,
+    }))
+  );
 
-    return { movimientoId: movimiento.id };
-  });
+  return { movimientoId: movimiento.id };
+}
+
+export async function registrarMovimiento(entrada: RegistrarMovimientoEntrada): Promise<{ movimientoId: string }> {
+  return conTenant(entrada.tenantId, (tx) => registrarMovimientoTx(tx, entrada));
 }
 
 export async function obtenerSaldoCuenta(tenantId: string, cuentaId: string): Promise<bigint> {
