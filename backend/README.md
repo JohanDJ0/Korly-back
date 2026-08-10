@@ -17,6 +17,10 @@ Tampoco tiene endpoints HTTP todavía.
 generando su asiento de ledger. Primer módulo que compone periodos +
 ledger en una sola transacción.
 
+**Punto 5 — gastos:** mismo patrón que ingresos con el signo
+invertido. No requirió ningún cambio en el ledger — las variantes `Tx`
+que forzó ingresos ya alcanzaban.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -241,6 +245,31 @@ azar) contra `PERIODO_NO_ENCONTRADO`.
 nuevo — ver
 [`drizzle/0005_ingresos_inmutable.sql`](drizzle/0005_ingresos_inmutable.sql).
 
+## Gastos
+
+`src/db/schema/gastos.ts` define `gastos`.
+`src/modulos/gastos/registrar-gasto.ts` expone `registrarGasto`. Es
+prácticamente un espejo de `registrarIngreso` con la partida invertida
+(`-monto` en la cuenta del periodo en vez de `+monto`) — mismas
+validaciones (`VALIDACION`, `PERIODO_NO_ENCONTRADO`,
+`PERIODO_NO_ACTIVO`), mismo patrón de RLS para BOLA vía `periodoId`,
+misma inmutabilidad reutilizando `ledger_bloquear_mutacion`.
+
+**No forzó ningún cambio en el ledger.** Este módulo reutiliza
+`registrarMovimientoTx` y `obtenerPeriodoPorIdTx` sin modificarlos —
+las variantes `Tx` que ingresos ya había forzado alcanzaron para
+gastos. No hizo falta agregar una tercera de forma reactiva.
+
+**Sobregiro permitido, sin suavizar** (modelo-dominio.md §5): un gasto
+puede dejar el saldo de la cuenta del periodo en negativo y se
+registra igual — no hay validación de "saldo suficiente". Probado
+explícitamente en `test/integracion/gastos.test.ts`.
+
+**Sin `categoriaId`.** La tabla no tiene columna de categoría: el
+módulo de categorías no existe todavía y agregar una columna sin tabla
+real a la que apuntar sería peor que omitirla. Se agrega cuando ese
+módulo exista.
+
 ## Qué valida este punto
 
 - El backend nunca usa el `id` de Supabase Auth como `usuario_id` de
@@ -266,9 +295,12 @@ nuevo — ver
   tenant; intentarlo contra un periodo ajeno falla igual que contra
   uno que no existe (RLS, no una comprobación aparte), y el registro
   es atómico (periodo validado + asiento + vínculo, todo o nada).
+- Un gasto se comporta igual que un ingreso en validación y
+  aislamiento, con el efecto contrario en el saldo, y sin bloquear el
+  sobregiro (modelo-dominio.md §5).
 
 ## Qué falta (siguientes puntos)
 
-Gastos, disponible, cierre — ver el orden de construcción acordado en
-la conversación de diseño. Periodos y ledger todavía no tienen
-endpoints HTTP: los expondrán esos módulos.
+Disponible, cierre — ver el orden de construcción acordado en la
+conversación de diseño. Periodos y ledger todavía no tienen endpoints
+HTTP: los expondrán esos módulos.

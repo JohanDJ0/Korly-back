@@ -1,0 +1,831 @@
+{
+  "id": "3683ad1b-4998-4c86-b424-da6a7fd06d76",
+  "prevId": "5844ee4f-8525-4283-bb07-afa791221b4a",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.tenants": {
+      "name": "tenants",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "tenants_lectura_propia": {
+          "name": "tenants_lectura_propia",
+          "as": "PERMISSIVE",
+          "for": "SELECT",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"tenants\".\"id\" = current_setting('app.tenant_id', true)::uuid"
+        },
+        "tenants_alta_aprovisionamiento": {
+          "name": "tenants_alta_aprovisionamiento",
+          "as": "PERMISSIVE",
+          "for": "INSERT",
+          "to": [
+            "app_backend"
+          ],
+          "withCheck": "true"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.identidades_externas": {
+      "name": "identidades_externas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "usuario_id": {
+          "name": "usuario_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "proveedor": {
+          "name": "proveedor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "id_en_proveedor": {
+          "name": "id_en_proveedor",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "identidades_externas_usuario_id_usuarios_id_fk": {
+          "name": "identidades_externas_usuario_id_usuarios_id_fk",
+          "tableFrom": "identidades_externas",
+          "columnsFrom": [
+            "usuario_id"
+          ],
+          "tableTo": "usuarios",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "identidades_externas_tenant_id_tenants_id_fk": {
+          "name": "identidades_externas_tenant_id_tenants_id_fk",
+          "tableFrom": "identidades_externas",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "identidades_externas_proveedor_id_unica": {
+          "name": "identidades_externas_proveedor_id_unica",
+          "columns": [
+            "proveedor",
+            "id_en_proveedor"
+          ],
+          "nullsNotDistinct": false
+        }
+      },
+      "policies": {
+        "identidades_externas_acceso_backend": {
+          "name": "identidades_externas_acceso_backend",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "true",
+          "withCheck": "true"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.usuarios": {
+      "name": "usuarios",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "usuarios_tenant_id_tenants_id_fk": {
+          "name": "usuarios_tenant_id_tenants_id_fk",
+          "tableFrom": "usuarios",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "usuarios_aislamiento_tenant": {
+          "name": "usuarios_aislamiento_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"usuarios\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid",
+          "withCheck": "\"usuarios\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.asientos": {
+      "name": "asientos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "movimiento_id": {
+          "name": "movimiento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cuenta_id": {
+          "name": "cuenta_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "monto_valor_minimo": {
+          "name": "monto_valor_minimo",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "moneda": {
+          "name": "moneda",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "asientos_tenant_id_tenants_id_fk": {
+          "name": "asientos_tenant_id_tenants_id_fk",
+          "tableFrom": "asientos",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "asientos_movimiento_id_movimientos_id_fk": {
+          "name": "asientos_movimiento_id_movimientos_id_fk",
+          "tableFrom": "asientos",
+          "columnsFrom": [
+            "movimiento_id"
+          ],
+          "tableTo": "movimientos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "asientos_cuenta_id_cuentas_id_fk": {
+          "name": "asientos_cuenta_id_cuentas_id_fk",
+          "tableFrom": "asientos",
+          "columnsFrom": [
+            "cuenta_id"
+          ],
+          "tableTo": "cuentas",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "asientos_aislamiento_tenant": {
+          "name": "asientos_aislamiento_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"asientos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid",
+          "withCheck": "\"asientos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.cuentas": {
+      "name": "cuentas",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "cuentas_tenant_id_tenants_id_fk": {
+          "name": "cuentas_tenant_id_tenants_id_fk",
+          "tableFrom": "cuentas",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "cuentas_aislamiento_tenant": {
+          "name": "cuentas_aislamiento_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"cuentas\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid",
+          "withCheck": "\"cuentas\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid"
+        }
+      },
+      "checkConstraints": {
+        "cuentas_tipo_valido": {
+          "name": "cuentas_tipo_valido",
+          "value": "\"cuentas\".\"tipo\" in ('periodo','meta','efectivo','banco','tarjeta')"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.movimientos": {
+      "name": "movimientos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "moneda": {
+          "name": "moneda",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_efectiva": {
+          "name": "fecha_efectiva",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_registro": {
+          "name": "fecha_registro",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "nota": {
+          "name": "nota",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "movimiento_revertido_id": {
+          "name": "movimiento_revertido_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "movimientos_tenant_id_tenants_id_fk": {
+          "name": "movimientos_tenant_id_tenants_id_fk",
+          "tableFrom": "movimientos",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "movimientos_movimiento_revertido_id_movimientos_id_fk": {
+          "name": "movimientos_movimiento_revertido_id_movimientos_id_fk",
+          "tableFrom": "movimientos",
+          "columnsFrom": [
+            "movimiento_revertido_id"
+          ],
+          "tableTo": "movimientos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "movimientos_aislamiento_tenant": {
+          "name": "movimientos_aislamiento_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"movimientos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid",
+          "withCheck": "\"movimientos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid"
+        }
+      },
+      "checkConstraints": {
+        "movimientos_tipo_valido": {
+          "name": "movimientos_tipo_valido",
+          "value": "\"movimientos\".\"tipo\" in ('ingreso','gasto','arrastre_sobrante','aporte_meta','retiro_meta','reversion')"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.periodos": {
+      "name": "periodos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cuenta_id": {
+          "name": "cuenta_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "tipo": {
+          "name": "tipo",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "estado": {
+          "name": "estado",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'borrador'"
+        },
+        "fecha_inicio": {
+          "name": "fecha_inicio",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fecha_fin": {
+          "name": "fecha_fin",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "periodos_un_activo_por_tenant": {
+          "name": "periodos_un_activo_por_tenant",
+          "columns": [
+            {
+              "expression": "tenant_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "with": {},
+          "method": "btree",
+          "where": "estado = 'activo'",
+          "concurrently": false
+        }
+      },
+      "foreignKeys": {
+        "periodos_tenant_id_tenants_id_fk": {
+          "name": "periodos_tenant_id_tenants_id_fk",
+          "tableFrom": "periodos",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "periodos_cuenta_id_cuentas_id_fk": {
+          "name": "periodos_cuenta_id_cuentas_id_fk",
+          "tableFrom": "periodos",
+          "columnsFrom": [
+            "cuenta_id"
+          ],
+          "tableTo": "cuentas",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "periodos_aislamiento_tenant": {
+          "name": "periodos_aislamiento_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"periodos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid",
+          "withCheck": "\"periodos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid"
+        }
+      },
+      "checkConstraints": {
+        "periodos_tipo_valido": {
+          "name": "periodos_tipo_valido",
+          "value": "\"periodos\".\"tipo\" in ('quincenal')"
+        },
+        "periodos_estado_valido": {
+          "name": "periodos_estado_valido",
+          "value": "\"periodos\".\"estado\" in ('borrador','activo','cerrado','archivado')"
+        }
+      },
+      "isRLSEnabled": true
+    },
+    "public.ingresos": {
+      "name": "ingresos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "periodo_id": {
+          "name": "periodo_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "movimiento_id": {
+          "name": "movimiento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "ingresos_tenant_id_tenants_id_fk": {
+          "name": "ingresos_tenant_id_tenants_id_fk",
+          "tableFrom": "ingresos",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "ingresos_periodo_id_periodos_id_fk": {
+          "name": "ingresos_periodo_id_periodos_id_fk",
+          "tableFrom": "ingresos",
+          "columnsFrom": [
+            "periodo_id"
+          ],
+          "tableTo": "periodos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "ingresos_movimiento_id_movimientos_id_fk": {
+          "name": "ingresos_movimiento_id_movimientos_id_fk",
+          "tableFrom": "ingresos",
+          "columnsFrom": [
+            "movimiento_id"
+          ],
+          "tableTo": "movimientos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "ingresos_aislamiento_tenant": {
+          "name": "ingresos_aislamiento_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"ingresos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid",
+          "withCheck": "\"ingresos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    },
+    "public.gastos": {
+      "name": "gastos",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "tenant_id": {
+          "name": "tenant_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "periodo_id": {
+          "name": "periodo_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "movimiento_id": {
+          "name": "movimiento_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "creado_en": {
+          "name": "creado_en",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "gastos_tenant_id_tenants_id_fk": {
+          "name": "gastos_tenant_id_tenants_id_fk",
+          "tableFrom": "gastos",
+          "columnsFrom": [
+            "tenant_id"
+          ],
+          "tableTo": "tenants",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "gastos_periodo_id_periodos_id_fk": {
+          "name": "gastos_periodo_id_periodos_id_fk",
+          "tableFrom": "gastos",
+          "columnsFrom": [
+            "periodo_id"
+          ],
+          "tableTo": "periodos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        },
+        "gastos_movimiento_id_movimientos_id_fk": {
+          "name": "gastos_movimiento_id_movimientos_id_fk",
+          "tableFrom": "gastos",
+          "columnsFrom": [
+            "movimiento_id"
+          ],
+          "tableTo": "movimientos",
+          "columnsTo": [
+            "id"
+          ],
+          "onUpdate": "no action",
+          "onDelete": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {
+        "gastos_aislamiento_tenant": {
+          "name": "gastos_aislamiento_tenant",
+          "as": "PERMISSIVE",
+          "for": "ALL",
+          "to": [
+            "app_backend"
+          ],
+          "using": "\"gastos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid",
+          "withCheck": "\"gastos\".\"tenant_id\" = current_setting('app.tenant_id', true)::uuid"
+        }
+      },
+      "checkConstraints": {},
+      "isRLSEnabled": true
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "views": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

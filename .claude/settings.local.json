@@ -62,7 +62,11 @@
       "Bash(DATABASE_URL=\"postgresql://placeholder:placeholder@localhost:5432/placeholder\" npx drizzle-kit generate --custom --name=ingresos_inmutable)",
       "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5437/postgres\" npx drizzle-kit migrate)",
       "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5437/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
-      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check5/**)"
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check5/**)",
+      "Bash(DATABASE_URL=\"postgresql://placeholder:placeholder@localhost:5432/placeholder\" npx drizzle-kit generate --custom --name=gastos_inmutable)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5438/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5438/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check6/**)"
     ]
   }
 }
