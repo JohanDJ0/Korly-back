@@ -74,8 +74,9 @@ El periodo corriente. Acepta gastos, ingresos, aportes a metas. Único estado do
 ### Cerrado
 No acepta movimientos nuevos. Se generó el resumen inmutable. Pendiente: decisión del sobrante.
 
-- Si hay sobrante, la app solicita decidir: **ahorrar** o **arrastrar**.
+- Si hay sobrante **positivo**, la app solicita decidir: **ahorrar** o **arrastrar**.
 - Si el usuario no decide en N días, **default: arrastrar automáticamente** al siguiente periodo. Es la opción conservadora — el dinero permanece disponible, y no se toma una decisión financiera (mandarlo a ahorro) sin consentimiento explícito.
+- Si el sobrante es **negativo** (déficit — se gastó más de lo que ingresó en todo el periodo, no solo un día con sobregiro momentáneo) *(añadido en revisión, ver §6)*: **se arrastra automáticamente al periodo siguiente, sin pedir decisión al usuario.** No existe la opción "ahorrar" para un déficit — no tiene sentido enviar una deuda a una meta de ahorro. El mecanismo de arrastre es el mismo asiento `Periodo A → Periodo B` del catálogo de eventos (§4), solo que con monto negativo: el periodo siguiente inicia con ese déficit descontado de su disponible desde el día 1.
 
 **Transición a Archivado:** automática, tras resolver el sobrante y pasado un periodo de gracia.
 
@@ -92,6 +93,7 @@ Solo consulta histórica.
 | Periodo activo sin ingreso registrado | No bloquea captura de gastos. La cifra de disponible no se muestra como certera (ver §5) |
 | **Editar/borrar gasto del periodo activo** *(resuelto en revisión, ver §6)* | Permitido directo mientras el periodo siga activo — no requiere reversión, porque nada se ha cerrado todavía |
 | **Segundo periodo creado mientras uno sigue activo** *(resuelto en revisión, ver §6)* | Rechazado explícitamente por invariante 9. El nuevo periodo queda en Borrador hasta que el activo cierre |
+| **Periodo cierra con saldo negativo (déficit)** *(resuelto en revisión, ver §6)* | Arrastre automático al siguiente periodo, sin ofrecer "ahorrar". El disponible del periodo siguiente nace ya descontado |
 
 ---
 
@@ -152,6 +154,7 @@ Tres preguntas surgieron al releer el modelo completo. Dos ya tienen resolución
 **Resueltas e incorporadas:**
 - *Edición de un gasto dentro del periodo activo* (no cerrado) no estaba cubierta — solo se había definido el caso de periodo cerrado. Se resuelve permitiendo edición directa mientras el periodo siga activo: no hay snapshot que proteger todavía.
 - *Qué pasa si se intenta crear un segundo periodo mientras uno está activo* no estaba explícito, solo implícito en la invariante 9. Se agregó como invariante 10 y como fila en la tabla de casos límite.
+- *Qué pasa si un periodo cierra con saldo negativo (déficit real, no solo sobregiro momentáneo dentro del periodo)*. Detectado durante la revisión de la implementación del módulo de gastos, al verificar que el sobregiro probado por los tests correspondía al comportamiento correcto dentro del periodo activo — surgió la pregunta de qué pasa al cierre. El modelo original de decisión de sobrante (§3) solo contemplaba montos positivos. Se resuelve arrastrando el déficit automáticamente, sin ofrecer la opción "ahorrar" (no aplica a una deuda).
 
 **Resuelta:**
 
