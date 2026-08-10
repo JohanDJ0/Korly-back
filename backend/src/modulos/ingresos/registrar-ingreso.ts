@@ -1,3 +1,4 @@
+import { and, eq } from 'drizzle-orm';
 import { ingresos } from '../../db/schema/ingresos.js';
 import { registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
@@ -62,5 +63,24 @@ export async function registrarIngreso(entrada: RegistrarIngresoEntrada): Promis
     if (!ingreso) throw new Error('No se pudo registrar el ingreso');
 
     return { id: ingreso.id, movimientoId };
+  });
+}
+
+/**
+ * Usado por el motor de flujo de caja (modelo-dominio.md §5) para
+ * decidir el estado `sin_ingreso`: un periodo sin ningún ingreso
+ * registrado no muestra una cifra de disponible como si fuera cierta,
+ * aunque ya tenga gastos. No importa el monto acumulado, solo si existe
+ * al menos una fila — de ahí que no haga falta traer más que el id.
+ */
+export async function existeIngresoParaPeriodo(tenantId: string, periodoId: string): Promise<boolean> {
+  return conTenant(tenantId, async (tx) => {
+    const [fila] = await tx
+      .select({ id: ingresos.id })
+      .from(ingresos)
+      .where(and(eq(ingresos.tenantId, tenantId), eq(ingresos.periodoId, periodoId)))
+      .limit(1);
+
+    return fila !== undefined;
   });
 }

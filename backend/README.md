@@ -21,6 +21,11 @@ ledger en una sola transacción.
 invertido. No requirió ningún cambio en el ledger — las variantes `Tx`
 que forzó ingresos ya alcanzaban.
 
+**Punto 6 — disponible:** el motor de flujo de caja (modelo-dominio.md
+§5), puramente de lectura. No agrega tablas ni requirió variantes `Tx`
+nuevas — compone `obtenerPeriodoActivo`, `existeIngresoParaPeriodo` y
+`obtenerSaldoCuenta` tal cual ya existían.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -211,6 +216,20 @@ lo detecte todavía — no hay cron ni cálculo perezoso de cierre. Tampoco
 existe resolución a la zona horaria IANA del usuario (CLAUDE.md): "hoy"
 es la fecha de calendario UTC del servidor.
 
+**Dónde debe vivir la resolución perezoso del cierre (importante para
+cuando se construya el módulo de cierre):** según ADR-004, el cálculo
+perezoso significa que al consultar el periodo activo y encontrar que
+su `fechaFin` ya pasó, el sistema debe reconocerlo y cerrarlo en ese
+momento — no seguir sirviendo cifras de un periodo que ya terminó en
+la realidad. Esa lógica pertenece a **este módulo** (probablemente
+dentro de `obtenerPeriodoActivo`/`obtenerPeriodoActivoTx`: un periodo
+con `fechaFin` pasada nunca debería devolverse como `'activo'`), no al
+módulo de disponible. Ver la nota correspondiente en la sección
+"Disponible" más abajo: el tope de "mínimo 1 día" que vive ahí hoy es
+un parche temporal exactamente por esta ausencia, y debería volverse
+redundante (defensa en profundidad, no el mecanismo principal) una vez
+que este módulo resuelva el cierre perezoso de verdad.
+
 ## Ingresos
 
 `src/db/schema/ingresos.ts` define `ingresos`.
@@ -270,6 +289,85 @@ módulo de categorías no existe todavía y agregar una columna sin tabla
 real a la que apuntar sería peor que omitirla. Se agrega cuando ese
 módulo exista.
 
+## Disponible (el motor de flujo de caja)
+
+`src/modulos/disponible/motor-flujo-caja.ts` tiene la matemática pura
+de modelo-dominio.md §5 (`calcularDiasRestantes`, `pisoDivisionBigInt`)
+— sin base de datos, probada en `test/unidad/motor-flujo-caja.test.ts`.
+`src/modulos/disponible/consultar-disponible.ts` la junta con periodos
+e ingresos/ledger: `consultarDisponible(tenantId, fechaReferencia?)`.
+
+No agrega tablas ni columnas — es puramente de lectura sobre lo que ya
+existe, y **no persiste nada en ningún lado**: cada llamada vuelve a
+leer el periodo activo, vuelve a comprobar si hay al menos un ingreso,
+y vuelve a sumar los asientos del ledger para el saldo. No corre dentro
+de una única transacción a propósito (a diferencia de
+`registrarIngreso`/`registrarGasto`, donde la atomicidad protege una
+escritura real): una pequeña discrepancia entre lecturas si algo se
+escribe a mitad de la consulta no es un bug para un número que el
+propio modelo de dominio define como recalculado en cada consulta.
+`test/integracion/disponible.test.ts` lo prueba en vivo: dos consultas
+con la misma fecha y sin escrituras de por medio dan el mismo
+resultado; una consulta después de registrar un gasto nuevo cambia de
+inmediato, sin que nada quede cacheado entre medio.
+
+Cuatro puntos que pedían verificación explícita, no solo "no truena":
+
+- **`sin_ingreso` no es un `$0` disfrazado.** Si el periodo activo no
+  tiene ningún ingreso registrado (aunque ya tenga gastos), la función
+  devuelve `{ estado: 'sin_ingreso', periodoId, calculadoEn }` — sin
+  `disponibleValorMinimo` ni `cifraDiariaValorMinimo` en absoluto (el
+  tipo `Disponible` es una unión discriminada que los excluye a nivel
+  de TypeScript, no solo los deja en `0`). Dos tests: sin ningún
+  movimiento, y con un gasto ya registrado pero sin ingreso.
+- **El piso (floor), no un truncado hacia cero.** El operador `/` de
+  `bigint` en JS trunca hacia cero, que **no es lo mismo** que el piso
+  matemático para negativos: `-5000n / 7n` da `-714n` truncado, pero el
+  piso real de `-714.285...` es `-715n`. Si hubiera usado el operador
+  nativo sin corrección, un sobregiro se habría **subestimado**.
+  `pisoDivisionBigInt` corrige explícitamente ese caso, probado en
+  unidad (`3000n/7n` → `428n`, no `429n`; `-5000n/7n` → `-715n`, no
+  `-714n`) y en integración con montos reales vía `consultarDisponible`.
+- **El `+1` en el último día, probado con el caso exacto.** No "no
+  truena en el último día" — un test crea un periodo, registra un
+  ingreso, y consulta exactamente con `fechaReferencia = fechaFin`,
+  afirmando `diasRestantes === 1`.
+- **Nunca almacenado, confirmado por código y por comportamiento.** Por
+  código: `grep -i "disponible\|saldo" src/db/schema/` no encuentra
+  ninguna columna, solo comentarios — no hay dónde guardarlo aunque
+  quisiera. Por comportamiento: los dos tests de la sección anterior.
+
+**Extensión propia, fuera de lo que especifica el modelo de dominio —
+y con fecha de caducidad conocida.** Si "hoy" ya pasó `fechaFin`
+(el periodo debería estar cerrado, pero el módulo de cierre no existe
+todavía), `calcularDiasRestantes` no deja que el resultado baje de 1 en
+vez de dividir entre cero o un negativo. Es la lectura más conservadora
+mientras no exista cierre automático — documentado y probado como lo
+que es: una decisión mía llenando un hueco, no algo que ADR-004 o
+modelo-dominio.md resuelvan directamente.
+
+**Por qué el parche está aquí y no en periodos, y qué debe pasar
+después (revisado explícitamente):** el lugar correcto para resolver
+un periodo vencido no cerrado es la capa de **periodos**, no esta. Por
+ADR-004, el cálculo perezoso significa que al consultar el periodo
+activo y encontrar que su `fechaFin` ya pasó, el sistema debe
+reconocerlo y cerrarlo ahí mismo — no seguir sirviendo cifras de un
+periodo que ya terminó en la realidad. Esa lógica no existe todavía en
+`obtenerPeriodoActivo` (solo cubre borrador → activo, ver la sección
+"Periodos" de arriba), así que este tope de 1 día es el parche correcto
+**mientras tanto**, no la solución. Cuando se construya el módulo de
+cierre y la resolución perezosa viva en `obtenerPeriodoActivo` (un
+periodo con `fechaFin` pasada nunca debería devolverse como
+`'activo'`), este tope **debería volverse redundante en el camino
+normal** — `disponible` nunca debería recibir un periodo vencido de
+`obtenerPeriodoActivo` una vez que eso exista. En ese punto el tope
+puede quedarse como salvaguarda defensiva (cinturón y tirantes, mismo
+espíritu que el `tenantId` redundante en `obtenerPeriodoPorIdTx`), pero
+ya no como el mecanismo que evita la división por cero en la práctica.
+Si al construir cierre este tope sigue siendo necesario para que algo
+pase las pruebas, es una señal de que la resolución perezosa de
+periodos no quedó bien resuelta ahí.
+
 ## Qué valida este punto
 
 - El backend nunca usa el `id` de Supabase Auth como `usuario_id` de
@@ -298,9 +396,16 @@ módulo exista.
 - Un gasto se comporta igual que un ingreso en validación y
   aislamiento, con el efecto contrario en el saldo, y sin bloquear el
   sobregiro (modelo-dominio.md §5).
+- El motor de flujo de caja nunca inventa una cifra sobre datos
+  incompletos (`sin_ingreso` es un estado real, no un `$0`), redondea
+  siempre hacia el piso matemático incluso en sobregiro, cuenta el
+  último día del periodo como 1 día y no 0, y no almacena ni cachea
+  nada — cada consulta es un recálculo completo.
 
 ## Qué falta (siguientes puntos)
 
-Disponible, cierre — ver el orden de construcción acordado en la
-conversación de diseño. Periodos y ledger todavía no tienen endpoints
-HTTP: los expondrán esos módulos.
+Cierre de periodo (transición activo → cerrado, resumen inmutable,
+decisión de sobrante, incluyendo el arrastre automático de déficit
+documentado en modelo-dominio.md §3) — ver el orden de construcción
+acordado en la conversación de diseño. Ningún módulo tiene endpoints
+HTTP todavía: eso llega en el último punto del walking skeleton.
