@@ -15,3 +15,17 @@ export class ErrorDominio extends Error {
     this.name = 'ErrorDominio';
   }
 }
+
+/**
+ * Código `23505` de Postgres (`unique_violation`). Usado por los
+ * find-or-create con reintento por `SAVEPOINT` (crearPeriodo,
+ * materializar-arrastre.ts) para distinguir "otra transacción concurrente
+ * ganó la carrera" de cualquier otro error real. El driver no envuelve
+ * el error de la misma forma según el camino (`tx.insert().values()` vs
+ * `tx.execute(sql\`...\`)`), de ahí el doble chequeo en `.code` y
+ * `.cause.code`.
+ */
+export function esViolacionDeIndiceUnico(error: unknown): boolean {
+  const codigo = (error as { code?: string; cause?: { code?: string } })?.code ?? (error as { cause?: { code?: string } })?.cause?.code;
+  return codigo === '23505';
+}

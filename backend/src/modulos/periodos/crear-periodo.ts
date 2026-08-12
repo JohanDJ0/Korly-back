@@ -1,8 +1,10 @@
 import { and, eq } from 'drizzle-orm';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
 import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
+import { reclamarArrastresTx } from '../cierre/materializar-arrastre.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
+import { esViolacionDeIndiceUnico } from '../../shared/errores.js';
 import { calcularQuincenaDeCalendario } from './calcular-quincena.js';
 
 export interface Periodo {
@@ -55,20 +57,33 @@ export async function crearPeriodo(
     const valoresBase = { tenantId, cuentaId: cuenta.id, tipo, fechaInicio, fechaFin };
 
     if (estadoDeseado === 'borrador') {
+      // Un periodo en borrador no es "el periodo siguiente" todavía —
+      // no reclama arrastres pendientes. Los reclama el que sí llegue a
+      // activo (hoy no hay mecanismo que promueva un borrador a activo
+      // cuando el bloqueante cierra; ver README, "Qué falta").
       return insertarPeriodo(tx, { ...valoresBase, estado: 'borrador' });
     }
 
+    let periodoCreado: Periodo;
     try {
       // SAVEPOINT: si el índice único parcial rechaza este insert por una
       // carrera, hace rollback solo hasta aquí — la cuenta creada arriba,
       // en la transacción exterior, sobrevive.
-      return await tx.transaction((tx2) => insertarPeriodo(tx2, { ...valoresBase, estado: 'activo' }));
+      periodoCreado = await tx.transaction((tx2) => insertarPeriodo(tx2, { ...valoresBase, estado: 'activo' }));
     } catch (error) {
       if (esViolacionDeIndiceUnico(error)) {
         return insertarPeriodo(tx, { ...valoresBase, estado: 'borrador' });
       }
       throw error;
     }
+
+    // Fuera del try/catch de arriba a propósito: si esto falla, no debe
+    // interpretarse como "perdí la carrera del periodo activo" y caer a
+    // borrador — el periodo ya se creó como activo. Un error aquí debe
+    // abortar toda la operación (se revierte junto con todo lo demás).
+    await reclamarArrastresTx(tx, tenantId, periodoCreado.id, periodoCreado.cuentaId, fechaReferencia);
+
+    return periodoCreado;
   });
 }
 
@@ -143,9 +158,4 @@ async function insertarPeriodo(
   const [periodo] = await tx.insert(periodos).values(valores).returning(COLUMNAS_PERIODO);
   if (!periodo) throw new Error('No se pudo crear el periodo');
   return { ...periodo, estado: periodo.estado as EstadoPeriodo };
-}
-
-function esViolacionDeIndiceUnico(error: unknown): boolean {
-  const codigo = (error as { code?: string; cause?: { code?: string } })?.code ?? (error as { cause?: { code?: string } })?.cause?.code;
-  return codigo === '23505';
 }

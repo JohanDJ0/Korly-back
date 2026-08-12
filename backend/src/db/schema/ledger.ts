@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, date, pgPolicy, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { bigint, check, date, pgPolicy, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { appBackend } from './roles.js';
 import { tenants } from './tenants.js';
 
@@ -15,7 +15,15 @@ import { tenants } from './tenants.js';
 // CHECK en la base de datos (abajo) además del tipo de TypeScript; son
 // pocos valores y cambian raramente, así que se aceptan duplicados entre
 // ambos en vez de generar uno desde el otro.
-export const TIPOS_CUENTA = ['periodo', 'meta', 'efectivo', 'banco', 'tarjeta'] as const;
+// 'arrastre_pendiente' agregado por el módulo de cierre (ver
+// modulos/cierre/materializar-arrastre.ts): la cuenta de tránsito por
+// tenant que recibe el sobrante/déficit al cerrar un periodo, hasta que
+// el periodo siguiente lo reclama. A diferencia de la contraparte
+// "externa" (modelada como cuentaId NULL, ver comentario en `asientos`
+// abajo), esta cuenta sí tiene un saldo real y consultable, así que
+// necesita existir como fila — nombrada según el vocabulario del
+// dominio (decisionSobrante, no una metáfora de infraestructura).
+export const TIPOS_CUENTA = ['periodo', 'meta', 'efectivo', 'banco', 'tarjeta', 'arrastre_pendiente'] as const;
 export type TipoCuenta = (typeof TIPOS_CUENTA)[number];
 
 export const TIPOS_MOVIMIENTO = [
@@ -39,7 +47,13 @@ export const cuentas = pgTable(
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
-    check('cuentas_tipo_valido', sql`${t.tipo} in ('periodo','meta','efectivo','banco','tarjeta')`),
+    check('cuentas_tipo_valido', sql`${t.tipo} in ('periodo','meta','efectivo','banco','tarjeta','arrastre_pendiente')`),
+    // Invariante análoga a "un periodo activo por tenant" (periodos.ts):
+    // como máximo una cuenta de arrastre pendiente por tenant. Defensa
+    // en profundidad contra una carrera en el find-or-create de
+    // materializar-arrastre.ts (mismo patrón de SAVEPOINT + reintento
+    // que ya usa crearPeriodo).
+    uniqueIndex('cuentas_una_arrastre_pendiente_por_tenant').on(t.tenantId).where(sql`tipo = 'arrastre_pendiente'`),
     pgPolicy('cuentas_aislamiento_tenant', {
       for: 'all',
       to: appBackend,

@@ -32,6 +32,10 @@ inmutable, y decisión del sobrante (positivo: `ahorrar`/`arrastrar`;
 déficit: automático). No tocó el mecanismo de reversión de ADR-001 —
 el arrastre es un movimiento hacia adelante, no una corrección.
 
+**Punto 8 — arrastre:** materializa de verdad el sobrante/déficit
+decidido como `arrastrar`, vía una cuenta `arrastre_pendiente` por
+tenant. Cierra el compromiso explícito dejado en el punto 7.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -437,17 +441,89 @@ incluyendo un `UPDATE` que deje `decisionSobrante` sin tocar (todavía
 comparar solo `new <> old` no distingue "sigue pendiente" de "volvió a
 pendiente" cuando ninguna de las dos cambió el valor.
 
-**Sin materializar el arrastre — próximo paso explícito, no un "algún
-día".** `decisionSobrante='arrastrado'` registra la decisión; el
-dinero no se mueve todavía a ninguna cuenta. El ciclo declarado
-termina en "...cerrar periodo → decidir sobrante", no en "crear el
-periodo siguiente y confirmar que heredó el arrastre". Moverlo de
-verdad sin violar la invariante 5 ("un periodo cerrado no cambia de
-saldo nunca") requiere una **cuenta puente por tenant** que reciba el
-arrastre al cerrar y lo entregue al periodo siguiente cuando se cree —
-pieza de arquitectura nueva, deliberadamente no diseñada todavía.
-**La siguiente entrega después de este punto es exactamente esa
-conexión, no otra parte del skeleton.**
+**Materialización del arrastre: resuelta en el punto 8.**
+`decisionSobrante='arrastrado'` solo registraba la decisión; el dinero
+no se movía todavía a ninguna cuenta. Ver la sección "Arrastre" más
+abajo para el mecanismo completo.
+
+## Arrastre (cuenta `arrastre_pendiente`)
+
+```
+src/db/schema/arrastres.ts                       # arrastres: rastrea cada arrastre desde que se drena hasta que se reclama
+src/modulos/cierre/materializar-arrastre.ts       # drenarACuentaPuenteTx, reclamarArrastresTx
+```
+
+**El problema que resuelve, en una frase:** la invariante 5 ("un
+periodo cerrado no cambia de saldo nunca") es literal — si se espera a
+que exista el periodo siguiente para recién ahí sacar el dinero de la
+cuenta del periodo que cerró, eso *es* modificar el saldo de un
+periodo cerrado, sin importar cuánto tiempo haya pasado. La única
+forma de cumplirla es drenar esa cuenta **en el mismo instante de
+cerrar**, como parte de esa transacción — hacia una cuenta puente por
+tenant (`'arrastre_pendiente'`, nuevo valor en `TIPOS_CUENTA` de
+`db/schema/ledger.ts`; a diferencia de la contraparte "externa",
+modelada como `cuentaId NULL`, esta cuenta sí tiene saldo real y
+consultable, así que necesita existir como fila). `drenarACuentaPuenteTx`
+se llama desde `cerrarYGenerarResumenTx` (`cierre/cerrar-periodo.ts`),
+en la misma transacción que marca `estado='cerrado'` y genera el
+resumen — no en una operación aparte.
+
+**Dónde está el dinero en cada momento, sin ventana de "en ningún
+lado":** son dos transacciones atómicas independientes, no una que
+cruce ambos periodos. Antes de cerrar, el dinero está en la cuenta del
+periodo que cierra. Al cerrar (una transacción), se mueve a la cuenta
+`arrastre_pendiente` del tenant. Ahí puede quedarse indefinidamente —
+no tiene fecha límite, a diferencia del default de 7 días de la
+*decisión* de sobrante, que es un asunto de UX, no de dónde vive el
+dinero. Al crear el periodo siguiente (otra transacción, independiente
+de la primera), se mueve de ahí a la cuenta del periodo nuevo. Si el
+proceso se interrumpe a mitad de cualquiera de las dos transacciones,
+Postgres la revierte completa — no hay estado parcial posible. Si se
+interrumpe *entre* las dos, el dinero sigue en la cuenta puente,
+contabilizado, esperando.
+
+**Por qué no basta con que el periodo nuevo reclame todo el saldo de
+la cuenta puente sin más.** Esto casi se coló en el diseño: si
+`crearPeriodo` reclamara *todo* el saldo puente sin condición, eso
+adelantaría la decisión de sobrante — un sobrante todavía `'pendiente'`
+aparecería ya disponible en el periodo nuevo, y si el usuario luego
+elige `'ahorrar'` (cuando exista Metas), ese dinero nunca debió estar
+ahí. Por eso existe la tabla `arrastres`: cada arrastre se rastrea
+individualmente (de qué resumen viene, si ya se reclamó), y
+`reclamarArrastresTx` solo reclama los que su resumen ya tiene
+decididos como `'arrastrado'` — nunca los `'pendiente'`. Reclama todos
+los elegibles, no solo el más reciente: si el usuario se saltó crear
+un periodo por un tiempo, o decidió el sobrante de un periodo viejo
+después de que ya existía uno nuevo, pueden acumularse varios;
+`test/integracion/arrastre.test.ts` prueba exactamente ese caso.
+
+**Filtro explícito por tenant, no solo RLS (mismo criterio que
+`periodoId` en ingresos/gastos).** La consulta de arrastres elegibles
+en `reclamarArrastresTx` lleva `tenantId` en el `WHERE`, y el `UPDATE`
+que reserva cada arrastre (evita que dos transacciones concurrentes lo
+reclamen dos veces) también. Probado con un caso concreto, no
+asumido: un tenant con un déficit arrastrado, y otro tenant creando su
+propio periodo — el saldo del periodo nuevo del segundo tenant nunca
+incluye el déficit del primero.
+
+**Reutilización, no invención.** El find-or-create de la cuenta puente
+usa el mismo `SAVEPOINT` + reintento que `crearPeriodo` ya usaba para
+"un periodo activo por tenant" (mismo índice único parcial, esta vez
+`cuentas_una_arrastre_pendiente_por_tenant`). El reclamo usa el mismo
+patrón de `UPDATE ... WHERE ... IS NULL` con chequeo de fila afectada
+que ya usaba `decidirSobrante`. `esViolacionDeIndiceUnico` y
+`fechaISO`, usadas por tercera vez entre módulos, se promovieron a
+`shared/errores.ts` y `shared/fechas.ts` en vez de duplicarse otra vez.
+
+**Gap descubierto de paso, no de este punto: sin promoción de
+borrador a activo.** Si el periodo B se crea en `'borrador'` (porque A
+seguía activo) y luego A cierra, nada promueve a B a `'activo'` — solo
+`crearPeriodo` puede activar un periodo, y B ya existe. Por eso
+`reclamarArrastresTx` no se llama para un periodo creado en
+`'borrador'`: no sería "el periodo siguiente" todavía en ningún
+sentido funcional. No es un bug de este punto, es un hueco preexistente
+del módulo de periodos que quedó más visible al construir esto — sin
+resolver, anotado abajo.
 
 ## Qué valida este punto
 
@@ -488,17 +564,26 @@ conexión, no otra parte del skeleton.**
   sobrante, una vez). Un déficit se arrastra sin pedir permiso; un
   sobrante positivo se resuelve por decisión explícita o, en su
   ausencia, por el default de 7 días.
+- El sobrante o déficit de un periodo cerrado nunca queda "en ningún
+  lado": se drena a la cuenta `arrastre_pendiente` del tenant en el
+  mismo instante de cerrar, y el periodo siguiente solo reclama lo que
+  ya está decidido como `arrastrar` — nunca adelanta una decisión
+  pendiente, y nunca cruza al periodo nuevo de otro tenant.
 
 ## Qué falta
 
-**Próximo paso inmediato (comprometido explícitamente, no un "algún
-día"): conectar cierre con la creación del siguiente periodo.**
-Diseñar e implementar la cuenta puente que materializa el arrastre
-(ver "Cierre" arriba) — antes de avanzar a cualquier otra parte del
-skeleton.
+**Sin promoción de borrador a activo** (descubierto al construir el
+punto 8, ver "Arrastre" arriba): si un periodo queda en `'borrador'`
+porque otro seguía activo, y ese otro cierra, nada lo asciende a
+`'activo'` — solo `crearPeriodo` activa un periodo, y el que está en
+borrador ya existe. En la práctica no bloquea el ciclo del walking
+skeleton (el usuario puede simplemente crear un periodo nuevo, que sí
+se activará), pero es un estado que puede quedar huérfano.
 
-Después de eso: ingresos/gastos retroactivos y edición sobre periodo
-cerrado (requiere el mecanismo de reversión de ADR-001, todavía sin
-tocar), metas de ahorro (para activar `'ahorrar'` en la decisión de
-sobrante), y finalmente la capa HTTP que expone todo esto como la API
-de openapi.yaml — ningún módulo tiene endpoints todavía.
+Después: ingresos/gastos retroactivos y edición sobre periodo cerrado
+(requiere el mecanismo de reversión de ADR-001, todavía sin tocar),
+metas de ahorro (para activar `'ahorrar'` en la decisión de sobrante,
+y para que `reclamarArrastresTx` sepa qué hacer con un arrastre
+decidido como `'ahorrado'`), y finalmente la capa HTTP que expone todo
+esto como la API de openapi.yaml — ningún módulo tiene endpoints
+todavía.

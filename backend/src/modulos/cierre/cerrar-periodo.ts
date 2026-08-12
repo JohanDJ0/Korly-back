@@ -2,8 +2,10 @@ import { and, eq } from 'drizzle-orm';
 import { periodos } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
+import { fechaISO } from '../../shared/fechas.js';
 import { resolverDecisionesVencidasTx } from './decidir-sobrante.js';
 import { generarResumenTx, obtenerResumenTx, type ResumenGenerado } from './generar-resumen.js';
+import { drenarACuentaPuenteTx } from './materializar-arrastre.js';
 
 /**
  * Default del barrido de sobrante pendiente (modelo-dominio.md §3).
@@ -79,6 +81,18 @@ export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fecha
   await resolverDecisionesVencidasTx(tx, tenantId, DIAS_DEFAULT_ARRASTRE, fechaReferencia);
 }
 
+/**
+ * Marca el periodo cerrado, genera su resumen, Y drena el sobrante (o
+ * déficit) hacia la cuenta `arrastre_pendiente` del tenant — las tres
+ * cosas en la misma transacción, porque son un solo evento de negocio
+ * ("cerrar") visto desde tres tablas distintas. El drenado ocurre aquí
+ * y solo aquí, nunca después: es la única forma de mover dinero fuera
+ * de la cuenta de un periodo cerrado sin violar la invariante 5 ("un
+ * periodo cerrado no cambia de saldo nunca") — si esperáramos a que
+ * exista el periodo siguiente para drenar, estaríamos modificando el
+ * saldo de un periodo ya cerrado después de cerrado. Ver
+ * modulos/cierre/materializar-arrastre.ts para el resto del mecanismo.
+ */
 async function cerrarYGenerarResumenTx(
   tx: Ejecutor,
   tenantId: string,
@@ -87,12 +101,7 @@ async function cerrarYGenerarResumenTx(
   fechaReferencia: Date
 ): Promise<ResumenGenerado> {
   await tx.update(periodos).set({ estado: 'cerrado' }).where(eq(periodos.id, periodoId));
-  return generarResumenTx(tx, tenantId, periodoId, cuentaId, fechaReferencia);
-}
-
-function fechaISO(fecha: Date): string {
-  const anio = fecha.getUTCFullYear();
-  const mes = String(fecha.getUTCMonth() + 1).padStart(2, '0');
-  const dia = String(fecha.getUTCDate()).padStart(2, '0');
-  return `${anio}-${mes}-${dia}`;
+  const resumen = await generarResumenTx(tx, tenantId, periodoId, cuentaId, fechaReferencia);
+  await drenarACuentaPuenteTx(tx, tenantId, resumen, cuentaId, fechaReferencia);
+  return resumen;
 }

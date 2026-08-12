@@ -8,6 +8,7 @@ import { periodos } from '../../src/db/schema/periodos.js';
 import { ingresos } from '../../src/db/schema/ingresos.js';
 import { gastos } from '../../src/db/schema/gastos.js';
 import { resumenes } from '../../src/db/schema/cierre.js';
+import { arrastres } from '../../src/db/schema/arrastres.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { crearCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
@@ -158,6 +159,28 @@ describe('aislamiento por tenant (RLS)', () => {
     const resumenB = await cerrarPeriodoManualmente(identidadB.tenantId, periodoB.id, new Date('2026-08-10T00:00:00Z'));
 
     const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(resumenes).where(eq(resumenes.id, resumenB.id)));
+
+    expect(filas).toHaveLength(0);
+  });
+
+  it('un tenant no puede leer el arrastre de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-arrastre-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-arrastre-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarGasto({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 500n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+    });
+    // Déficit: arrastrado automático, genera una fila en arrastres al cerrar.
+    await cerrarPeriodoManualmente(identidadB.tenantId, periodoB.id, new Date('2026-08-10T00:00:00Z'));
+
+    const filas = await conTenant(identidadA.tenantId, (tx) =>
+      tx.select().from(arrastres).where(eq(arrastres.periodoOrigenId, periodoB.id))
+    );
 
     expect(filas).toHaveLength(0);
   });

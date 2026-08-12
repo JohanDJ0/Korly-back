@@ -81,7 +81,13 @@
       "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check9/**)",
       "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5442/postgres\" npx drizzle-kit migrate)",
       "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5442/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
-      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-final/**)"
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-final/**)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5443/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5443/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-arrastre/**)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5444/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5444/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-finalcheck/**)"
     ]
   }
 }
