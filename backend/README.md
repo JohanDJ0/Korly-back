@@ -36,6 +36,12 @@ el arrastre es un movimiento hacia adelante, no una corrección.
 decidido como `arrastrar`, vía una cuenta `arrastre_pendiente` por
 tenant. Cierra el compromiso explícito dejado en el punto 7.
 
+**Punto 9 — promoción de borrador:** un periodo en `'borrador'` ahora
+sí transiciona a `'activo'` cuando le toca (modelo-dominio.md §3), en
+vez de quedar huérfano para siempre. Con la condición estricta
+`fechaInicio <= hoy <= fechaFin`, no la literal "ya llegó su fecha de
+inicio" — ver esa sección para por qué.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -515,15 +521,56 @@ que ya usaba `decidirSobrante`. `esViolacionDeIndiceUnico` y
 `fechaISO`, usadas por tercera vez entre módulos, se promovieron a
 `shared/errores.ts` y `shared/fechas.ts` en vez de duplicarse otra vez.
 
-**Gap descubierto de paso, no de este punto: sin promoción de
-borrador a activo.** Si el periodo B se crea en `'borrador'` (porque A
-seguía activo) y luego A cierra, nada promueve a B a `'activo'` — solo
-`crearPeriodo` puede activar un periodo, y B ya existe. Por eso
-`reclamarArrastresTx` no se llama para un periodo creado en
-`'borrador'`: no sería "el periodo siguiente" todavía en ningún
-sentido funcional. No es un bug de este punto, es un hueco preexistente
-del módulo de periodos que quedó más visible al construir esto — sin
-resolver, anotado abajo.
+**Promoción de borrador a activo: resuelta, ver la siguiente
+sección.** Este punto detectó el hueco (si el periodo B se crea en
+`'borrador'` porque A seguía activo, y luego A cierra, nada promovía a
+B); se resolvió aparte porque tocaba tanto a periodos como a cierre.
+
+## Promoción de borrador a activo
+
+`modulos/cierre/cerrar-periodo.ts` → `promoverBorradorSiExisteTx`,
+llamada desde `resolverPendientesTx` cada vez que el tenant se queda
+sin periodo activo — tanto justo después de cerrar uno vencido en la
+misma operación, como cuando ya no había ninguno activo por otra razón
+(por ejemplo, tras `cerrarPeriodoManualmente`, que no promueve nada
+por sí mismo: sigue el mismo principio perezoso de todo lo demás,
+`test/integracion/promocion-borrador.test.ts` prueba ese orden
+explícitamente).
+
+**La condición es más estricta que "ya llegó su fecha de inicio".**
+Promueve solo si `fechaInicio <= hoy <= fechaFin` — la ventana del
+borrador contiene genuinamente hoy, no solo "ya empezó". Razón: con el
+mecanismo actual de `crearPeriodo` (deriva la quincena de `hoy`, y
+`openapi.yaml` prohíbe que el cliente especifique `fechaInicio` para
+quincenal), un borrador creado mientras otro periodo está activo
+**siempre termina con el mismo rango de fechas que ese activo** — no
+hay forma, bajo el contrato actual, de pedir "el periodo siguiente"
+mientras el actual sigue vigente. Si el chequeo fuera solo
+`fechaInicio <= hoy`, en el momento en que el periodo activo cierra
+(porque su `fechaFin` ya pasó), cualquier borrador duplicado suyo
+**también** tendría el `fechaFin` ya vencido — promoverlo lo activaría
+ya muerto, y el siguiente toque lo cerraría de inmediato generando un
+resumen sin actividad real. La condición estricta evita ese churn:
+promueve cuando genuinamente le toca, deja huérfano (sin tocar) cuando
+su ventana completa ya pasó sin haber sido usado.
+
+**El borrador promovido reclama arrastres pendientes**, igual que un
+periodo recién creado — si no lo hiciera, un usuario cuyo borrador se
+promueve no recibiría su arrastre decidido hasta que por casualidad se
+creara otro periodo después.
+
+**Más de un borrador candidato:** no hay restricción única sobre
+`estado = 'borrador'` (a diferencia de `'activo'`), así que pueden
+acumularse varios. Se promueve el de `fechaInicio` más próxima y, en
+empate, el más antiguo (`creadoEn`); los demás quedan como estaban —
+ver "Higiene de borradores" más abajo.
+
+**Cómo se probó una condición que hoy casi nunca se cumple en la
+práctica:** ya que `crearPeriodo` no puede producir un borrador con
+ventana futura genuina, los tests de este punto insertan el borrador
+directamente con las fechas que quieren ejercitar (bypaseando
+`crearPeriodo`), en vez de depender de que el mecanismo actual llegue
+a producir esa condición por sí solo.
 
 ## Qué valida este punto
 
@@ -569,18 +616,34 @@ resolver, anotado abajo.
   mismo instante de cerrar, y el periodo siguiente solo reclama lo que
   ya está decidido como `arrastrar` — nunca adelanta una decisión
   pendiente, y nunca cruza al periodo nuevo de otro tenant.
+- Un periodo en borrador transiciona a activo cuando le toca de verdad
+  (su ventana contiene hoy), tanto al cerrarse perezosamente el que lo
+  bloqueaba como al tocar el tenant después de un cierre manual — sin
+  activar uno cuya ventana ya quedó completamente atrás.
 
 ## Qué falta
 
-**Sin promoción de borrador a activo** (descubierto al construir el
-punto 8, ver "Arrastre" arriba): si un periodo queda en `'borrador'`
-porque otro seguía activo, y ese otro cierra, nada lo asciende a
-`'activo'` — solo `crearPeriodo` activa un periodo, y el que está en
-borrador ya existe. En la práctica no bloquea el ciclo del walking
-skeleton (el usuario puede simplemente crear un periodo nuevo, que sí
-se activará), pero es un estado que puede quedar huérfano.
+### Higiene de borradores, pendiente
 
-Después: ingresos/gastos retroactivos y edición sobre periodo cerrado
+Dos huecos de la misma familia (acumulación sin limpieza), agrupados
+a propósito para decidirlos juntos:
+
+- **Borradores huérfanos.** Un borrador cuya ventana completa ya pasó
+  sin haber sido promovido (ver "Promoción de borrador a activo")
+  queda así para siempre — nada lo limpia ni lo marca de otra forma.
+  No es peor que antes de este punto (donde ningún borrador se
+  promovía nunca), pero tampoco se resolvió.
+- **Sin prevención de duplicados en el origen.** `crearPeriodo` puede
+  seguir generando varios `'borrador'` para el mismo tenant (no hay
+  restricción única sobre ese estado, a diferencia de `'activo'`); la
+  promoción elige uno de forma determinista, pero no evita que se sigan
+  acumulando. Resolverlo en el origen (¿rechazar? ¿devolver el
+  borrador existente?) es una decisión de diseño aparte de "cómo
+  promuevo el que ya existe".
+
+### Después de eso
+
+Ingresos/gastos retroactivos y edición sobre periodo cerrado
 (requiere el mecanismo de reversión de ADR-001, todavía sin tocar),
 metas de ahorro (para activar `'ahorrar'` en la decisión de sobrante,
 y para que `reclamarArrastresTx` sepa qué hacer con un arrastre

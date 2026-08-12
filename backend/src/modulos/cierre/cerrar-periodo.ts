@@ -1,11 +1,11 @@
-import { and, eq } from 'drizzle-orm';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { periodos } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
 import { resolverDecisionesVencidasTx } from './decidir-sobrante.js';
 import { generarResumenTx, obtenerResumenTx, type ResumenGenerado } from './generar-resumen.js';
-import { drenarACuentaPuenteTx } from './materializar-arrastre.js';
+import { drenarACuentaPuenteTx, reclamarArrastresTx } from './materializar-arrastre.js';
 
 /**
  * Default del barrido de sobrante pendiente (modelo-dominio.md §3).
@@ -58,7 +58,8 @@ export async function cerrarPeriodoManualmente(
 
 /**
  * Resuelve, de forma perezosa, lo que quedó pendiente para este tenant:
- * cierra el periodo activo si su `fechaFin` ya pasó, y aplica el
+ * cierra el periodo activo si su `fechaFin` ya pasó, promueve un
+ * borrador en espera si ya no queda ningún periodo activo, y aplica el
  * default de arrastre a resúmenes con sobrante pendiente hace más de
  * `DIAS_DEFAULT_ARRASTRE` días. La llama `obtenerPeriodoActivoTx`/
  * `obtenerPeriodoPorIdTx` en modulos/periodos/crear-periodo.ts antes de
@@ -66,6 +67,13 @@ export async function cerrarPeriodoManualmente(
  * tenant, no algo que cada módulo consumidor tenga que recordar llamar
  * por separado (mismo principio que llevó a centralizar `app.tenant_id`
  * en un solo lugar, ADR-005).
+ *
+ * La promoción de borrador se evalúa siempre que no quede activo — no
+ * solo justo después de cerrar uno en esta misma llamada — para cubrir
+ * también al tenant que cerró su periodo manualmente
+ * (`cerrarPeriodoManualmente`, que no promueve nada por sí mismo,
+ * siguiendo el mismo principio perezoso: se resuelve en el siguiente
+ * toque real, no de forma eager dentro del cierre).
  */
 export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date = new Date()): Promise<void> {
   const [activo] = await tx
@@ -74,11 +82,54 @@ export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fecha
     .where(and(eq(periodos.tenantId, tenantId), eq(periodos.estado, 'activo')))
     .limit(1);
 
+  let hayActivo = activo !== undefined;
+
   if (activo && activo.fechaFin < fechaISO(fechaReferencia)) {
     await cerrarYGenerarResumenTx(tx, tenantId, activo.id, activo.cuentaId, fechaReferencia);
+    hayActivo = false;
+  }
+
+  if (!hayActivo) {
+    await promoverBorradorSiExisteTx(tx, tenantId, fechaReferencia);
   }
 
   await resolverDecisionesVencidasTx(tx, tenantId, DIAS_DEFAULT_ARRASTRE, fechaReferencia);
+}
+
+/**
+ * modelo-dominio.md §3: Borrador existe para que el usuario configure
+ * el periodo siguiente con anticipación mientras el actual sigue
+ * activo, y transiciona a Activo "automática al llegar la fecha de
+ * inicio". Promueve solo si HOY está genuinamente dentro de la ventana
+ * del borrador (`fechaInicio <= hoy <= fechaFin`) — no basta con
+ * `fechaInicio <= hoy`. Con el mecanismo actual de creación de
+ * periodos, un borrador casi siempre comparte fechas con el periodo
+ * que estaba activo cuando se creó (ver README, "Higiene de
+ * borradores"); si además `fechaFin` ya pasó, promoverlo lo activaría
+ * ya vencido, y el siguiente toque lo cerraría de inmediato generando
+ * un resumen sin ninguna actividad real — churn, no valor. Un borrador
+ * cuya ventana completa ya quedó atrás simplemente no se promueve
+ * (queda huérfano, ver README).
+ *
+ * Si hay más de un borrador candidato (no hay restricción única sobre
+ * `estado = 'borrador'`, a diferencia de `'activo'`), se promueve el de
+ * `fechaInicio` más próxima y, en empate, el más antiguo — los demás
+ * quedan como estaban.
+ */
+async function promoverBorradorSiExisteTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date): Promise<void> {
+  const hoy = fechaISO(fechaReferencia);
+
+  const [borrador] = await tx
+    .select()
+    .from(periodos)
+    .where(and(eq(periodos.tenantId, tenantId), eq(periodos.estado, 'borrador'), lte(periodos.fechaInicio, hoy), gte(periodos.fechaFin, hoy)))
+    .orderBy(asc(periodos.fechaInicio), asc(periodos.creadoEn))
+    .limit(1);
+
+  if (!borrador) return;
+
+  await tx.update(periodos).set({ estado: 'activo' }).where(eq(periodos.id, borrador.id));
+  await reclamarArrastresTx(tx, tenantId, borrador.id, borrador.cuentaId, fechaReferencia);
 }
 
 /**
