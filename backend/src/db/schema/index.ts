@@ -5,3 +5,4 @@ export * from './ledger.js';
 export * from './periodos.js';
 export * from './ingresos.js';
 export * from './gastos.js';
+export * from './cierre.js';

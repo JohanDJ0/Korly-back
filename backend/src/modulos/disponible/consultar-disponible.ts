@@ -41,7 +41,7 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * recalculado en cada consulta, no como una fotografía congelada.
  */
 export async function consultarDisponible(tenantId: string, fechaReferencia: Date = new Date()): Promise<Disponible | null> {
-  const periodo = await obtenerPeriodoActivo(tenantId);
+  const periodo = await obtenerPeriodoActivo(tenantId, fechaReferencia);
   if (!periodo) return null;
 
   const hayIngreso = await existeIngresoParaPeriodo(tenantId, periodo.id);

@@ -26,6 +26,12 @@ que forzó ingresos ya alcanzaban.
 nuevas — compone `obtenerPeriodoActivo`, `existeIngresoParaPeriodo` y
 `obtenerSaldoCuenta` tal cual ya existían.
 
+**Punto 7 — cierre:** transición activo → cerrado perezosa de verdad
+(cierra la conexión con disponible del punto anterior), resumen
+inmutable, y decisión del sobrante (positivo: `ahorrar`/`arrastrar`;
+déficit: automático). No tocó el mecanismo de reversión de ADR-001 —
+el arrastre es un movimiento hacia adelante, no una corrección.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -184,10 +190,11 @@ que todavía no existe en el walking skeleton.
 ## Periodos (anclaje a calendario)
 
 `src/db/schema/periodos.ts` define `periodos`.
-`src/modulos/periodos/crear-periodo.ts` expone `crearPeriodo` y
-`obtenerPeriodoActivo`. `src/modulos/periodos/calcular-quincena.ts` es
-la función pura del anclaje a calendario (ADR-004: 1–15 y 16–fin de
-mes, nunca "inicio + N días") — probada sin base de datos en
+`src/modulos/periodos/crear-periodo.ts` expone `crearPeriodo`,
+`obtenerPeriodoActivo` y `obtenerPeriodoPorId`.
+`src/modulos/periodos/calcular-quincena.ts` es la función pura del
+anclaje a calendario (ADR-004: 1–15 y 16–fin de mes, nunca "inicio + N
+días") — probada sin base de datos en
 `test/unidad/calcular-quincena.test.ts` contra los casos frontera que
 el ADR pide explícitamente (meses de 30/31 días, febrero bisiesto y
 no bisiesto, fin de año).
@@ -208,27 +215,24 @@ de un `SAVEPOINT` (así no se pierde la cuenta de ledger ya creada en la
 misma transacción). `test/integracion/periodos.test.ts` prueba esto
 con dos llamadas concurrentes reales, no solo secuenciales.
 
-**Pendiente explícito.** Este punto solo cubre borrador → activo. La
-transición activo → cerrado, el resumen inmutable y la decisión de
-sobrante son del módulo de cierre (siguiente en el orden acordado): un
-periodo puede quedar `'activo'` más allá de su `fechaFin` sin que nada
-lo detecte todavía — no hay cron ni cálculo perezoso de cierre. Tampoco
-existe resolución a la zona horaria IANA del usuario (CLAUDE.md): "hoy"
-es la fecha de calendario UTC del servidor.
+**Pendiente explícito, al escribir este punto (antes de que existiera
+cierre).** Un periodo podía quedar `'activo'` más allá de su `fechaFin`
+sin que nada lo detectara — no había cron ni cálculo perezoso de
+cierre. Resuelto por el módulo de cierre (ver esa sección más abajo):
+`obtenerPeriodoActivoTx`/`obtenerPeriodoPorIdTx` ahora resuelven eso
+antes de devolver un periodo. Sigue sin existir un cron — el cierre es
+puramente perezoso, se dispara al consultar, nunca en segundo plano —
+y tampoco existe resolución a la zona horaria IANA del usuario
+(CLAUDE.md): "hoy" sigue siendo la fecha de calendario UTC del
+servidor en todo el código, no solo aquí.
 
-**Dónde debe vivir la resolución perezoso del cierre (importante para
-cuando se construya el módulo de cierre):** según ADR-004, el cálculo
-perezoso significa que al consultar el periodo activo y encontrar que
-su `fechaFin` ya pasó, el sistema debe reconocerlo y cerrarlo en ese
-momento — no seguir sirviendo cifras de un periodo que ya terminó en
-la realidad. Esa lógica pertenece a **este módulo** (probablemente
-dentro de `obtenerPeriodoActivo`/`obtenerPeriodoActivoTx`: un periodo
-con `fechaFin` pasada nunca debería devolverse como `'activo'`), no al
-módulo de disponible. Ver la nota correspondiente en la sección
-"Disponible" más abajo: el tope de "mínimo 1 día" que vive ahí hoy es
-un parche temporal exactamente por esta ausencia, y debería volverse
-redundante (defensa en profundidad, no el mecanismo principal) una vez
-que este módulo resuelva el cierre perezoso de verdad.
+**Resuelto en el punto 7 (cierre):** `obtenerPeriodoActivoTx` y
+`obtenerPeriodoPorIdTx` ahora llaman a
+`modulos/cierre/cerrar-periodo.ts` → `resolverPendientesTx` antes de
+devolver un periodo — un periodo con `fechaFin` pasada se cierra ahí
+mismo y deja de devolverse como `'activo'`. Ver la sección "Cierre"
+más abajo para el detalle de cómo se evitó el ciclo de imports que
+esto habría creado.
 
 ## Ingresos
 
@@ -338,35 +342,112 @@ Cuatro puntos que pedían verificación explícita, no solo "no truena":
   quisiera. Por comportamiento: los dos tests de la sección anterior.
 
 **Extensión propia, fuera de lo que especifica el modelo de dominio —
-y con fecha de caducidad conocida.** Si "hoy" ya pasó `fechaFin`
-(el periodo debería estar cerrado, pero el módulo de cierre no existe
-todavía), `calcularDiasRestantes` no deja que el resultado baje de 1 en
-vez de dividir entre cero o un negativo. Es la lectura más conservadora
-mientras no exista cierre automático — documentado y probado como lo
-que es: una decisión mía llenando un hueco, no algo que ADR-004 o
-modelo-dominio.md resuelvan directamente.
+y ya resuelta, no solo documentada.** Si "hoy" ya pasó `fechaFin`,
+`calcularDiasRestantes` no deja que el resultado baje de 1 en vez de
+dividir entre cero o un negativo. Cuando se escribió este punto, el
+módulo de cierre no existía todavía — ver la sección "Cierre" más
+abajo para lo que cambió: `obtenerPeriodoActivo` ya resuelve el cierre
+perezoso de un periodo vencido **antes** de que `disponible` lo vea,
+así que este tope ya no debería activarse en el camino normal. Queda
+como salvaguarda defensiva (cinturón y tirantes, mismo espíritu que el
+`tenantId` redundante en `obtenerPeriodoPorIdTx`), no como el
+mecanismo que evita la división por cero en la práctica — y
+`test/integracion/cierre.test.ts` prueba justamente eso: un periodo
+vencido se cierra solo al consultarlo, sin que `disponible` tenga que
+intervenir.
 
-**Por qué el parche está aquí y no en periodos, y qué debe pasar
-después (revisado explícitamente):** el lugar correcto para resolver
-un periodo vencido no cerrado es la capa de **periodos**, no esta. Por
-ADR-004, el cálculo perezoso significa que al consultar el periodo
-activo y encontrar que su `fechaFin` ya pasó, el sistema debe
-reconocerlo y cerrarlo ahí mismo — no seguir sirviendo cifras de un
-periodo que ya terminó en la realidad. Esa lógica no existe todavía en
-`obtenerPeriodoActivo` (solo cubre borrador → activo, ver la sección
-"Periodos" de arriba), así que este tope de 1 día es el parche correcto
-**mientras tanto**, no la solución. Cuando se construya el módulo de
-cierre y la resolución perezosa viva en `obtenerPeriodoActivo` (un
-periodo con `fechaFin` pasada nunca debería devolverse como
-`'activo'`), este tope **debería volverse redundante en el camino
-normal** — `disponible` nunca debería recibir un periodo vencido de
-`obtenerPeriodoActivo` una vez que eso exista. En ese punto el tope
-puede quedarse como salvaguarda defensiva (cinturón y tirantes, mismo
-espíritu que el `tenantId` redundante en `obtenerPeriodoPorIdTx`), pero
-ya no como el mecanismo que evita la división por cero en la práctica.
-Si al construir cierre este tope sigue siendo necesario para que algo
-pase las pruebas, es una señal de que la resolución perezosa de
-periodos no quedó bien resuelta ahí.
+## Cierre
+
+```
+src/db/schema/cierre.ts                  # resumenes
+src/modulos/cierre/generar-resumen.ts    # generarResumenTx, obtenerResumenTx — núcleo compartido, solo Tx
+src/modulos/cierre/cerrar-periodo.ts     # cerrarPeriodoManualmente (top-level) + resolverPendientesTx (Tx)
+src/modulos/cierre/decidir-sobrante.ts   # decidirSobrante (top-level) + resolverDecisionesVencidasTx (Tx)
+```
+
+**El ciclo de imports que esto podía crear, y cómo se evitó.**
+`modulos/periodos/crear-periodo.ts` llama a `resolverPendientesTx` de
+este módulo para el cierre perezoso — así que `cierre` no puede
+importar el módulo de periodos de vuelta sin crear un ciclo. Donde
+`cierre` necesita leer o escribir la tabla `periodos` (marcar
+`estado='cerrado'`, verificar que un periodo existe), lee
+`db/schema/periodos.ts` directamente, no `modulos/periodos/crear-periodo.ts`
+— mismo patrón que ya usa `ingresos` con el schema del ledger. Esto
+cuesta una pequeña duplicación (la consulta de "¿existe este periodo
+de este tenant?" está escrita tanto en `cierre` como en `periodos`, en
+vez de compartir una función), a cambio de un grafo de dependencias
+sin ciclos. Es una decisión de arquitectura explícita, no un descuido.
+
+**Cierre perezoso real (no solo el tope de disponible).**
+`obtenerPeriodoActivoTx`/`obtenerPeriodoPorIdTx` en periodos llaman a
+`resolverPendientesTx` antes de devolver cualquier periodo. Si el que
+iban a devolver está `'activo'` pero su `fechaFin` ya pasó, se cierra
+ahí mismo — genera el resumen y pasa a `'cerrado'` — y ya no se
+devuelve como activo. Como esto vive en el único punto de entrada que
+usan disponible, ingresos, gastos y el propio `crearPeriodo`, lo
+heredan gratis sin que cada módulo tenga que acordarse de resolverlo
+por separado (mismo principio que centralizar `app.tenant_id`,
+ADR-005). Consecuencia con test propio: si el periodo activo de un
+tenant ya venció, `crearPeriodo` lo cierra primero y el periodo nuevo
+nace `'activo'` directo, no en `'borrador'`.
+
+**Cierre manual, necesario para poder ejercer el ciclo del walking
+skeleton sin esperar 15 días reales.** `cerrarPeriodoManualmente`
+fuerza el cierre de un periodo activo antes de su `fechaFin` —
+equivalente a `POST /periodos/{id}/cerrar` de openapi.yaml. Idempotente
+(invariante 8): cerrar un periodo ya cerrado devuelve su resumen
+existente en vez de generar uno nuevo.
+
+**Déficit vs. sobrante positivo (modelo-dominio.md §3, regla agregada
+en revisión).** `generarResumenTx` decide solo: si `sobrante < 0`,
+`decisionSobrante` queda `'arrastrado'` de inmediato, sin pedir nada
+al usuario — no existe "ahorrar" una deuda. Si es positivo, queda
+`'pendiente'` hasta que `decidirSobrante` (decisión explícita) o
+`resolverDecisionesVencidasTx` (el barrido de N días) lo resuelvan.
+
+**`'ahorrar'` declarado pero rechazado, a propósito.** El tipo
+`DecisionSobranteEntrada` incluye `'ahorrar'` (coincide con
+`openapi.yaml`), pero `decidirSobrante` lanza
+`ErrorDominio('NO_SOPORTADO', ...)` si se elige — el módulo de Metas no
+existe todavía. Mismo patrón que `crearPeriodo` con tipos de periodo
+no-quincenales: la firma pública ya tiene la forma correcta, activarlo
+de verdad no debería requerir cambiarla.
+
+**N = 7 días para el default de arrastre — propuesta propia, no un
+dato.** No está en ningún documento. Es una intuición razonable
+(suficiente para decidir con calma, corto para no dejarlo pendiente
+hasta que la *siguiente* quincena también cierre) — **debe revisarse
+con evidencia real de comportamiento de usuarios cuando exista**, no
+tratarse como definitivo. `generadoEn` en `resumenes` se fija con
+`fechaReferencia` explícito (nunca `new Date()` interno) por la misma
+razón que el resto del código evita el reloj real dentro de una
+operación — mismo principio que ADR-004 exige para los jobs de cierre
+("fecha objetivo pasada como parámetro") — y es lo que hace posible
+probar el barrido de N días sin esperar tiempo real.
+
+**Transición controlada, no bloqueo total.** A diferencia de
+asientos/movimientos/ingresos/gastos (`UPDATE`/`DELETE` bloqueados sin
+excepción), un resumen tiene un campo que sí debe poder escribirse una
+vez después del `INSERT`: `decisionSobrante`, de `'pendiente'` a
+`'ahorrado'`/`'arrastrado'`. El trigger en
+[`drizzle/0009_resumenes_transicion_controlada.sql`](drizzle/0009_resumenes_transicion_controlada.sql)
+permite exactamente esa transición y bloquea cualquier otra —
+incluyendo un `UPDATE` que deje `decisionSobrante` sin tocar (todavía
+`'pendiente'`): un bug real que encontré escribiendo los tests, porque
+comparar solo `new <> old` no distingue "sigue pendiente" de "volvió a
+pendiente" cuando ninguna de las dos cambió el valor.
+
+**Sin materializar el arrastre — próximo paso explícito, no un "algún
+día".** `decisionSobrante='arrastrado'` registra la decisión; el
+dinero no se mueve todavía a ninguna cuenta. El ciclo declarado
+termina en "...cerrar periodo → decidir sobrante", no en "crear el
+periodo siguiente y confirmar que heredó el arrastre". Moverlo de
+verdad sin violar la invariante 5 ("un periodo cerrado no cambia de
+saldo nunca") requiere una **cuenta puente por tenant** que reciba el
+arrastre al cerrar y lo entregue al periodo siguiente cuando se cree —
+pieza de arquitectura nueva, deliberadamente no diseñada todavía.
+**La siguiente entrega después de este punto es exactamente esa
+conexión, no otra parte del skeleton.**
 
 ## Qué valida este punto
 
@@ -401,11 +482,23 @@ periodos no quedó bien resuelta ahí.
   siempre hacia el piso matemático incluso en sobregiro, cuenta el
   último día del periodo como 1 día y no 0, y no almacena ni cachea
   nada — cada consulta es un recálculo completo.
+- Un periodo vencido se cierra solo, sin cron, la primera vez que algo
+  lo consulta — y ese cierre genera un resumen inmutable que nadie
+  puede alterar salvo la única transición permitida (decidir el
+  sobrante, una vez). Un déficit se arrastra sin pedir permiso; un
+  sobrante positivo se resuelve por decisión explícita o, en su
+  ausencia, por el default de 7 días.
 
-## Qué falta (siguientes puntos)
+## Qué falta
 
-Cierre de periodo (transición activo → cerrado, resumen inmutable,
-decisión de sobrante, incluyendo el arrastre automático de déficit
-documentado en modelo-dominio.md §3) — ver el orden de construcción
-acordado en la conversación de diseño. Ningún módulo tiene endpoints
-HTTP todavía: eso llega en el último punto del walking skeleton.
+**Próximo paso inmediato (comprometido explícitamente, no un "algún
+día"): conectar cierre con la creación del siguiente periodo.**
+Diseñar e implementar la cuenta puente que materializa el arrastre
+(ver "Cierre" arriba) — antes de avanzar a cualquier otra parte del
+skeleton.
+
+Después de eso: ingresos/gastos retroactivos y edición sobre periodo
+cerrado (requiere el mecanismo de reversión de ADR-001, todavía sin
+tocar), metas de ahorro (para activar `'ahorrar'` en la decisión de
+sobrante), y finalmente la capa HTTP que expone todo esto como la API
+de openapi.yaml — ningún módulo tiene endpoints todavía.

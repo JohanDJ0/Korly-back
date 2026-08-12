@@ -1,5 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
+import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { calcularQuincenaDeCalendario } from './calcular-quincena.js';
@@ -49,7 +50,7 @@ export async function crearPeriodo(
 
   return conTenant(tenantId, async (tx) => {
     const cuenta = await crearCuentaTx(tx, tenantId, 'periodo');
-    const hayActivo = (await obtenerPeriodoActivoTx(tx, tenantId)) !== null;
+    const hayActivo = (await obtenerPeriodoActivoTx(tx, tenantId, fechaReferencia)) !== null;
     const estadoDeseado: EstadoPeriodo = hayActivo ? 'borrador' : 'activo';
     const valoresBase = { tenantId, cuentaId: cuenta.id, tipo, fechaInicio, fechaFin };
 
@@ -71,11 +72,24 @@ export async function crearPeriodo(
   });
 }
 
-export async function obtenerPeriodoActivo(tenantId: string): Promise<Periodo | null> {
-  return conTenant(tenantId, (tx) => obtenerPeriodoActivoTx(tx, tenantId));
+export async function obtenerPeriodoActivo(tenantId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
+  return conTenant(tenantId, (tx) => obtenerPeriodoActivoTx(tx, tenantId, fechaReferencia));
 }
 
-async function obtenerPeriodoActivoTx(tx: Ejecutor, tenantId: string): Promise<Periodo | null> {
+/**
+ * Cierre perezoso (ADR-004): antes de decidir cuál periodo está activo,
+ * se resuelve lo pendiente para este tenant — si el que iba a devolver
+ * ya pasó su `fechaFin`, se cierra aquí mismo y deja de contar como
+ * activo. Es el único punto de entrada para esto: todo lo que llama a
+ * `obtenerPeriodoActivo`/`obtenerPeriodoPorId` (disponible, ingresos,
+ * gastos, este mismo módulo) lo hereda gratis, sin tener que acordarse
+ * de llamarlo por separado. Esto es lo que vuelve redundante — en el
+ * camino normal, no como mecanismo principal — el tope de "mínimo 1 día"
+ * en modulos/disponible/motor-flujo-caja.ts.
+ */
+async function obtenerPeriodoActivoTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date): Promise<Periodo | null> {
+  await resolverPendientesTx(tx, tenantId, fechaReferencia);
+
   const [fila] = await tx
     .select(COLUMNAS_PERIODO)
     .from(periodos)
@@ -85,8 +99,8 @@ async function obtenerPeriodoActivoTx(tx: Ejecutor, tenantId: string): Promise<P
   return fila ? { ...fila, estado: fila.estado as EstadoPeriodo } : null;
 }
 
-export async function obtenerPeriodoPorId(tenantId: string, periodoId: string): Promise<Periodo | null> {
-  return conTenant(tenantId, (tx) => obtenerPeriodoPorIdTx(tx, tenantId, periodoId));
+export async function obtenerPeriodoPorId(tenantId: string, periodoId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
+  return conTenant(tenantId, (tx) => obtenerPeriodoPorIdTx(tx, tenantId, periodoId, fechaReferencia));
 }
 
 /**
@@ -97,8 +111,15 @@ export async function obtenerPeriodoPorId(tenantId: string, periodoId: string): 
  * estado — es la defensa en profundidad que promete ADR-005 funcionando
  * en este caso concreto: un intento de BOLA vía `periodoId` no distingue
  * "no existe" de "existe pero no es tuyo".
+ *
+ * Mismo cierre perezoso que `obtenerPeriodoActivoTx` — un `periodoId`
+ * que apunta al periodo activo vencido debe reflejar que ya está
+ * cerrado, no dejar que ingresos/gastos escriban contra un periodo que
+ * en la realidad ya terminó.
  */
-export async function obtenerPeriodoPorIdTx(tx: Ejecutor, tenantId: string, periodoId: string): Promise<Periodo | null> {
+export async function obtenerPeriodoPorIdTx(tx: Ejecutor, tenantId: string, periodoId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
+  await resolverPendientesTx(tx, tenantId, fechaReferencia);
+
   const [fila] = await tx
     .select(COLUMNAS_PERIODO)
     .from(periodos)

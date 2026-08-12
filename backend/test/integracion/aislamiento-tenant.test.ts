@@ -7,11 +7,13 @@ import { asientos, cuentas, movimientos } from '../../src/db/schema/ledger.js';
 import { periodos } from '../../src/db/schema/periodos.js';
 import { ingresos } from '../../src/db/schema/ingresos.js';
 import { gastos } from '../../src/db/schema/gastos.js';
+import { resumenes } from '../../src/db/schema/cierre.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { crearCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
+import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { conTenant, db } from '../../src/shared/db.js';
 
 /**
@@ -137,6 +139,25 @@ describe('aislamiento por tenant (RLS)', () => {
     });
 
     const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(gastos).where(eq(gastos.id, gastoIdB)));
+
+    expect(filas).toHaveLength(0);
+  });
+
+  it('un tenant no puede leer el resumen de cierre de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-resumen-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-resumen-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+    });
+    const resumenB = await cerrarPeriodoManualmente(identidadB.tenantId, periodoB.id, new Date('2026-08-10T00:00:00Z'));
+
+    const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(resumenes).where(eq(resumenes.id, resumenB.id)));
 
     expect(filas).toHaveLength(0);
   });

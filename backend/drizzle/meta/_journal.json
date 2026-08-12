@@ -57,6 +57,20 @@
       "when": 1786347551998,
       "tag": "0007_gastos_inmutable",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1786515186526,
+      "tag": "0008_familiar_otto_octavius",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1786515200372,
+      "tag": "0009_resumenes_transicion_controlada",
+      "breakpoints": true
     }
   ]
 }

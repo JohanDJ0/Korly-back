@@ -14,14 +14,21 @@
  * El `+1` evita dividir entre cero el último día del periodo: si hoy es
  * exactamente `fechaFin`, el resultado es 1 día, no 0.
  *
- * Extensión propia, NO especificada por modelo-dominio.md: si "hoy" ya
- * pasó `fechaFin` (el periodo debería estar cerrado, pero el módulo de
- * cierre todavía no existe — ver README, sección de periodos), la resta
- * cruda daría 0 o negativo. En vez de dividir entre cero o invertir el
- * signo de la cifra diaria por un tecnicismo de fechas, se fija un piso
- * de 1 día. Es la lectura más conservadora mientras no exista cierre
- * automático, no un caso que el modelo de dominio haya resuelto — de
- * ahí que esté separado y documentado aparte de la fórmula de arriba.
+ * El `Math.max(1, ...)` es una extensión propia, NO especificada por
+ * modelo-dominio.md, para cuando "hoy" ya pasó `fechaFin`.
+ *
+ * ACTUALIZACIÓN (módulo de cierre): esto ya **no debería ocurrir en el
+ * camino normal**. `obtenerPeriodoActivo`/`obtenerPeriodoPorId`
+ * (modulos/periodos/crear-periodo.ts) resuelven el cierre perezoso
+ * antes de devolver un periodo — un periodo con `fechaFin` pasada ya no
+ * se devuelve como `'activo'`, así que `consultarDisponible` nunca
+ * debería recibir uno vencido para calcularle días restantes. El tope
+ * de aquí queda como **salvaguarda defensiva** (cinturón y tirantes,
+ * mismo espíritu que el `tenantId` redundante en `obtenerPeriodoPorIdTx`),
+ * no como el mecanismo que evita la división por cero en la práctica.
+ * Si algún test de cierre llega a depender de este tope para pasar, es
+ * señal de que la resolución perezosa de periodos tiene un hueco — no
+ * una razón para relajar esto.
  */
 export function calcularDiasRestantes(fechaFin: string, fechaReferencia: Date): number {
   const fin = Date.UTC(...partesFechaISO(fechaFin));

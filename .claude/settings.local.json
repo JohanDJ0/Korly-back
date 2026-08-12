@@ -70,7 +70,18 @@
       "Bash(npx vitest *)",
       "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5439/postgres\" npx drizzle-kit migrate)",
       "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5439/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
-      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check7/**)"
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check7/**)",
+      "Bash(DATABASE_URL=\"postgresql://placeholder:placeholder@localhost:5432/placeholder\" npx drizzle-kit generate --custom --name=resumenes_transicion_controlada)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5440/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5440/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check8/**)",
+      "Bash(tasklist //FI \"IMAGENAME eq postgres.exe\")",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5441/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5441/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-check9/**)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost:5442/postgres\" npx drizzle-kit migrate)",
+      "Bash(APP_DATABASE_URL=\"postgresql://app_backend:app_backend_ci@localhost:5442/postgres\" SUPABASE_URL=\"https://placeholder.supabase.co\" SUPABASE_SERVICE_ROLE_KEY=\"placeholder\" npx vitest run)",
+      "Read(//c/Users/johan/AppData/Local/Temp/claude/C--Users-johan-Desktop-Korly-Back/0464b6bc-439f-4bd9-8b33-83b56c16f2c5/scratchpad/pg-final/**)"
     ]
   }
 }
