@@ -115,41 +115,67 @@ interno (aprovisionamiento just-in-time, ver
 `src/modulos/identidad/resolver-identidad.ts`). Llamadas siguientes con
 el mismo token devuelven el mismo `usuarioId`/`tenantId`.
 
-## Tests de integración (contra Postgres real)
+## Cómo correr los tests localmente
+
+```bash
+npm run test:local
+```
+
+Un solo comando, sin pasos manuales previos. `npm test` a secas (el
+`vitest run` crudo) **no alcanza por sí solo** — necesita un Postgres
+real ya corriendo, con el rol `app_backend` creado y las migraciones
+aplicadas; sin eso falla con `relation "periodos" does not exist` (o
+la primera tabla que toque) en la mayoría de los archivos. `npm run
+test:local` (`scripts/test-local.ts`) hace las cuatro cosas en una
+sola invocación:
+
+1. Levanta un Postgres efímero (`embedded-postgres`, sin Docker) en un
+   puerto libre elegido dinámicamente — nunca choca con un Postgres
+   real que ya esté corriendo en tu máquina, y el directorio de datos
+   vive en el temp del sistema operativo, no en el repo.
+2. Crea el rol `app_backend` ejecutando
+   [`scripts/bootstrap-roles-ci.sql`](scripts/bootstrap-roles-ci.sql)
+   directamente (sin pasar por `psql`, que no todos tienen instalado).
+3. Aplica todas las migraciones (`drizzle-orm/postgres-js/migrator`,
+   programático — mismo mecanismo que `npm run db:migrate`, sin
+   depender de que la CLI de `drizzle-kit` esté en el `PATH`).
+4. Corre `vitest run` con las variables de entorno correctas
+   (`APP_DATABASE_URL` apuntando al Postgres efímero;
+   `SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` con placeholders, porque
+   ningún test llama a Supabase de verdad, pero
+   `src/shared/supabase-admin.ts` exige que existan).
+
+Al terminar — pase o falle la suite — detiene Postgres y borra el
+directorio de datos temporal (`persistent: false`); el código de
+salida del comando es el mismo que el de `vitest` (`0` si todo pasó,
+`1` si algo falló), así que sirve igual en un script que a mano.
+
+**Resultado esperado:**
+
+```
+ Test Files  11 passed (11)
+      Tests  86 passed (86)
+```
+
+Si ves menos archivos o tests que eso, probablemente sea una entrega
+más nueva del backend con más módulos — no una señal de que algo esté
+roto, mientras el resumen final diga "passed" y no "failed".
 
 `test/integracion/aislamiento-tenant.test.ts` prueba que un tenant no
 puede leer filas de otro (regla derivada de ADR-005).
 `test/integracion/ledger.test.ts` prueba las invariantes del ledger
-(ver sección siguiente). Ambos corren en CI en cada push/PR que toque
-`backend/` ([`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml)),
-contra un Postgres efímero levantado como servicio — no necesitan
-credenciales de Supabase.
-
-Para correrlo en local hace falta un Postgres desechable propio (no tu
-proyecto Supabase: el test inserta tenants/usuarios de prueba de verdad
-y no los borra). Con un Postgres local en el puerto 5432:
-
-```bash
-psql "postgresql://postgres:<tu_password>@localhost:5432/postgres" \
-  -f scripts/bootstrap-roles-ci.sql
-
-DATABASE_URL="postgresql://postgres:<tu_password>@localhost:5432/postgres" npm run db:migrate
-
-APP_DATABASE_URL="postgresql://app_backend:app_backend_ci@localhost:5432/postgres" \
-SUPABASE_URL="https://placeholder.supabase.co" \
-SUPABASE_SERVICE_ROLE_KEY="placeholder" \
-npm test
-```
-
-`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` son placeholders: el test no
-pasa por `auth.ts`, así que nunca llama a Supabase de verdad, pero
-`src/shared/supabase-admin.ts` exige que las variables existan al
-importarse.
+(ver sección siguiente). Todos los tests de integración corren en CI
+en cada push/PR que toque `backend/`
+([`.github/workflows/backend-ci.yml`](../.github/workflows/backend-ci.yml))
+contra un Postgres efímero levantado como servicio de GitHub Actions
+— un mecanismo distinto a `test:local` (ese usa Postgres embebido, sin
+Docker), pero equivalente en espíritu: tampoco depende de pasos
+manuales ni de credenciales de Supabase.
 
 El primer test del archivo (`corre con el rol sin privilegios`) falla
-a propósito si `APP_DATABASE_URL` apunta al rol `postgres` en vez de a
-`app_backend` — así el resto de las aserciones no puede pasar "por
-accidente" contra un rol que se salta RLS.
+a propósito si la conexión de los tests apunta al rol `postgres` en
+vez de a `app_backend` — así el resto de las aserciones no puede pasar
+"por accidente" contra un rol que se salta RLS.
 
 ## El ledger (partida doble)
 
