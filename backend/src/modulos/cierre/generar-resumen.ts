@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { asientos, movimientos } from '../../db/schema/ledger.js';
 import { resumenes, type EstadoDecisionSobrante } from '../../db/schema/cierre.js';
-import type { Ejecutor } from '../../shared/db.js';
+import { conTenant, type Ejecutor } from '../../shared/db.js';
 
 export interface ResumenGenerado {
   id: string;
@@ -67,6 +67,11 @@ export async function generarResumenTx(
     ...resumen,
     decisionSobrante: resumen.decisionSobrante as EstadoDecisionSobrante,
   };
+}
+
+/** Variante top-level para callers que no ya tienen una transacción abierta (la capa HTTP). */
+export async function obtenerResumen(tenantId: string, periodoId: string): Promise<ResumenGenerado | null> {
+  return conTenant(tenantId, (tx) => obtenerResumenTx(tx, tenantId, periodoId));
 }
 
 export async function obtenerResumenTx(tx: Ejecutor, tenantId: string, periodoId: string): Promise<ResumenGenerado | null> {

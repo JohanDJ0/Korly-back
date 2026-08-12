@@ -42,6 +42,12 @@ vez de quedar huérfano para siempre. Con la condición estricta
 `fechaInicio <= hoy <= fechaFin`, no la literal "ya llegó su fecha de
 inicio" — ver esa sección para por qué.
 
+**Punto 10 — capa HTTP mínima:** los ocho endpoints necesarios para
+ejercer el ciclo completo (crear periodo, ingresos, gastos, disponible,
+cerrar, resumen, decidir sobrante, periodo siguiente) — no toda la API
+de `docs/openapi.yaml` todavía. Probado de punta a punta contra el
+servidor real y un proyecto Supabase real, no solo con los tests.
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -598,6 +604,115 @@ directamente con las fechas que quieren ejercitar (bypaseando
 `crearPeriodo`), en vez de depender de que el mecanismo actual llegue
 a producir esa condición por sí solo.
 
+## Capa HTTP
+
+```
+src/shared/http.ts                     # registrarManejadorErroresDominio, montoADto/montoDesdeDto
+src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo
+src/modulos/ingresos/rutas.ts          # POST /periodos/:periodoId/ingresos
+src/modulos/gastos/rutas.ts            # POST /periodos/:periodoId/gastos
+src/modulos/disponible/rutas.ts        # GET /periodos/activo/disponible
+src/modulos/cierre/rutas.ts            # POST .../cerrar, GET .../resumen, POST .../sobrante/decision
+```
+
+Los ocho endpoints mínimos para ejercer el ciclo central — no la API
+completa de `docs/openapi.yaml` (sin paginación, sin editar/eliminar
+gasto, sin metas, sin categorías). Todos viven bajo `/v1` y detrás del
+mismo `authPlugin` que ya protege `/v1/me` desde el punto 1 — nada
+nuevo en autenticación, solo se extiende.
+
+**Cada ruta llama directo a la función de dominio que ya existía y
+estaba probada.** No hay lógica de negocio nueva en `rutas.ts` — son
+handlers finos que deserializan el body, llaman, y serializan la
+respuesta. La validación real (¿el periodo está activo? ¿el monto es
+positivo?) sigue viviendo en las funciones de dominio, no se duplicó
+aquí.
+
+**Mapeo de errores, centralizado.** `registrarManejadorErroresDominio`
+es un `setErrorHandler` global: traduce cualquier `ErrorDominio` a
+`{codigo, mensaje}` con el status correcto
+(`PERIODO_NO_ENCONTRADO`→404, `PERIODO_NO_ACTIVO`→409,
+`SOBRANTE_YA_DECIDIDO`→409, `VALIDACION`→400, `NO_SOPORTADO`→501 — no
+400: el valor es válido según el contrato, simplemente no está
+implementado, mismo criterio que ya se usaba en `decidirSobrante`).
+También respeta el `statusCode` que Fastify ya trae en sus propios
+errores de framework (body JSON vacío o mal formado, ruta inexistente)
+en vez de aplastarlos a 500 — **bug real, no hipotético**, encontrado
+probando el ciclo completo contra el servidor real: un
+`POST /cerrar` sin body pero con `Content-Type: application/json` es
+un 400 de Fastify (`FST_ERR_CTP_EMPTY_JSON_BODY`), y la primera
+versión de este manejador lo devolvía como 500.
+
+**`bigint` ↔ `integer` en el límite HTTP — decisión consciente, con su
+límite documentado (no solo mencionada de pasada).** Internamente todo
+monto es `bigint` (ADR-002). `docs/openapi.yaml` define
+`Monto.valorMinimo` como `integer` — un número JSON, no un `string`.
+`montoADto`/`montoDesdeDto` (`shared/http.ts`) son el único lugar que
+convierte entre ambos, tal como exige ADR-002 ("un solo lugar en el
+código convierte entre entero y presentación"). La conversión no
+pierde precisión para ningún monto real: `Number.MAX_SAFE_INTEGER`
+(2^53 − 1) equivale a ~90 billones de pesos en centavos. Más allá de
+eso, `Number(bigint)` pierde precisión en silencio — un límite teórico
+real, pero ya implícito en que el propio contrato eligió `integer` y
+no `string` para este campo; no es una laxitud introducida por esta
+implementación, hereda la del contrato.
+
+**Simplificaciones conscientes frente al contrato completo:**
+- `POST /periodos/:id/ingresos` y `.../gastos` devuelven `{id,
+  movimientoId, periodoId}`, no el `Ingreso`/`Gasto` completo de
+  `docs/openapi.yaml` (que ecoa monto/fecha) — esos campos viven en
+  `movimientos`, no en `ingresos`/`gastos` (deliberadamente delgadas,
+  ver esas secciones arriba), y reconstruirlos pediría una consulta
+  nueva que nada más necesita todavía.
+- `GET /periodos/:id/resumen` devuelve 404 tanto si el periodo no
+  existe como si existe pero no está cerrado — `docs/openapi.yaml`
+  distingue esos dos casos (404 vs. 409) y distinguirlos aquí pediría
+  una consulta extra a `periodos` que hoy nada más necesita.
+- `disponible`/`cifraDiaria`/`montoAplicado` en las respuestas de
+  disponible y de decidir sobrante asumen `moneda: 'MXN'` a la fuerza
+  — ni `consultarDisponible` ni `decidirSobrante` rastrean moneda
+  internamente (multi-moneda está fuera del MVP), mismo default que ya
+  usa `generar-resumen.ts` cuando no hay de dónde derivarla.
+
+## Probar el ciclo completo (REST Client)
+
+[`http/ciclo-completo.http`](http/ciclo-completo.http) ejercita el
+ciclo entero contra el servidor local apuntando a tu Supabase real:
+autenticación → crear periodo → ingreso → disponible → dos gastos
+(consultando disponible entre cada uno, para ver el sobregiro) →
+cerrar → resumen → decidir sobrante → crear el periodo siguiente →
+confirmar que heredó el arrastre.
+
+**Cómo correrlo:**
+
+1. Instala la extensión **REST Client** (`humao.rest-client`) en VS
+   Code. No hace falta Postman ni una cuenta externa — el archivo vive
+   en el repo, versionado junto con el código.
+2. Levanta el servidor real (`npm run dev`, con tu `.env` ya
+   configurado — ver pasos 1-6 arriba) y aplica las migraciones
+   pendientes si no lo has hecho (`npm run db:migrate`).
+3. Consigue un `access_token` real de Supabase Auth: la forma más
+   rápida sin frontend todavía es la misma del paso 7 de arriba
+   (crear un usuario de prueba en el dashboard de Supabase, obtener
+   `data.session.access_token` vía el SDK o `signInWithPassword`).
+4. Abre `http/ciclo-completo.http`, pega el token en `@authToken`
+   (arriba del archivo), y confirma que `@baseUrl` apunta a tu
+   servidor local (`http://localhost:3000/v1` por defecto).
+5. Corre cada bloque con **Send Request** (aparece arriba de cada
+   `###`), uno por uno, en el orden del archivo. Los `@periodoId`/
+   `@periodoSiguienteId` se llenan solos con el `id` de la respuesta
+   del bloque anterior — no hay que copiar UUIDs a mano.
+
+**Qué esperar, paso por paso:** cada bloque del archivo trae un
+comentario explicando qué debería devolver y por qué — incluidos dos
+resultados que parecen errores pero no lo son: el paso 12
+(`POST .../sobrante/decision`) da `409 SOBRANTE_YA_DECIDIDO` si el
+déficit del paso 8 ya se arrastró solo al cerrar, y el paso 15
+(`GET .../disponible` del periodo siguiente, antes de su primer
+ingreso) da `estado: 'sin_ingreso'` aunque el arrastre ya esté en el
+ledger — modelo-dominio.md §5 no muestra la cifra como cierta hasta
+que hay un ingreso real de ese periodo.
+
 ## Qué valida este punto
 
 - El backend nunca usa el `id` de Supabase Auth como `usuario_id` de
@@ -646,6 +761,11 @@ a producir esa condición por sí solo.
   (su ventana contiene hoy), tanto al cerrarse perezosamente el que lo
   bloqueaba como al tocar el tenant después de un cierre manual — sin
   activar uno cuya ventana ya quedó completamente atrás.
+- Los ocho endpoints mínimos exponen el ciclo completo sobre HTTP real,
+  con el mismo `authPlugin` y las mismas funciones de dominio ya
+  probadas — no hay lógica nueva en las rutas. Validado de punta a
+  punta contra el servidor real y un proyecto Supabase real (no solo
+  con los tests), incluido el archivo `.http` versionado en el repo.
 
 ## Qué falta
 
@@ -669,10 +789,10 @@ a propósito para decidirlos juntos:
 
 ### Después de eso
 
-Ingresos/gastos retroactivos y edición sobre periodo cerrado
-(requiere el mecanismo de reversión de ADR-001, todavía sin tocar),
-metas de ahorro (para activar `'ahorrar'` en la decisión de sobrante,
-y para que `reclamarArrastresTx` sepa qué hacer con un arrastre
-decidido como `'ahorrado'`), y finalmente la capa HTTP que expone todo
-esto como la API de openapi.yaml — ningún módulo tiene endpoints
-todavía.
+Ingresos/gastos retroactivos y edición sobre periodo cerrado (requiere
+el mecanismo de reversión de ADR-001, todavía sin tocar), metas de
+ahorro (para activar `'ahorrar'` en la decisión de sobrante, y para
+que `reclamarArrastresTx` sepa qué hacer con un arrastre decidido como
+`'ahorrado'`), y el resto de la API de `docs/openapi.yaml` que los
+ocho endpoints actuales no cubren (paginación, editar/eliminar gasto,
+categorías).

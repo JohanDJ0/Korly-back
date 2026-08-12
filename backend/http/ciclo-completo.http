@@ -1,0 +1,131 @@
+### Ciclo completo del walking skeleton, contra el servidor local
+### apuntando a Supabase real. Requiere la extensión "REST Client"
+### de VS Code (humao.rest-client). Ver backend/README.md, sección
+### "Probar el ciclo completo (REST Client)", para cómo obtener
+### @authToken y qué esperar en cada paso.
+###
+### Corre cada bloque con "Send Request" uno por uno, en orden — no
+### todos de golpe. Los @variables de más abajo se llenan solos con la
+### respuesta del bloque anterior (mirar los comentarios "Captura...").
+
+@baseUrl = http://localhost:3000/v1
+@authToken = PEGA_AQUI_TU_ACCESS_TOKEN_DE_SUPABASE
+
+### 1. Confirmar identidad — aprovisiona tenant/usuario si es la primera vez con este token.
+GET {{baseUrl}}/me
+Authorization: Bearer {{authToken}}
+
+### 2. Crear periodo. Si ya tienes uno activo de una corrida anterior, este queda en 'borrador' — no es un error.
+# @name crearPeriodo
+POST {{baseUrl}}/periodos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "tipo": "quincenal"
+}
+
+###
+@periodoId = {{crearPeriodo.response.body.id}}
+
+### 3. Confirmar que quedó activo (si el paso 2 devolvió estado "borrador", este va a mostrar OTRO periodo — el que ya estaba activo).
+GET {{baseUrl}}/periodos/activo
+Authorization: Bearer {{authToken}}
+
+### 4. Registrar el ingreso de la quincena.
+POST {{baseUrl}}/periodos/{{periodoId}}/ingresos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 300000, "moneda": "MXN" },
+  "fechaEfectiva": "2026-08-12",
+  "nota": "Quincena"
+}
+
+### 5. Consultar disponible — debe reflejar el ingreso completo, sin gastos todavía.
+GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}
+
+### 6. Registrar un primer gasto pequeño.
+POST {{baseUrl}}/periodos/{{periodoId}}/gastos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 50000, "moneda": "MXN" },
+  "fechaEfectiva": "2026-08-12",
+  "nota": "Super"
+}
+
+### 7. Consultar disponible otra vez — debe haber bajado exactamente el monto del gasto.
+GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}
+
+### 8. Registrar un segundo gasto, grande a propósito, para forzar sobregiro y ver el arrastre automático de déficit más adelante.
+POST {{baseUrl}}/periodos/{{periodoId}}/gastos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 700000, "moneda": "MXN" },
+  "fechaEfectiva": "2026-08-12",
+  "nota": "Gasto grande a propósito, para ver sobregiro"
+}
+
+### 9. Consultar disponible — "disponible" y "cifraDiaria" deben verse negativos (sobregiro, modelo-dominio.md §5: se muestra sin suavizar).
+GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}
+
+### 10. Cerrar el periodo manualmente — no hay que esperar a que la quincena real termine.
+POST {{baseUrl}}/periodos/{{periodoId}}/cerrar
+Authorization: Bearer {{authToken}}
+
+### 11. Consultar el resumen. Con el gasto grande del paso 8, "sobrante" debería ser negativo y "decisionSobrante" ya "arrastrado" (el déficit se decide solo al cerrar, modelo-dominio.md §3).
+GET {{baseUrl}}/periodos/{{periodoId}}/resumen
+Authorization: Bearer {{authToken}}
+
+### 12. Decidir el sobrante como "arrastrar". Si el paso 11 ya mostró "arrastrado" (caso de déficit), esta llamada da 409 SOBRANTE_YA_DECIDIDO — es la respuesta correcta, no un error tuyo. Si en tu prueba el sobrante quedó positivo (ajusta los montos arriba para eso), esta es la que lo decide de verdad.
+POST {{baseUrl}}/periodos/{{periodoId}}/sobrante/decision
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "decision": "arrastrar"
+}
+
+### 13. Crear el periodo siguiente — reclama el arrastre ya decidido en la misma operación (modulos/cierre/materializar-arrastre.ts).
+# @name crearPeriodoSiguiente
+POST {{baseUrl}}/periodos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "tipo": "quincenal"
+}
+
+###
+@periodoSiguienteId = {{crearPeriodoSiguiente.response.body.id}}
+
+### 14. Confirmar que el periodo siguiente es el activo ahora.
+GET {{baseUrl}}/periodos/activo
+Authorization: Bearer {{authToken}}
+
+### 15. Disponible del periodo siguiente ANTES de su primer ingreso — probablemente "sin_ingreso": el arrastre ya está en el ledger, pero la cifra no se muestra como cierta hasta que haya un ingreso real de ESTE periodo (modelo-dominio.md §5). No es un bug.
+GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}
+
+### 16. Registrar el primer ingreso del periodo siguiente.
+POST {{baseUrl}}/periodos/{{periodoSiguienteId}}/ingresos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 100000, "moneda": "MXN" },
+  "fechaEfectiva": "2026-08-12",
+  "nota": "Primer ingreso del periodo siguiente"
+}
+
+### 17. Consultar disponible — debe reflejar el ingreso de este periodo MENOS el arrastre heredado del anterior. Con los montos de este archivo tal cual: 100000 - 450000 = -350000.
+GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}

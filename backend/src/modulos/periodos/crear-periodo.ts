@@ -4,7 +4,7 @@ import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
 import { reclamarArrastresTx } from '../cierre/materializar-arrastre.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
-import { esViolacionDeIndiceUnico } from '../../shared/errores.js';
+import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
 import { calcularQuincenaDeCalendario } from './calcular-quincena.js';
 
 export interface Periodo {
@@ -45,7 +45,7 @@ export async function crearPeriodo(
   fechaReferencia: Date = new Date()
 ): Promise<Periodo> {
   if (tipo !== 'quincenal') {
-    throw new Error(`Tipo de periodo no soportado todavía: ${tipo}`);
+    throw new ErrorDominio('VALIDACION', `Tipo de periodo no soportado todavía: ${tipo}`);
   }
 
   const { fechaInicio, fechaFin } = calcularQuincenaDeCalendario(fechaReferencia);
