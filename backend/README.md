@@ -48,6 +48,21 @@ cerrar, resumen, decidir sobrante, periodo siguiente) — no toda la API
 de `docs/openapi.yaml` todavía. Probado de punta a punta contra el
 servidor real y un proyecto Supabase real, no solo con los tests.
 
+**Punto 11 — editar/eliminar gasto:** genera por fin el
+`movimientoRevertidoId` que quedó pendiente desde el punto 2 (ADR-001).
+Un solo mecanismo (reversión, nunca mutación) para ambos casos —
+periodo activo o ya cerrado — que solo cambia a qué periodo va a parar
+la corrección. De paso, corrigió un hallazgo real: `registrarIngreso`/
+`registrarGasto` nunca habían expuesto `fechaReferencia`, lo que dejaba
+buena parte de la suite de tests dependiente de la fecha real del
+reloj (ver sección "Gastos").
+
+**Punto 12 — listar ingresos y gastos:** `GET /periodos/:periodoId/ingresos`
+y `GET /periodos/:periodoId/gastos` (este último paginado por keyset,
+`?cursor&limite`) — lo mínimo para que un cliente pueda ver de vuelta
+lo que ya capturó, no solo el resumen agregado. Un gasto editado o
+eliminado sigue apareciendo tal cual en la lista (nunca hard delete).
+
 ## 1. Crear el proyecto Supabase
 
 Crear un proyecto en https://supabase.com (plan free). De **Project
@@ -284,9 +299,12 @@ esto habría creado.
 **Deliberadamente delgada:** la tabla `ingresos` solo guarda
 `periodoId` + `movimientoId` — monto, moneda, fecha efectiva y nota
 viven en `movimientos` (que el ingreso genera vía
-`registrarMovimientoTx`), no se duplican. Leer un ingreso completo
-implica un `JOIN` a `movimientos`; no hay una consulta así todavía
-porque no hay endpoint que la necesite.
+`registrarMovimientoTx`), no se duplican. `listarIngresos` es el primer
+consumidor que sí hace ese `JOIN` (`GET /periodos/:periodoId/ingresos`,
+sin paginación — el contrato no la pide para ingresos, casi siempre
+son pocos por periodo, invariante 12). El monto que devuelve viene de
+la pata del asiento con `cuentaId` no nulo — siempre positiva para un
+ingreso, por construcción, sin necesitar `abs()`.
 
 **Refactor que esto forzó en el ledger.** `registrarMovimiento` (y
 `crearCuenta`, desde periodos) abrían su propia transacción, lo que
@@ -334,6 +352,94 @@ explícitamente en `test/integracion/gastos.test.ts`.
 módulo de categorías no existe todavía y agregar una columna sin tabla
 real a la que apuntar sería peor que omitirla. Se agrega cuando ese
 módulo exista.
+
+### Editar y eliminar un gasto (`editarGasto`, `eliminarGasto`)
+
+Genera por fin el `movimientoRevertidoId` que quedó pendiente desde
+`db/schema/ledger.ts` (ADR-001): revertir es crear un movimiento
+`tipo: 'reversion'` con las partidas invertidas, nunca tocar la fila
+original — `gastos` sigue siendo inmutable, tal cual antes; lo único
+nuevo es que ahora sí existe un camino para "corregir" sin violarlo.
+
+**Hallazgo antes de escribir código:** `modelo-dominio.md` §3 describe
+editar/borrar un gasto del periodo *activo* como "directo, sin
+reversión" — pero los triggers de inmutabilidad (`ledger_bloquear_mutacion`
+sobre `movimientos`/`asientos`, `gastos_inmutables` sobre `gastos`) ya
+bloquean cualquier `UPDATE`/`DELETE` sin excepción por estado del
+periodo. No hay, ni puede haber, un camino "directo". La lectura
+consistente con ADR-001 (no negociable) y con la propia `openapi.yaml`
+(que para `DELETE` sí dice "el asiento se revierte", incluso en periodo
+activo) es que el mecanismo es siempre el mismo — reversión — y lo
+único que cambia entre periodo activo y cerrado es **a qué periodo va
+a parar la corrección**.
+
+**Mecanismo único para ambos casos:** la reversión (y, al editar, el
+movimiento nuevo con el monto corregido) siempre se registra contra el
+**periodo activo actual** — nunca contra la cuenta del periodo
+original. Si el gasto seguía en el periodo activo, ese "periodo activo
+actual" resulta ser el mismo de siempre (edición "normal", sin cruce).
+Si el periodo original ya cerró, su saldo congelado nunca se vuelve a
+tocar (invariantes 5 y 15: un periodo cerrado no cambia de saldo, su
+resumen es inmutable) y la corrección aparece en el disponible que el
+usuario ve hoy — exactamente como pide la tabla de casos límite de
+modelo-dominio.md §3. `ajusteGenerado` en la respuesta de `PATCH`
+distingue ambos casos para el cliente.
+
+Si no hay ningún periodo activo cuando se intenta corregir un gasto
+viejo (nadie ha creado el periodo siguiente todavía), se rechaza con
+`SIN_PERIODO_ACTIVO` (409) en vez de perder la corrección en silencio
+o inventar un periodo. Corregir el mismo gasto dos veces (dos
+`DELETE`, o `PATCH` después de `DELETE`) se rechaza con
+`GASTO_YA_REVERTIDO` (409) — se detecta buscando si ya existe un
+movimiento cuyo `movimientoRevertidoId` apunte al de este gasto, sin
+necesitar una columna de estado nueva.
+
+**`categoriaId` en `PATCH` responde `NO_SOPORTADO` (501)**, mismo
+criterio que en cierre: el campo es válido según el contrato, no está
+implementado. **`monto` se exige siempre en `PATCH`**, aunque
+`openapi.yaml` lo marca opcional — como `movimientos` también es
+inmutable, hasta "solo corregir la nota" exige el mismo reverso +
+asiento nuevo que corregir el monto; no hay un camino más barato para
+un cambio parcial.
+
+**Hallazgo aparte, encontrado al escribir las pruebas de este punto:**
+`registrarIngreso` y `registrarGasto` nunca habían expuesto un
+parámetro `fechaReferencia` para el cierre perezoso del periodo
+destino — a diferencia de `crearPeriodo`, `cerrarPeriodoManualmente` y
+`consultarDisponible`, que sí lo tenían desde su propio punto. Mientras
+la fecha real de "hoy" quedó dentro de la ventana de los periodos de
+prueba (agosto de 2026), pasó inadvertido; en cuanto el reloj real
+avanzó más allá, casi toda la suite de integración empezó a fallar:
+cada llamada sin `fechaReferencia` usaba `new Date()` real para decidir
+si el periodo seguía activo, y encontraba el periodo de prueba ya
+cerrado por el tiempo transcurrido. Se corrigió agregando el parámetro
+opcional a ambas funciones (default `new Date()`, igual que el resto)
+y pasándolo explícitamente en cada test que fija su propio "hoy" — ya
+no depende de cuándo se ejecute la suite.
+
+### Listar gastos (`listarGastos`)
+
+`GET /periodos/:periodoId/gastos` — a diferencia de ingresos, sí pagina
+(`?cursor=...&limite=...`, default 50, máximo 200): es el evento más
+frecuente del sistema (modelo-dominio.md §4), un periodo activo puede
+acumular muchos. Orden más reciente primero.
+
+**Cursor por keyset, no por offset.** El cursor codifica en base64url
+el par `(fechaRegistro, id)` del último elemento visto — no un número
+de página. Un offset numérico se puede volver inconsistente si se
+inserta un gasto nuevo entre una página y la siguiente (todo se
+recorre o algo se salta); el keyset no tiene ese problema porque cada
+página pide explícitamente "lo que sigue después de este punto exacto"
+en vez de "la fila N". Un cursor mal formado responde `400 VALIDACION`,
+no un 500 ni resultados silenciosamente vacíos.
+
+**Un gasto editado o eliminado sigue apareciendo en la lista**, con su
+monto original — nunca hard delete (Documento Maestro §7.6). La lista
+es el historial honesto de lo que se capturó, no el estado económico
+vigente (eso lo da el ledger, vía `disponible`/`resumen`); mostrar
+cuál de estos gastos ya fue corregido es un problema de presentación
+que le toca al cliente, no algo que este endpoint resuelva — `Gasto` en
+`openapi.yaml` no define ningún campo para eso todavía.
 
 ## Disponible (el motor de flujo de caja)
 
@@ -609,17 +715,17 @@ a producir esa condición por sí solo.
 ```
 src/shared/http.ts                     # registrarManejadorErroresDominio, montoADto/montoDesdeDto
 src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo
-src/modulos/ingresos/rutas.ts          # POST /periodos/:periodoId/ingresos
-src/modulos/gastos/rutas.ts            # POST /periodos/:periodoId/gastos
+src/modulos/ingresos/rutas.ts          # POST/GET /periodos/:periodoId/ingresos
+src/modulos/gastos/rutas.ts            # POST/GET /periodos/:periodoId/gastos, PATCH/DELETE /gastos/:gastoId
 src/modulos/disponible/rutas.ts        # GET /periodos/activo/disponible
 src/modulos/cierre/rutas.ts            # POST .../cerrar, GET .../resumen, POST .../sobrante/decision
 ```
 
-Los ocho endpoints mínimos para ejercer el ciclo central — no la API
-completa de `docs/openapi.yaml` (sin paginación, sin editar/eliminar
-gasto, sin metas, sin categorías). Todos viven bajo `/v1` y detrás del
-mismo `authPlugin` que ya protege `/v1/me` desde el punto 1 — nada
-nuevo en autenticación, solo se extiende.
+Doce endpoints para ejercer el ciclo central, corregir un gasto y ver
+de vuelta lo que se capturó — no la API completa de
+`docs/openapi.yaml` (sin metas, sin categorías). Todos viven bajo `/v1`
+y detrás del mismo `authPlugin` que ya protege `/v1/me` desde el punto
+1 — nada nuevo en autenticación, solo se extiende.
 
 **Cada ruta llama directo a la función de dominio que ya existía y
 estaba probada.** No hay lógica de negocio nueva en `rutas.ts` — son
@@ -631,10 +737,12 @@ aquí.
 **Mapeo de errores, centralizado.** `registrarManejadorErroresDominio`
 es un `setErrorHandler` global: traduce cualquier `ErrorDominio` a
 `{codigo, mensaje}` con el status correcto
-(`PERIODO_NO_ENCONTRADO`→404, `PERIODO_NO_ACTIVO`→409,
-`SOBRANTE_YA_DECIDIDO`→409, `VALIDACION`→400, `NO_SOPORTADO`→501 — no
-400: el valor es válido según el contrato, simplemente no está
-implementado, mismo criterio que ya se usaba en `decidirSobrante`).
+(`PERIODO_NO_ENCONTRADO`→404, `GASTO_NO_ENCONTRADO`→404,
+`PERIODO_NO_ACTIVO`→409, `SOBRANTE_YA_DECIDIDO`→409,
+`SIN_PERIODO_ACTIVO`→409, `GASTO_YA_REVERTIDO`→409, `VALIDACION`→400,
+`NO_SOPORTADO`→501 — no 400: el valor es válido según el contrato,
+simplemente no está implementado, mismo criterio que ya se usaba en
+`decidirSobrante`).
 También respeta el `statusCode` que Fastify ya trae en sus propios
 errores de framework (body JSON vacío o mal formado, ruta inexistente)
 en vez de aplastarlos a 500 — **bug real, no hipotético**, encontrado
@@ -681,7 +789,13 @@ ciclo entero contra el servidor local apuntando a tu Supabase real:
 autenticación → crear periodo → ingreso → disponible → dos gastos
 (consultando disponible entre cada uno, para ver el sobregiro) →
 cerrar → resumen → decidir sobrante → crear el periodo siguiente →
-confirmar que heredó el arrastre.
+confirmar que heredó el arrastre (pasos 1-17) — y a partir de ahí,
+listar ingresos/gastos del primer periodo (con paginación), editar y
+eliminar dos de esos gastos ya en un periodo cerrado (para ver el
+ajuste cruzar al periodo activo de hoy), y confirmar que siguen
+apareciendo en la lista aunque ya estén corregidos (pasos 18-25). El
+archivo se sigue extendiendo así, en el mismo orden en que se van
+agregando módulos — no hace falta un archivo nuevo por cada punto.
 
 **Cómo correrlo:**
 
@@ -711,7 +825,10 @@ déficit del paso 8 ya se arrastró solo al cerrar, y el paso 15
 (`GET .../disponible` del periodo siguiente, antes de su primer
 ingreso) da `estado: 'sin_ingreso'` aunque el arrastre ya esté en el
 ledger — modelo-dominio.md §5 no muestra la cifra como cierta hasta
-que hay un ingreso real de ese periodo.
+que hay un ingreso real de ese periodo. Más adelante, el paso 25
+(`DELETE` sobre un gasto que el paso 22 ya eliminó) da `409
+GASTO_YA_REVERTIDO` a propósito — es la prueba de que no se puede
+corregir el mismo gasto dos veces.
 
 ## Qué valida este punto
 
@@ -761,11 +878,24 @@ que hay un ingreso real de ese periodo.
   (su ventana contiene hoy), tanto al cerrarse perezosamente el que lo
   bloqueaba como al tocar el tenant después de un cierre manual — sin
   activar uno cuya ventana ya quedó completamente atrás.
-- Los ocho endpoints mínimos exponen el ciclo completo sobre HTTP real,
+- Los doce endpoints exponen el ciclo completo sobre HTTP real,
   con el mismo `authPlugin` y las mismas funciones de dominio ya
   probadas — no hay lógica nueva en las rutas. Validado de punta a
   punta contra el servidor real y un proyecto Supabase real (no solo
   con los tests), incluido el archivo `.http` versionado en el repo.
+- Editar o eliminar un gasto nunca muta ni borra su fila, ni la del
+  movimiento original (los triggers de inmutabilidad lo impiden sin
+  excepción) — siempre generan una reversión, que aterriza en el
+  periodo activo actual sin importar si el gasto era de ese mismo
+  periodo o de uno ya cerrado. Un periodo cerrado nunca vuelve a
+  cambiar de saldo por esta vía (invariantes 5 y 15), y corregir el
+  mismo gasto dos veces se rechaza explícitamente.
+- Listar ingresos o gastos de un periodo respeta el mismo aislamiento
+  por tenant que el resto (un `periodoId` ajeno no distingue "no
+  existe" de "no es tuyo"); la paginación de gastos por keyset no
+  pierde ni repite filas si se inserta un gasto nuevo entre una página
+  y la siguiente, y un cursor mal formado se rechaza explícitamente en
+  vez de fallar en silencio.
 
 ## Qué falta
 
@@ -789,10 +919,10 @@ a propósito para decidirlos juntos:
 
 ### Después de eso
 
-Ingresos/gastos retroactivos y edición sobre periodo cerrado (requiere
-el mecanismo de reversión de ADR-001, todavía sin tocar), metas de
-ahorro (para activar `'ahorrar'` en la decisión de sobrante, y para
+Editar/eliminar un **ingreso** (openapi.yaml no define ese endpoint
+todavía — solo gastos lo tienen), metas de ahorro (para activar
+`'ahorrar'` en la decisión de sobrante — hoy `NO_SOPORTADO` — y para
 que `reclamarArrastresTx` sepa qué hacer con un arrastre decidido como
-`'ahorrado'`), y el resto de la API de `docs/openapi.yaml` que los
-ocho endpoints actuales no cubren (paginación, editar/eliminar gasto,
+`'ahorrado'`), y el resto de la API de `docs/openapi.yaml` que los doce
+endpoints actuales no cubren (categorías, y la propia entidad de
 categorías).

@@ -1,4 +1,4 @@
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { asientos, cuentas, movimientos, type TipoCuenta, type TipoMovimiento } from '../../db/schema/ledger.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 
@@ -90,6 +90,63 @@ export async function registrarMovimientoTx(tx: Ejecutor, entrada: RegistrarMovi
 
 export async function registrarMovimiento(entrada: RegistrarMovimientoEntrada): Promise<{ movimientoId: string }> {
   return conTenant(entrada.tenantId, (tx) => registrarMovimientoTx(tx, entrada));
+}
+
+/**
+ * Genera el `movimientoRevertidoId` que quedó pendiente desde que se
+ * definió esta tabla (ver comentario en db/schema/ledger.ts): un
+ * movimiento `tipo: 'reversion'` con las mismas partidas que el
+ * original pero invertidas.
+ *
+ * `cuentaDestino` casi nunca es la cuenta del movimiento original — es
+ * la cuenta del periodo ACTIVO actual. Un movimiento de un periodo ya
+ * cerrado no puede volver a tocar el saldo de ESE periodo (invariantes
+ * 5 y 15, modelo-dominio.md: un periodo cerrado no cambia de saldo
+ * nunca, y su resumen es inmutable); la corrección completa —reversión
+ * y, si aplica, el asiento nuevo— se registra en el periodo activo de
+ * hoy, tal como exige la tabla de casos límite de modelo-dominio.md §3.
+ * Cuando el gasto original SÍ sigue en el periodo activo, `cuentaDestino`
+ * resulta ser la misma cuenta de siempre — no es un caso especial, es
+ * el mismo cálculo con el mismo resultado.
+ *
+ * La partida con `cuentaId: null` (contraparte externa) se invierte tal
+ * cual, sin redirigir — no representa ningún periodo, no hay nada que
+ * reapuntar.
+ */
+export async function revertirMovimientoTx(
+  tx: Ejecutor,
+  tenantId: string,
+  movimientoIdOriginal: string,
+  cuentaDestino: string,
+  fechaEfectiva: string,
+  nota?: string
+): Promise<{ movimientoId: string }> {
+  const [movimientoOriginal] = await tx
+    .select({ moneda: movimientos.moneda })
+    .from(movimientos)
+    .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.id, movimientoIdOriginal)))
+    .limit(1);
+  if (!movimientoOriginal) throw new Error('No se encontró el movimiento a revertir');
+
+  const asientosOriginales = await tx
+    .select({ cuentaId: asientos.cuentaId, montoValorMinimo: asientos.montoValorMinimo })
+    .from(asientos)
+    .where(and(eq(asientos.tenantId, tenantId), eq(asientos.movimientoId, movimientoIdOriginal)));
+
+  const partidasInvertidas: Partida[] = asientosOriginales.map((asiento) => ({
+    cuentaId: asiento.cuentaId === null ? null : cuentaDestino,
+    montoValorMinimo: -asiento.montoValorMinimo,
+  }));
+
+  return registrarMovimientoTx(tx, {
+    tenantId,
+    tipo: 'reversion',
+    moneda: movimientoOriginal.moneda,
+    fechaEfectiva,
+    nota,
+    movimientoRevertidoId: movimientoIdOriginal,
+    partidas: partidasInvertidas,
+  });
 }
 
 export async function obtenerSaldoCuenta(tenantId: string, cuentaId: string): Promise<bigint> {

@@ -10,10 +10,10 @@ import { gastos } from '../../src/db/schema/gastos.js';
 import { resumenes } from '../../src/db/schema/cierre.js';
 import { arrastres } from '../../src/db/schema/arrastres.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
-import { crearCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { crearCuenta, obtenerSaldoCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
-import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
-import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
+import { listarIngresos, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
+import { eliminarGasto, listarGastos, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { conTenant, db } from '../../src/shared/db.js';
 
@@ -119,6 +119,7 @@ describe('aislamiento por tenant (RLS)', () => {
       monto: 1000n,
       moneda: 'MXN',
       fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
     });
 
     const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(ingresos).where(eq(ingresos.id, ingresoIdB)));
@@ -137,11 +138,67 @@ describe('aislamiento por tenant (RLS)', () => {
       monto: 1000n,
       moneda: 'MXN',
       fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
     });
 
     const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(gastos).where(eq(gastos.id, gastoIdB)));
 
     expect(filas).toHaveLength(0);
+  });
+
+  it('un tenant no puede eliminar el gasto de otro tenant vía gastoId (BOLA)', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-editar-gasto-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-editar-gasto-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const { id: gastoIdB } = await registrarGasto({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+
+    // El `WHERE tenantId = <A>` de eliminarGasto (más RLS por debajo) no
+    // distingue "no existe" de "existe pero es de otro tenant" — mismo
+    // criterio de defensa en profundidad que ya se prueba para periodos.
+    await expect(
+      eliminarGasto({ tenantId: identidadA.tenantId, gastoId: gastoIdB, fechaReferencia: new Date('2026-08-01T00:00:00Z') })
+    ).rejects.toMatchObject({
+      codigo: 'GASTO_NO_ENCONTRADO',
+    });
+
+    // Y el gasto de B sigue intacto: A no logró revertirlo de rebote.
+    expect(await obtenerSaldoCuenta(identidadB.tenantId, periodoB.cuentaId)).toBe(-1000n);
+  });
+
+  it('un tenant no puede listar los ingresos ni los gastos del periodo de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-listar-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-listar-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+    await registrarGasto({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 500n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+
+    // Mismo criterio que el resto: "no existe" y "existe pero es de otro
+    // tenant" se ven idénticos desde A.
+    await expect(listarIngresos(identidadA.tenantId, periodoB.id)).rejects.toMatchObject({ codigo: 'PERIODO_NO_ENCONTRADO' });
+    await expect(listarGastos(identidadA.tenantId, periodoB.id)).rejects.toMatchObject({ codigo: 'PERIODO_NO_ENCONTRADO' });
   });
 
   it('un tenant no puede leer el resumen de cierre de otro tenant', async () => {
@@ -155,6 +212,7 @@ describe('aislamiento por tenant (RLS)', () => {
       monto: 1000n,
       moneda: 'MXN',
       fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
     });
     const resumenB = await cerrarPeriodoManualmente(identidadB.tenantId, periodoB.id, new Date('2026-08-10T00:00:00Z'));
 
@@ -174,6 +232,7 @@ describe('aislamiento por tenant (RLS)', () => {
       monto: 500n,
       moneda: 'MXN',
       fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
     });
     // Déficit: arrastrado automático, genera una fila en arrastres al cerrar.
     await cerrarPeriodoManualmente(identidadB.tenantId, periodoB.id, new Date('2026-08-10T00:00:00Z'));

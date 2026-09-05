@@ -1,6 +1,17 @@
 import type { FastifyInstance } from 'fastify';
-import { registrarIngreso } from './registrar-ingreso.js';
-import { montoDesdeDto, type MontoDto } from '../../shared/http.js';
+import { listarIngresos, registrarIngreso, type IngresoDetallado } from './registrar-ingreso.js';
+import { montoADto, montoDesdeDto, type MontoDto } from '../../shared/http.js';
+
+function ingresoADto(ingreso: IngresoDetallado) {
+  return {
+    id: ingreso.id,
+    periodoId: ingreso.periodoId,
+    monto: montoADto(ingreso.montoValorMinimo, ingreso.moneda),
+    fechaEfectiva: ingreso.fechaEfectiva,
+    fechaRegistro: ingreso.fechaRegistro.toISOString(),
+    nota: ingreso.nota ?? undefined,
+  };
+}
 
 interface RegistrarIngresoBody {
   monto: MontoDto;
@@ -32,5 +43,10 @@ export async function rutasIngresos(app: FastifyInstance): Promise<void> {
     });
 
     reply.code(201).send({ id: resultado.id, movimientoId: resultado.movimientoId, periodoId: request.params.periodoId });
+  });
+
+  app.get<{ Params: { periodoId: string } }>('/periodos/:periodoId/ingresos', async (request, reply) => {
+    const ingresos = await listarIngresos(request.identidad.tenantId, request.params.periodoId);
+    reply.send(ingresos.map(ingresoADto));
   });
 }

@@ -102,7 +102,7 @@ export async function obtenerPeriodoActivo(tenantId: string, fechaReferencia: Da
  * camino normal, no como mecanismo principal — el tope de "mínimo 1 día"
  * en modulos/disponible/motor-flujo-caja.ts.
  */
-async function obtenerPeriodoActivoTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date): Promise<Periodo | null> {
+export async function obtenerPeriodoActivoTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date): Promise<Periodo | null> {
   await resolverPendientesTx(tx, tenantId, fechaReferencia);
 
   const [fila] = await tx

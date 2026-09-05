@@ -24,7 +24,14 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
   it('un sobrante positivo pendiente NO se reclama al crear el periodo siguiente', async () => {
     const tenantId = await tenantNuevo();
     const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: p1.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
     // Sin decidirSobrante: sigue 'pendiente'.
 
@@ -40,7 +47,14 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
   it('un sobrante decidido como arrastrar se reclama al crear el periodo siguiente', async () => {
     const tenantId = await tenantNuevo();
     const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: p1.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
     await decidirSobrante(tenantId, p1.id, 'arrastrar');
 
@@ -52,8 +66,9 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
   it('un déficit se arrastra automáticamente y el periodo siguiente nace ya descontado', async () => {
     const tenantId = await tenantNuevo();
     const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 500n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
-    await registrarGasto({ tenantId, periodoId: p1.id, monto: 2000n, moneda: 'MXN', fechaEfectiva: '2026-08-02' });
+    const hoy1 = new Date('2026-08-01T00:00:00Z');
+    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 500n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy1 });
+    await registrarGasto({ tenantId, periodoId: p1.id, monto: 2000n, moneda: 'MXN', fechaEfectiva: '2026-08-02', fechaReferencia: hoy1 });
     // Déficit: decisionSobrante ya queda 'arrastrado' al cerrar, sin decidirSobrante.
     await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
 
@@ -66,7 +81,14 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
     const tenantId = await tenantNuevo();
 
     const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: p1.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
     // p1 sigue 'pendiente' cuando se crea p2 (6 días desde el cierre,
     // bajo el umbral del barrido de N días) — no se reclama todavía.
@@ -78,7 +100,14 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
     // reclama automáticamente en ese momento, solo al crear el próximo.
     await decidirSobrante(tenantId, p1.id, 'arrastrar');
 
-    await registrarGasto({ tenantId, periodoId: p2.id, monto: 200n, moneda: 'MXN', fechaEfectiva: '2026-08-17' });
+    await registrarGasto({
+      tenantId,
+      periodoId: p2.id,
+      monto: 200n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-17',
+      fechaReferencia: new Date('2026-08-17T00:00:00Z'),
+    });
     // p2 cierra con déficit (0 - 200): se arrastra automático.
     await cerrarPeriodoManualmente(tenantId, p2.id, new Date('2026-08-25T00:00:00Z'));
 
@@ -91,7 +120,14 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
   it('el arrastre de un tenant nunca se filtra al periodo nuevo de otro tenant (filtro explícito por tenant, no solo RLS)', async () => {
     const tenantA = await tenantNuevo();
     const pA = await crearPeriodo(tenantA, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-    await registrarGasto({ tenantId: tenantA, periodoId: pA.id, monto: 400n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarGasto({
+      tenantId: tenantA,
+      periodoId: pA.id,
+      monto: 400n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     // Déficit de A: -400, arrastrado automático.
     await cerrarPeriodoManualmente(tenantA, pA.id, new Date('2026-08-10T00:00:00Z'));
 

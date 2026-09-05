@@ -1,5 +1,6 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq, isNotNull } from 'drizzle-orm';
 import { ingresos } from '../../db/schema/ingresos.js';
+import { asientos, movimientos } from '../../db/schema/ledger.js';
 import { registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { conTenant } from '../../shared/db.js';
@@ -14,6 +15,14 @@ export interface RegistrarIngresoEntrada {
   /** 'YYYY-MM-DD' — cuándo llegó realmente el dinero (ADR-007), no cuándo se registra. */
   fechaEfectiva: string;
   nota?: string;
+  /**
+   * Para el cierre perezoso que resuelve el periodo destino (ADR-004:
+   * "fecha objetivo pasada como parámetro, nunca now() dentro del job").
+   * Por defecto `new Date()` — el caso real. Exponerlo (en vez de dejarlo
+   * fijo dentro de la función, como estaba antes) es lo que le permite a
+   * un test fijar "hoy" y no depender de la fecha real de cuando corra.
+   */
+  fechaReferencia?: Date;
 }
 
 export interface IngresoRegistrado {
@@ -36,7 +45,7 @@ export async function registrarIngreso(entrada: RegistrarIngresoEntrada): Promis
   }
 
   return conTenant(entrada.tenantId, async (tx) => {
-    const periodo = await obtenerPeriodoPorIdTx(tx, entrada.tenantId, entrada.periodoId);
+    const periodo = await obtenerPeriodoPorIdTx(tx, entrada.tenantId, entrada.periodoId, entrada.fechaReferencia ?? new Date());
     if (!periodo) {
       throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
     }
@@ -82,5 +91,56 @@ export async function existeIngresoParaPeriodo(tenantId: string, periodoId: stri
       .limit(1);
 
     return fila !== undefined;
+  });
+}
+
+export interface IngresoDetallado {
+  id: string;
+  periodoId: string;
+  montoValorMinimo: bigint;
+  moneda: string;
+  fechaEfectiva: string;
+  fechaRegistro: Date;
+  nota: string | null;
+}
+
+/**
+ * openapi.yaml `GET /periodos/{periodoId}/ingresos`: sin paginación (a
+ * diferencia de gastos, que sí la define) — un periodo tiene "cero o
+ * varios" ingresos (invariante 12), casi siempre pocos, así que el
+ * contrato no la pidió.
+ *
+ * `montoValorMinimo` sale de la pata del asiento con `cuentaId` no nulo
+ * (la que sí representa una cuenta real, ver comentario de `cuentaId`
+ * en db/schema/ledger.ts): para un ingreso siempre es positiva, por
+ * construcción de `registrarIngreso` — no hace falta `abs()`.
+ */
+export async function listarIngresos(
+  tenantId: string,
+  periodoId: string,
+  fechaReferencia: Date = new Date()
+): Promise<IngresoDetallado[]> {
+  return conTenant(tenantId, async (tx) => {
+    const periodo = await obtenerPeriodoPorIdTx(tx, tenantId, periodoId, fechaReferencia);
+    if (!periodo) {
+      throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
+    }
+
+    const filas = await tx
+      .select({
+        id: ingresos.id,
+        montoValorMinimo: asientos.montoValorMinimo,
+        moneda: movimientos.moneda,
+        fechaEfectiva: movimientos.fechaEfectiva,
+        fechaRegistro: movimientos.fechaRegistro,
+        nota: movimientos.nota,
+      })
+      .from(ingresos)
+      .innerJoin(movimientos, eq(movimientos.id, ingresos.movimientoId))
+      .innerJoin(asientos, and(eq(asientos.movimientoId, ingresos.movimientoId), isNotNull(asientos.cuentaId)))
+      .where(and(eq(ingresos.tenantId, tenantId), eq(ingresos.periodoId, periodoId)))
+      .orderBy(desc(movimientos.fechaRegistro));
+
+    return filas.map((fila) => ({ ...fila, periodoId }));
   });
 }

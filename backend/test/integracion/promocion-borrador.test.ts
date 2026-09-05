@@ -76,7 +76,14 @@ describe('promoción de borrador a activo', () => {
   it('al cerrar perezosamente el periodo vencido, promueve el borrador que ya le toca, en la misma operación', async () => {
     const tenantId = await tenantNuevo();
     const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 500n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: p1.id,
+      monto: 500n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     const borrador = await insertarBorrador(tenantId, '2026-08-16', '2026-08-31');
 
     const activo = await obtenerPeriodoActivo(tenantId, new Date('2026-08-20T00:00:00Z'));
@@ -90,7 +97,14 @@ describe('promoción de borrador a activo', () => {
   it('el borrador promovido reclama arrastres ya decididos como arrastrar', async () => {
     const tenantId = await tenantNuevo();
     const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: p1.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
     await decidirSobrante(tenantId, p1.id, 'arrastrar');
 

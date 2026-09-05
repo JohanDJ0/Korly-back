@@ -48,6 +48,7 @@ GET {{baseUrl}}/periodos/activo/disponible
 Authorization: Bearer {{authToken}}
 
 ### 6. Registrar un primer gasto pequeño.
+# @name registrarGasto1
 POST {{baseUrl}}/periodos/{{periodoId}}/gastos
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -63,6 +64,7 @@ GET {{baseUrl}}/periodos/activo/disponible
 Authorization: Bearer {{authToken}}
 
 ### 8. Registrar un segundo gasto, grande a propósito, para forzar sobregiro y ver el arrastre automático de déficit más adelante.
+# @name registrarGasto2
 POST {{baseUrl}}/periodos/{{periodoId}}/gastos
 Authorization: Bearer {{authToken}}
 Content-Type: application/json
@@ -128,4 +130,49 @@ Content-Type: application/json
 
 ### 17. Consultar disponible — debe reflejar el ingreso de este periodo MENOS el arrastre heredado del anterior. Con los montos de este archivo tal cual: 100000 - 450000 = -350000.
 GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}
+
+### --- Editar/eliminar gasto y listar movimientos (agregado después del ciclo base) ---
+### Todo lo de aquí en adelante opera sobre el PRIMER periodo ({{periodoId}}),
+### que ya quedó cerrado en el paso 10 — a propósito, para ejercer el caso
+### más interesante: el ajuste de una corrección aterriza en el periodo
+### activo de HOY ({{periodoSiguienteId}}), nunca en el cerrado.
+
+### 18. Listar los ingresos del primer periodo — debe traer el único del paso 4.
+GET {{baseUrl}}/periodos/{{periodoId}}/ingresos
+Authorization: Bearer {{authToken}}
+
+### 19. Listar los gastos del primer periodo, de a uno (limite=1), para ver la paginación. Trae el más reciente (el del paso 8) y un siguienteCursor no nulo.
+# @name listarGastosPagina1
+GET {{baseUrl}}/periodos/{{periodoId}}/gastos?limite=1
+Authorization: Bearer {{authToken}}
+
+### 20. Con ese cursor, la segunda página trae el otro gasto (el del paso 6) y siguienteCursor ya null — no hay más.
+GET {{baseUrl}}/periodos/{{periodoId}}/gastos?limite=1&cursor={{listarGastosPagina1.response.body.siguienteCursor}}
+Authorization: Bearer {{authToken}}
+
+### 21. Editar el gasto del paso 6 (el pequeño, $500). Su periodo ya cerró, así que ajusteGenerado debe salir true y periodoDelAjuste debe ser {{periodoSiguienteId}} — no {{periodoId}}.
+PATCH {{baseUrl}}/gastos/{{registrarGasto1.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 80000, "moneda": "MXN" },
+  "nota": "Super, corregido — era 500, en realidad 800"
+}
+
+### 22. Eliminar el gasto del paso 8 (el grande, el que forzó el sobregiro). También cruza al periodo activo de hoy.
+DELETE {{baseUrl}}/gastos/{{registrarGasto2.response.body.id}}
+Authorization: Bearer {{authToken}}
+
+### 23. Repetir el disponible de hoy — debe reflejar los dos ajustes del 21 y 22 encima de lo que ya tenía el paso 17.
+GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}
+
+### 24. Listar los gastos del primer periodo OTRA VEZ — los dos originales (pasos 6 y 8) siguen apareciendo tal cual, con sus montos de siempre. Nunca hard delete: lo que cambió es su efecto en el ledger, no su fila (Documento Maestro §7.6).
+GET {{baseUrl}}/periodos/{{periodoId}}/gastos
+Authorization: Bearer {{authToken}}
+
+### 25. Intentar eliminar el gasto del paso 8 otra vez — 409 GASTO_YA_REVERTIDO. No es un bug: ya se corrigió en el paso 22, no se puede corregir dos veces el mismo.
+DELETE {{baseUrl}}/gastos/{{registrarGasto2.response.body.id}}
 Authorization: Bearer {{authToken}}

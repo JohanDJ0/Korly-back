@@ -32,8 +32,9 @@ describe('cierre', () => {
 
   it('cierra un periodo activo manualmente y genera su resumen con sobrante positivo', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 3000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
-    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 1200n, moneda: 'MXN', fechaEfectiva: '2026-08-02' });
+    const hoy = new Date('2026-08-01T00:00:00Z');
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 3000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 1200n, moneda: 'MXN', fechaEfectiva: '2026-08-02', fechaReferencia: hoy });
 
     const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
@@ -49,8 +50,23 @@ describe('cierre', () => {
 
   it('déficit: arrastre automático, sin quedar pendiente de decisión', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
-    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 6000n, moneda: 'MXN', fechaEfectiva: '2026-08-02' });
+    const hoyDeficit = new Date('2026-08-01T00:00:00Z');
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: hoyDeficit,
+    });
+    await registrarGasto({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 6000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-02',
+      fechaReferencia: hoyDeficit,
+    });
 
     const fechaCierre = new Date('2026-08-10T00:00:00Z');
     const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, fechaCierre);
@@ -62,7 +78,14 @@ describe('cierre', () => {
 
   it('cerrar dos veces es idempotente: devuelve el mismo resumen, no genera otro', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 500n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 500n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
 
     const primero = await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
     const segundo = await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-12T00:00:00Z'));
@@ -95,7 +118,14 @@ describe('cierre', () => {
 
   it('un periodo vencido se cierra solo al consultarlo, sin llamar a cerrarPeriodoManualmente', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo(); // fin = 2026-08-15
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 700n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 700n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
 
     const despuesDeVencer = new Date('2026-08-20T00:00:00Z');
 
@@ -121,7 +151,14 @@ describe('cierre', () => {
 
   it('"ahorrar" no está soportado: requiere el módulo de metas', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
     await expect(decidirSobrante(tenantId, periodo.id, 'ahorrar')).rejects.toMatchObject({ codigo: 'NO_SOPORTADO' });
@@ -129,7 +166,14 @@ describe('cierre', () => {
 
   it('decide arrastrar un sobrante positivo pendiente', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
     const resultado = await decidirSobrante(tenantId, periodo.id, 'arrastrar');
@@ -143,7 +187,14 @@ describe('cierre', () => {
 
   it('rechaza decidir dos veces sobre el mismo sobrante', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
     await decidirSobrante(tenantId, periodo.id, 'arrastrar');
@@ -153,8 +204,22 @@ describe('cierre', () => {
 
   it('rechaza decidir sobre un déficit ya auto-decidido', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
-    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-02' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 100n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+    await registrarGasto({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 5000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-02',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
     await expect(decidirSobrante(tenantId, periodo.id, 'arrastrar')).rejects.toMatchObject({ codigo: 'SOBRANTE_YA_DECIDIDO' });
@@ -162,7 +227,14 @@ describe('cierre', () => {
 
   it('rechaza decidir sobre el periodo cerrado de OTRO tenant como si no existiera', async () => {
     const { tenantId: tenantB, periodo: periodoB } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId: tenantB, periodoId: periodoB.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId: tenantB,
+      periodoId: periodoB.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantB, periodoB.id, new Date('2026-08-10T00:00:00Z'));
 
     const { tenantId: tenantA } = await tenantConPeriodoActivo();
@@ -174,7 +246,14 @@ describe('cierre', () => {
 
   it(`un sobrante pendiente por más de ${DIAS_DEFAULT_ARRASTRE} días se arrastra solo, sin acción del usuario`, async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
 
     const fechaCierre = new Date('2026-08-10T00:00:00Z');
     await cerrarPeriodoManualmente(tenantId, periodo.id, fechaCierre);
@@ -192,7 +271,14 @@ describe('cierre', () => {
 
   it('un resumen no se puede eliminar', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 100n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
     await expect(
@@ -202,7 +288,14 @@ describe('cierre', () => {
 
   it('un UPDATE que no decide nada (decision_sobrante sigue pendiente) se rechaza', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 100n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
     // No toca decision_sobrante en absoluto: sigue 'pendiente' antes y
@@ -217,7 +310,14 @@ describe('cierre', () => {
 
   it('no se puede alterar un monto ya generado, ni siquiera junto con una decisión válida', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 100n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
     await expect(
@@ -233,7 +333,14 @@ describe('cierre', () => {
 
   it('un resumen ya decidido no se puede modificar de ninguna forma, ni siquiera intentar volverlo a pendiente', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
-    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01' });
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 100n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
     await decidirSobrante(tenantId, periodo.id, 'arrastrar');
 

@@ -14,6 +14,13 @@ const CODIGO_A_STATUS: Record<string, number> = {
   PERIODO_NO_ACTIVO: 409,
   SOBRANTE_YA_DECIDIDO: 409,
   NO_SOPORTADO: 501,
+  GASTO_NO_ENCONTRADO: 404,
+  // No documentados en openapi.yaml (que solo lista 404 genérico para
+  // PATCH/DELETE /gastos/{gastoId}) — mismo criterio que NO_SOPORTADO:
+  // agregamos el código que realmente distingue el caso, en vez de
+  // forzarlo dentro de uno existente que significa otra cosa.
+  SIN_PERIODO_ACTIVO: 409,
+  GASTO_YA_REVERTIDO: 409,
 };
 
 /**

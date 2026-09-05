@@ -18,7 +18,11 @@ describe('periodos (estados e invariante de un solo activo)', () => {
     expect(periodo.fechaInicio).toBe('2026-08-01');
     expect(periodo.fechaFin).toBe('2026-08-15');
 
-    const activo = await obtenerPeriodoActivo(tenantId);
+    // Misma fecha de referencia que crearPeriodo: obtenerPeriodoActivo
+    // también resuelve el cierre perezoso (ver crear-periodo.ts), así
+    // que con la fecha real de HOY (bien pasado el 15 de agosto de
+    // 2026) cerraría este periodo de prueba antes de la aserción.
+    const activo = await obtenerPeriodoActivo(tenantId, new Date('2026-08-01T00:00:00Z'));
     expect(activo?.id).toBe(periodo.id);
   });
 
@@ -31,7 +35,7 @@ describe('periodos (estados e invariante de un solo activo)', () => {
     expect(primero.estado).toBe('activo');
     expect(segundo.estado).toBe('borrador');
 
-    const activo = await obtenerPeriodoActivo(tenantId);
+    const activo = await obtenerPeriodoActivo(tenantId, new Date('2026-08-01T00:00:00Z'));
     expect(activo?.id).toBe(primero.id);
   });
 

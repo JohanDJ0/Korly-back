@@ -3,7 +3,7 @@ import { sql } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
 import { asientos } from '../../src/db/schema/ledger.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
-import { crearCuenta, obtenerSaldoCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { crearCuenta, obtenerSaldoCuenta, registrarMovimiento, revertirMovimientoTx } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { conTenant } from '../../src/shared/db.js';
 
 /**
@@ -138,5 +138,61 @@ describe('ledger (partida doble)', () => {
     await expect(
       conTenant(tenantId, (tx) => tx.execute(sql`delete from asientos where movimiento_id = ${movimientoId}`))
     ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/inmutables/) } });
+  });
+
+  describe('revertirMovimientoTx', () => {
+    it('invierte las partidas y las redirige a la cuenta destino, sin tocar la original', async () => {
+      const tenantId = await tenantDePrueba();
+      const cuentaOriginal = await crearCuenta(tenantId, 'periodo');
+      const cuentaDestino = await crearCuenta(tenantId, 'periodo');
+
+      const { movimientoId } = await registrarMovimiento({
+        tenantId,
+        tipo: 'gasto',
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        partidas: [
+          { cuentaId: cuentaOriginal.id, montoValorMinimo: -70000n },
+          { cuentaId: null, montoValorMinimo: 70000n },
+        ],
+      });
+
+      const { movimientoId: movimientoReversionId } = await conTenant(tenantId, (tx) =>
+        revertirMovimientoTx(tx, tenantId, movimientoId, cuentaDestino.id, '2026-08-05', 'prueba')
+      );
+
+      expect(movimientoReversionId).not.toBe(movimientoId);
+      // La cuenta original nunca se toca — su saldo sigue reflejando
+      // solo el gasto de siempre, ninguna reversión pasó por ahí.
+      expect(await obtenerSaldoCuenta(tenantId, cuentaOriginal.id)).toBe(-70000n);
+      // La reversión (un crédito de +70000, la contraparte del gasto
+      // original) aterriza en la cuenta destino, no en la original.
+      expect(await obtenerSaldoCuenta(tenantId, cuentaDestino.id)).toBe(70000n);
+    });
+
+    it('deja movimientoRevertidoId apuntando al movimiento original', async () => {
+      const tenantId = await tenantDePrueba();
+      const cuenta = await crearCuenta(tenantId, 'periodo');
+
+      const { movimientoId } = await registrarMovimiento({
+        tenantId,
+        tipo: 'ingreso',
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        partidas: [
+          { cuentaId: cuenta.id, montoValorMinimo: 1000n },
+          { cuentaId: null, montoValorMinimo: -1000n },
+        ],
+      });
+
+      const [fila] = await conTenant(tenantId, async (tx) => {
+        const { movimientoId: movimientoReversionId } = await revertirMovimientoTx(tx, tenantId, movimientoId, cuenta.id, '2026-08-02');
+        return tx.execute<{ movimiento_revertido_id: string }>(
+          sql`select movimiento_revertido_id from movimientos where id = ${movimientoReversionId}`
+        );
+      });
+
+      expect(fila?.movimiento_revertido_id).toBe(movimientoId);
+    });
   });
 });

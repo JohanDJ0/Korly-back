@@ -16,10 +16,12 @@ import { tenants } from './tenants.js';
  * real a la cual apuntar, sería peor que omitirla — se agrega cuando
  * ese módulo exista, no antes.
  *
- * Sin edición/eliminación: el endpoint que lo permitiría (con reversión
- * automática si el periodo ya cerró, ver openapi.yaml `PATCH/DELETE
- * /gastos/{gastoId}`) está fuera de alcance de este punto. Por ahora es
- * inmutable igual que ingresos, vía el mismo trigger reutilizado.
+ * Inmutable vía el mismo trigger reutilizado que `ingresos` — y sigue
+ * siéndolo incluso con editar/eliminar ya implementado (ver
+ * modulos/gastos/registrar-gasto.ts, `editarGasto`/`eliminarGasto`):
+ * esta fila nunca se actualiza ni se borra. Corregir un gasto genera una
+ * reversión de su movimiento y, en una edición, una fila NUEVA aquí para
+ * el monto corregido — la fila original queda igual, para siempre.
  */
 export const gastos = pgTable(
   'gastos',
