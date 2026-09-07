@@ -710,6 +710,26 @@ directamente con las fechas que quieren ejercitar (bypaseando
 `crearPeriodo`), en vez de depender de que el mecanismo actual llegue
 a producir esa condición por sí solo.
 
+## CORS
+
+`@fastify/cors` se registra en `src/app.ts`, con origen configurable
+vía `CORS_ORIGIN` (lista separada por comas; default
+`http://localhost:5173`, el puerto de Vite en desarrollo).
+
+**Hallazgo real, no hipotético:** ningún test, ni `curl`, ni Postman,
+ni el archivo `.http` necesitaron esto nunca — ninguno pasa por un
+navegador. En cuanto el frontend (`frontend/`) intentó su primer
+`GET /me` real, Fastify respondía 404 al preflight `OPTIONS` (sin CORS
+no hay ninguna ruta para ese método) y el navegador nunca llegaba a
+mandar el request real. Si el frontend corre en un puerto distinto al
+default, `CORS_ORIGIN` tiene que incluirlo.
+
+Los métodos permitidos se declaran explícitos
+(`['GET', 'POST', 'PATCH', 'DELETE']`) — el default de
+`@fastify/cors` no incluye `PATCH`/`DELETE` (comprobado contra el
+servidor real con `curl -X OPTIONS`), lo que habría bloqueado editar y
+eliminar gasto desde el navegador aunque el preflight respondiera 204.
+
 ## Capa HTTP
 
 ```

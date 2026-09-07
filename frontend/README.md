@@ -5,6 +5,12 @@
 de Supabase Auth + pantalla de login real, contra el backend real. Sin
 registro público todavía — ver "Qué falta".
 
+**Punto 2 — pantalla de "disponible":** el aha moment del producto
+(documento-maestro-v2.md §13.3) — sin periodo activo → botón para
+crearlo; con periodo pero sin ingreso → formulario mínimo; con ingreso
+→ la cifra real. Probado de punta a punta contra el backend real, con
+un usuario nuevo (sin datos) para ejercer los tres estados.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -19,6 +25,14 @@ cp .env.example .env
   navegador.
 - `VITE_API_BASE_URL` — la URL del backend, incluyendo `/v1`
   (`http://localhost:3000/v1` para desarrollo local).
+
+**El backend necesita saber de este origen.** `backend/.env` debe
+tener `CORS_ORIGIN` incluyendo el puerto de este dev server
+(`http://localhost:5173` ya es el valor por defecto si se omite la
+variable — ver `backend/README.md`, sección "CORS"). Sin esto, el
+navegador bloquea todo request real con un preflight `OPTIONS`
+fallido — se ve en los logs del backend como `"Route OPTIONS:/v1/...
+not found"`.
 
 ## 2. Instalar y correr
 
@@ -37,16 +51,22 @@ email/password.
 ```
 src/
   lib/
-    supabase.ts   # cliente de Supabase — SOLO Auth (login, sesión)
-    api.ts        # cliente HTTP hacia el backend propio, con el Bearer token adjunto
-    utils.ts      # cn() de shadcn/ui
+    supabase.ts     # cliente de Supabase — SOLO Auth (login, sesión)
+    api.ts          # cliente HTTP hacia el backend propio, con el Bearer token adjunto
+    query-client.ts # instancia única de QueryClient — compartida con auth-store.ts
+    dinero.ts       # formatearMonto() — único lugar que convierte centavos a texto
+    utils.ts        # cn() de shadcn/ui
   stores/
     auth-store.ts # Zustand — la sesión de Supabase, sincronizada vía onAuthStateChange
+  hooks/
+    use-disponible.ts, use-crear-periodo.ts, use-registrar-ingreso.ts  # un hook de TanStack Query por endpoint
   routes/
     Login.tsx
-    Home.tsx          # placeholder del punto 1 — la pantalla real de "disponible" llega en el punto 2
+    Home.tsx          # la pantalla de "disponible" (punto 2) — sin periodo / sin ingreso / cifra real
     ProtectedRoute.tsx
-  components/ui/  # primitivos de shadcn/ui
+  components/
+    CifraDisponible.tsx, FormularioIngreso.tsx
+    ui/  # primitivos de shadcn/ui
 ```
 
 **El frontend nunca lee datos de negocio directo de Supabase.** Solo
@@ -64,6 +84,21 @@ de Supabase ya expone un patrón de suscripción
 (`onAuthStateChange`) — `auth-store.ts` simplemente lo conecta a un
 store de Zustand una sola vez al cargar el módulo, sin duplicar el
 mecanismo con Context.
+
+**Hallazgo real, encontrado probando el cambio de usuario en el
+navegador (no hipotético):** la caché de TanStack Query vive por
+`queryKey`, no por usuario — `['disponible']` es la misma key sin
+importar quién esté logueado. Cerrar sesión e iniciar con OTRA cuenta
+dejaba la cifra del usuario anterior en caché, y se alcanzaba a
+renderizar mezclada con el estado del usuario nuevo (p. ej. "Empecemos"
+y la cifra vieja al mismo tiempo) hasta que el primer refetch
+completaba. `auth-store.ts` ahora vacía toda la caché
+(`queryClient.clear()`) cada vez que el `id` del usuario autenticado
+cambia — más simple y más seguro que invalidar selectivamente, porque
+cualquier query nueva que se agregue después queda cubierta
+automáticamente. `query-client.ts` existe como módulo aparte
+precisamente para que `auth-store.ts` (que no es un componente React)
+pueda importar la misma instancia que usa el `Provider` en `App.tsx`.
 
 ## Nota sobre shadcn/ui: componentes escritos a mano
 
@@ -83,15 +118,23 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
 
 - Un login real (`supabase.auth.signInWithPassword`) contra el
   proyecto Supabase real produce una sesión cuyo `access_token` el
-  backend acepta — `Home.tsx` llama a `GET /me` y muestra el
-  `tenantId` resuelto, la misma prueba vertical que el punto 1 del
-  backend, ahora desde el navegador.
+  backend acepta — probado en el punto 1 contra `GET /me`, la misma
+  prueba vertical que el punto 1 del backend, ahora desde el navegador
+  (`Home.tsx` ya es la pantalla real de disponible, no ese placeholder).
 - Sin sesión, cualquier ruta protegida redirige a `/login`
   (`ProtectedRoute.tsx`) — probado navegando directo a `/` sin haber
   iniciado sesión.
 - Validación de formulario (Zod + React Hook Form) antes de tocar la
   red: campos vacíos o un correo mal formado se rechazan sin llamar a
   Supabase.
+- Los tres estados de la pantalla de "disponible" — sin periodo activo,
+  con periodo pero sin ingreso, y con la cifra real, incluido un caso
+  de sobregiro real (negativo, sin suavizar, en rojo) — probados contra
+  el backend real, con un usuario nuevo para los dos primeros estados
+  (evita depender de datos ya sembrados por pruebas anteriores).
+- Cambiar de usuario (cerrar sesión + iniciar con otra cuenta) nunca
+  deja datos del usuario anterior visibles, ni mezclados con los del
+  nuevo — ver el hallazgo de `queryClient.clear()` arriba.
 
 ## Qué falta
 
@@ -99,8 +142,6 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   dashboard de Supabase — construirlo es una pantalla más, no una
   decisión de arquitectura; se agrega cuando haga falta probar con
   gente real.
-- **La pantalla real de "disponible"** (punto 2) — `Home.tsx` hoy es
-  solo la prueba de que el login funciona.
 - Captura de gasto, historial, cierre/resumen/decisión de sobrante —
   ver la propuesta completa de puntos discutida con el usuario.
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
