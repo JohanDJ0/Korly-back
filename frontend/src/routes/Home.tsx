@@ -9,7 +9,9 @@ import { FormularioIngreso } from '@/components/FormularioIngreso';
 import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
+import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { ApiError } from '@/lib/api';
+import { formatearRangoFechas } from '@/lib/fechas';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -20,6 +22,7 @@ import { supabase } from '@/lib/supabase';
  */
 export function Home() {
   const { data, isLoading, error } = useDisponible();
+  const { data: periodoActivo } = usePeriodoActivo();
   const crearPeriodo = useCrearPeriodo();
   const cerrarPeriodo = useCerrarPeriodo();
   const navigate = useNavigate();
@@ -36,6 +39,15 @@ export function Home() {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
       <h1 className="text-2xl font-semibold">Korly</h1>
+
+      {periodoActivo && (
+        // ADR-004: la quincena está anclada a calendario, no es
+        // "inicio + 15 días fijos" — si el periodo se creó a mitad de
+        // una quincena real (p. ej. al probar la app), los días
+        // restantes reales son menos de 15. Mostrar el rango explica
+        // por qué, en vez de dejar que el usuario asuma un conteo fijo.
+        <p className="text-sm text-muted-foreground">Quincena del {formatearRangoFechas(periodoActivo.fechaInicio, periodoActivo.fechaFin)}</p>
+      )}
 
       {isLoading && <p className="text-muted-foreground">Cargando…</p>}
 

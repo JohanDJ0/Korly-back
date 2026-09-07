@@ -119,16 +119,21 @@ Todo movimiento lleva `fecha_registro` (cuándo lo capturó el usuario) y `fecha
 ### Fórmula base
 
 ```
-disponible      = Σ ingresos del periodo − Σ gastos del periodo
-días_restantes  = (fecha_fin del periodo − hoy) + 1     [zona horaria del usuario]
-cifra_diaria    = piso( disponible ÷ días_restantes )
+disponible          = Σ ingresos del periodo − Σ gastos del periodo
+días_restantes      = (fecha_fin del periodo − hoy) + 1     [zona horaria del usuario]
+gastado_hoy         = max(0, −Σ asientos de gasto/reversión con fecha efectiva = hoy)
+disponible_base_hoy = disponible + gastado_hoy               [deshace el efecto de hoy]
+objetivo_hoy        = piso( disponible_base_hoy ÷ días_restantes )
+cifra_diaria        = objetivo_hoy − gastado_hoy              [puede ser negativa: te pasaste hoy]
 ```
 
 El `+1` evita división entre cero el último día del periodo.
 
-### Decisión central: recálculo diario, no presupuesto fijo
+### Decisión central: recálculo diario, no presupuesto fijo — pero el objetivo de HOY es fijo dentro del propio día
 
-La cifra diaria **se recalcula en cada consulta**, con el disponible y los días restantes del momento — no se fija al iniciar el periodo. Si un día se gasta de más, la cifra del día siguiente **baja sola** para compensar. Es exactamente la conducta que el usuario ya hace de cabeza, tarde; el motor la hace todos los días, desde el día uno.
+La cifra diaria **se recalcula en cada consulta**, con el disponible y los días restantes del momento — no se fija al iniciar el periodo. Si un día se gasta de más, la cifra del día siguiente **baja sola** para compensar.
+
+*(Corrección, ver §6): la primera implementación calculaba `cifra_diaria = piso(disponible ÷ días_restantes)` directo, sin aislar `gastado_hoy` — así que gastar exactamente lo sugerido bajaba la cifra de "hoy" en la misma consulta, como si el gasto se hubiera repartido también hacia atrás, y un sobregiro grande podía mostrar un residuo pequeño pero todavía positivo, ocultando el tamaño real del exceso. Esto contradecía la frase anterior ("la cifra del día siguiente baja sola"): la compensación debe verse al día siguiente, no a mitad del mismo día. La fórmula corregida separa `objetivo_hoy` (fijo, calculado sobre lo que había antes de cualquier gasto de hoy) de `gastado_hoy`, y solo resta — nunca vuelve a dividir dentro del mismo día. Es exactamente la conducta que el usuario ya hace de cabeza, tarde: sabe cuánto se puede gastar hoy, y si se pasa, lo siente hoy como exceso, no como una meta que se movió sola; el ajuste real llega mañana.*
 
 ### Casos límite
 
@@ -137,6 +142,7 @@ La cifra diaria **se recalcula en cada consulta**, con el disponible y los días
 | Día 1 con ingreso registrado | Cifra normal desde el primer momento — es el aha moment del onboarding |
 | Periodo activo sin ingreso | **No se muestra cifra de disponible.** Estado explícito: "Registra tu ingreso para ver cuánto puedes gastar." Captura de gastos no se bloquea |
 | Sobregiro (disponible negativo) | Se muestra el negativo sin suavizar. La cifra diaria también es negativa: comunica que se está gastando de un futuro que aún no llega |
+| Te excediste HOY, pero el disponible total sigue positivo | `cifra_diaria` puede ser negativa (`objetivo_hoy − gastado_hoy`) sin que `disponible` lo sea — son señales distintas y se presentan por separado, nunca coloreando una según el signo de la otra |
 | Ingreso a medio periodo (bono, extra) | Se suma al disponible al registrarse; el recálculo diario lo reparte solo entre los días que quedan |
 | Residuo de truncamiento | Se diluye en el sobrante al cierre, sin evento propio |
 
@@ -155,6 +161,7 @@ Tres preguntas surgieron al releer el modelo completo. Dos ya tienen resolución
 - *Edición de un gasto dentro del periodo activo* (no cerrado) no estaba cubierta — solo se había definido el caso de periodo cerrado. Se resuelve permitiendo edición directa mientras el periodo siga activo: no hay snapshot que proteger todavía.
 - *Qué pasa si se intenta crear un segundo periodo mientras uno está activo* no estaba explícito, solo implícito en la invariante 9. Se agregó como invariante 10 y como fila en la tabla de casos límite.
 - *Qué pasa si un periodo cierra con saldo negativo (déficit real, no solo sobregiro momentáneo dentro del periodo)*. Detectado durante la revisión de la implementación del módulo de gastos, al verificar que el sobregiro probado por los tests correspondía al comportamiento correcto dentro del periodo activo — surgió la pregunta de qué pasa al cierre. El modelo original de decisión de sobrante (§3) solo contemplaba montos positivos. Se resuelve arrastrando el déficit automáticamente, sin ofrecer la opción "ahorrar" (no aplica a una deuda).
+- *La fórmula original de §5 redistribuía dentro del mismo día.* Detectado por el usuario probando la app real: gastar exactamente lo sugerido para hoy hacía bajar la cifra de "hoy" en la misma consulta, y un sobregiro grande el mismo día podía mostrar un residuo positivo pequeño en vez del tamaño real del exceso — contradiciendo la propia frase de §5 ("la cifra del día siguiente baja sola", no la de hoy). Se resuelve separando `objetivo_hoy` (fijo, sobre el disponible de antes de cualquier gasto de hoy) de `gastado_hoy` — ver la fórmula corregida arriba.
 
 **Resuelta:**
 

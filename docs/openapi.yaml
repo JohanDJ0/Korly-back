@@ -841,7 +841,22 @@ components:
           description: Incluye el día de hoy. Presente solo si estado = ok
         cifraDiaria:
           $ref: '#/components/schemas/Monto'
-          description: piso(disponible / diasRestantes). Presente solo si estado = ok
+          description: >
+            Objetivo fijo del día (calculado sobre el disponible de antes
+            de cualquier gasto de hoy) menos gastadoHoy — puede ser
+            negativo si hoy ya se excedió el objetivo. No es
+            piso(disponible / diasRestantes) directo: ver
+            modelo-dominio.md §5 y §6 sobre por qué esa fórmula más
+            simple redistribuía a mitad del propio día. Presente solo si
+            estado = ok
+        gastadoHoy:
+          $ref: '#/components/schemas/Monto'
+          description: >
+            Extensión sobre este contrato (ver backend/README.md,
+            "Disponible"). Cuánto ha salido netamente de la cuenta hoy
+            (gastos menos sus reversiones del mismo día); nunca negativo.
+            cifraDiaria + gastadoHoy = el objetivo fijo de hoy. Presente
+            solo si estado = ok
         calculadoEn:
           type: string
           format: date-time

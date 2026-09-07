@@ -33,6 +33,11 @@ export async function rutasDisponible(app: FastifyInstance): Promise<void> {
       disponible: montoADto(disponible.disponibleValorMinimo, MONEDA_DEFAULT),
       diasRestantes: disponible.diasRestantes,
       cifraDiaria: montoADto(disponible.cifraDiariaValorMinimo, MONEDA_DEFAULT),
+      // Extensión sobre openapi.yaml (ver backend/README.md, "Disponible")
+      // — sin esto el cliente no puede distinguir "cifraDiaria negativa
+      // porque te pasaste hoy" de "negativa porque el periodo entero va
+      // mal", ni mostrar cuánto llevas gastado hoy en específico.
+      gastadoHoy: montoADto(disponible.gastadoHoyValorMinimo, MONEDA_DEFAULT),
       calculadoEn: disponible.calculadoEn,
     });
   });

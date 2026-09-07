@@ -15,6 +15,8 @@ export interface DisponibleOk {
   disponible: MontoDto;
   diasRestantes: number;
   cifraDiaria: MontoDto;
+  /** Extensión sobre openapi.yaml (ver backend/README.md, "Disponible") — cuánto se ha gastado hoy específicamente. */
+  gastadoHoy: MontoDto;
   calculadoEn: string;
 }
 

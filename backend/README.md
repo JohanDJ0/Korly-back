@@ -513,6 +513,56 @@ mecanismo que evita la división por cero en la práctica — y
 vencido se cierra solo al consultarlo, sin que `disponible` tenga que
 intervenir.
 
+### Rediseño posterior: el objetivo de "hoy" es fijo, no se redistribuye a mitad del día
+
+**Hallazgo real, del usuario probando la app ya con el frontend
+construido, no un bug encontrado por mí.** La fórmula original era
+literalmente `piso(disponible / díasRestantes)`, recalculada en cada
+consulta tal como pide modelo-dominio.md §5. El problema: como "hoy"
+cuenta dentro de `díasRestantes`, gastar exactamente la cifra sugerida
+bajaba la cifra de **hoy mismo** en la misma consulta (el gasto se
+"repartía" también hacia atrás), y un sobregiro grande el mismo día
+podía dejar un residuo positivo pequeño en vez de mostrar el tamaño
+real del exceso — el usuario reportó ver "puedes gastar hoy $49.38"
+después de haberse pasado por $4,000, con el disponible total todavía
+en $444.45. Esto además contradecía la propia frase siguiente de §5:
+*"si un día se gasta de más, la cifra del día siguiente baja sola"* —
+la implementación compensaba el mismo día, no el día siguiente.
+
+**Fórmula corregida** (`consultar-disponible.ts`):
+
+```
+gastadoHoy        = max(0, −Σ asientos de tipo 'gasto'/'reversion' de HOY)
+disponibleBaseHoy = disponible + gastadoHoy   [deshace el efecto de hoy]
+objetivoHoy       = piso(disponibleBaseHoy / díasRestantes)
+cifraDiaria       = objetivoHoy − gastadoHoy  [puede ser negativa: te pasaste hoy]
+```
+
+`disponible` (el total) no cambió en absoluto — nunca fue el problema.
+Al día siguiente, `disponible` ya incluye lo real de hoy (de más o de
+menos) y `díasRestantes` bajó uno: ahí es donde ocurre la
+redistribución, nunca a mitad del mismo día — probado explícitamente
+(`test/integracion/disponible.test.ts`, "gastar de más hoy sí baja la
+cifra del día siguiente").
+
+**Por qué el corte usa `obtenerNetoCuentaEnFecha(..., tipos)` filtrado
+por tipo, y no el neto simple de "todo lo de hoy".** Se probó primero
+con el neto de TODOS los asientos de hoy — y falla en el caso más
+común: el día 1, con el ingreso y el primer gasto fechados el mismo
+día. Un ingreso de 5000 y un gasto de 555 el mismo día dan un neto de
++4445 (positivo), así que "gastado hoy" habría salido en 0 — el gasto
+real quedó escondido detrás del ingreso, más grande. `tipos:
+['gasto', 'reversion']` evita que un ingreso del mismo día tape un
+gasto real, y sigue dejando que revertir un gasto el mismo día que se
+registró (editar/eliminar, ver "Gastos" arriba) cancele exactamente su
+propio efecto, porque la reversión también es de un tipo de esa lista
+— probado explícitamente.
+
+**`gastadoHoy` se agrega como campo nuevo en la respuesta de
+`/disponible`** (extensión sobre `openapi.yaml`, mismo criterio que
+`NO_SOPORTADO`/`revertido`): sin él, el cliente no puede mostrar "ya
+gastaste $X de tu objetivo de $Y", solo el resultado final.
+
 ## Cierre
 
 ```
@@ -892,6 +942,13 @@ corregir el mismo gasto dos veces.
   siempre hacia el piso matemático incluso en sobregiro, cuenta el
   último día del periodo como 1 día y no 0, y no almacena ni cachea
   nada — cada consulta es un recálculo completo.
+- El objetivo de "hoy" es fijo dentro del propio día: gastar
+  exactamente lo sugerido deja la cifra en 0 (no la redistribuye a otro
+  número), un sobregiro grande el mismo día se ve como negativo
+  completo (nunca como un residuo positivo que lo esconde), y revertir
+  un gasto el mismo día regresa la cifra a su objetivo íntegro. La
+  redistribución real —compensar lo gastado de más— solo ocurre al día
+  siguiente, nunca a mitad del mismo día.
 - Un periodo vencido se cierra solo, sin cron, la primera vez que algo
   lo consulta — y ese cierre genera un resumen inmutable que nadie
   puede alterar salvo la única transición permitida (decidir el

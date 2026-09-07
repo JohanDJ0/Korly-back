@@ -69,6 +69,24 @@ ya hay sesión. Probado de punta a punta: cuenta nueva → confirmación
 (vía Admin API, sin acceso al correo real) → login → identidad
 aprovisionada sola, con "Empecemos" para un tenant genuinamente nuevo.
 
+**Punto 7 — rediseño del motor de flujo de caja + rango de fechas de
+la quincena:** dos hallazgos reales del usuario probando la app.
+(1) Al crear un periodo que no coincide con el inicio real de una
+quincena de calendario (ADR-004), "9 días más" en vez de "15" es
+correcto pero confuso sin contexto — `Home.tsx` ahora muestra "Quincena
+del 1 de septiembre – 15 de septiembre" (`lib/fechas.ts`,
+`usePeriodoActivo`) para que quede claro por qué. (2) El backend
+cambió cómo calcula `cifraDiaria` — ver `backend/README.md`, "Rediseño
+posterior" — y ahora expone `gastadoHoy`; `CifraDisponible.tsx` separa
+el color de "hoy" del de "total" (pueden ser negativos por razones
+distintas: excederse hoy con el total todavía en positivo, o al
+revés) y muestra "Ya gastaste $X de tu objetivo de hoy de $Y" cuando
+aplica. Probado de punta a punta reproduciendo el caso real reportado:
+gastar exactamente lo sugerido da "$0.00" (no un número redistribuido),
+y un sobregiro de $4,000 sobre un objetivo de $555.55 muestra "Te
+excediste hoy por $4,000.00" en rojo, con el disponible total
+($444.45) en negro por separado.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -113,6 +131,7 @@ src/
     api.ts          # cliente HTTP hacia el backend propio, con el Bearer token adjunto
     query-client.ts # instancia única de QueryClient — compartida con auth-store.ts
     dinero.ts       # formatearMonto() — único lugar que convierte centavos a texto
+    fechas.ts       # formatearRangoFechas() — formatea en UTC a propósito, ver el comentario ahí
     utils.ts        # cn() de shadcn/ui
   stores/
     auth-store.ts # Zustand — la sesión de Supabase, sincronizada vía onAuthStateChange
@@ -244,6 +263,16 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   la pantalla lo maneja sin intentar entrar sin sesión; tras confirmar
   y entrar, el backend aprovisiona la identidad sola, sin ningún
   cambio de código ahí — mismo mecanismo que ya prueba el punto 1.
+- El rango de fechas de la quincena se muestra correctamente en UTC
+  (`1 de septiembre – 15 de septiembre`) — sin forzar la zona horaria,
+  el navegador en México (UTC-6) lo habría corrido un día hacia atrás.
+- Reproducido el caso real reportado por el usuario: gastar
+  exactamente el objetivo sugerido de hoy da "$0.00" (nunca un número
+  redistribuido); un sobregiro de $4,000 sobre un objetivo de $555.55
+  muestra "Te excediste hoy por $4,000.00" en rojo mientras el
+  disponible total ($444.45, todavía positivo) se muestra en negro por
+  separado — las dos cifras se colorean por su propio signo, nunca por
+  el signo de la otra.
 
 ## Qué falta
 

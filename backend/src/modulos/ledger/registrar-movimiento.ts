@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { asientos, cuentas, movimientos, type TipoCuenta, type TipoMovimiento } from '../../db/schema/ledger.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 
@@ -157,6 +157,42 @@ export async function obtenerSaldoCuenta(tenantId: string, cuentaId: string): Pr
       .where(eq(asientos.cuentaId, cuentaId));
 
     return BigInt(fila?.saldo ?? '0');
+  });
+}
+
+/**
+ * A diferencia de `obtenerSaldoCuenta` (el saldo total), esto es un
+ * corte: la suma de los asientos cuyo movimiento tiene una
+ * `fechaEfectiva` exacta, opcionalmente restringido a ciertos `tipo`s
+ * (`TIPOS_MOVIMIENTO`, un valor cerrado que sí vive en el schema del
+ * ledger — pedirlo aquí no es que este módulo "sepa qué es un gasto",
+ * el llamador decide cuáles tipos le importan).
+ *
+ * El filtro por tipo importa porque el neto simple de "todo lo de hoy"
+ * puede esconder un gasto detrás de un ingreso más grande del mismo
+ * día (el caso típico del día 1) — ver el comentario en
+ * consultar-disponible.ts sobre por qué el motor de flujo de caja pide
+ * el neto de `['gasto', 'reversion']` específicamente, no de todo.
+ */
+export async function obtenerNetoCuentaEnFecha(
+  tenantId: string,
+  cuentaId: string,
+  fechaEfectiva: string,
+  tipos?: TipoMovimiento[]
+): Promise<bigint> {
+  return conTenant(tenantId, async (tx) => {
+    const condiciones = [eq(asientos.cuentaId, cuentaId), eq(movimientos.fechaEfectiva, fechaEfectiva)];
+    if (tipos && tipos.length > 0) {
+      condiciones.push(inArray(movimientos.tipo, tipos));
+    }
+
+    const [fila] = await tx
+      .select({ neto: sql<string>`coalesce(sum(${asientos.montoValorMinimo}), 0)::text` })
+      .from(asientos)
+      .innerJoin(movimientos, eq(movimientos.id, asientos.movimientoId))
+      .where(and(...condiciones));
+
+    return BigInt(fila?.neto ?? '0');
   });
 }
 

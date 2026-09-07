@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
-import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
+import { eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
 
@@ -183,5 +183,99 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     if (antes?.estado !== 'ok' || despues?.estado !== 'ok') throw new Error('esperaba estado ok en ambas');
     expect(antes.disponibleValorMinimo).toBe(1000n);
     expect(despues.disponibleValorMinimo).toBe(700n);
+  });
+
+  // --- 5. El objetivo de "hoy" es fijo — no se vuelve a repartir dentro del mismo día ---
+
+  it('gastar exactamente el objetivo sugerido de hoy deja cifraDiaria en 0, no la redistribuye a otro número', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-07T00:00:00Z'); // fechaFin=08-15 -> 9 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-07', fechaReferencia: hoy });
+
+    // objetivo = piso(5000 / 9) = 555
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 555n, moneda: 'MXN', fechaEfectiva: '2026-08-07', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(4445n);
+    expect(resultado.gastadoHoyValorMinimo).toBe(555n);
+    // Con la fórmula anterior (disponible / díasRestantes sin excluir
+    // hoy) esto habría dado piso(4445/9) = 493 — bajando la cifra de
+    // hoy en la misma consulta en la que se cumplió exactamente el
+    // objetivo. El objetivo fijo da 0: "ya usaste lo de hoy", ni más ni menos.
+    expect(resultado.cifraDiariaValorMinimo).toBe(0n);
+  });
+
+  it('un sobregiro grande el mismo día se ve como negativo completo, no como un residuo positivo que lo esconde', async () => {
+    // Reproduce el caso real reportado: disponible total sigue viéndose
+    // positivo y modesto después del sobregiro, pero "puedes gastar
+    // hoy" debe reflejar el tamaño real de lo excedido, no un número
+    // positivo pequeño que sugiere que todavía hay margen.
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-07T00:00:00Z'); // 9 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-07', fechaReferencia: hoy });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 555n, moneda: 'MXN', fechaEfectiva: '2026-08-07', fechaReferencia: hoy });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 4000n, moneda: 'MXN', fechaEfectiva: '2026-08-07', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    // Disponible total sigue positivo (5000 - 555 - 4000 = 445) — este
+    // número siempre fue correcto, nunca fue el problema.
+    expect(resultado.disponibleValorMinimo).toBe(445n);
+    expect(resultado.gastadoHoyValorMinimo).toBe(4555n);
+    // Con la fórmula anterior esto habría dado piso(445/9) = 49 — un
+    // positivo pequeño que sugiere "todavía puedes gastar algo hoy",
+    // ocultando que ya te excediste por 4000. El objetivo fijo (555)
+    // menos lo gastado (4555) da el tamaño real del exceso.
+    expect(resultado.cifraDiariaValorMinimo).toBe(-4000n);
+  });
+
+  it('revertir un gasto el mismo día que se registró regresa cifraDiaria a su objetivo completo', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-07T00:00:00Z'); // 9 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-07', fechaReferencia: hoy });
+    const { id: gastoId } = await registrarGasto({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 2000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-07',
+      fechaReferencia: hoy,
+    });
+
+    await eliminarGasto({ tenantId, gastoId, fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    // El gasto y su reversión son del mismo día: el neto de hoy vuelve a
+    // ser 0, así que no debe quedar ninguna resta fantasma.
+    expect(resultado.disponibleValorMinimo).toBe(5000n);
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n);
+    expect(resultado.cifraDiariaValorMinimo).toBe(555n); // piso(5000/9), objetivo completo
+  });
+
+  it('gastar de más hoy sí baja la cifra del día siguiente — la redistribución ocurre entre días, no dentro del mismo día', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const dia1 = new Date('2026-08-01T00:00:00Z'); // 15 días restantes, objetivo = piso(5000/15) = 333
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: dia1 });
+    // Gasta mucho más que el objetivo de hoy (333).
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: dia1 });
+
+    const dia2 = new Date('2026-08-02T00:00:00Z'); // 14 días restantes, sin gastos nuevos
+    const resultado = await consultarDisponible(tenantId, dia2);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    // disponible = 5000 - 1000 = 4000; objetivo de hoy = piso(4000/14) = 285,
+    // menor que los 333 de ayer — la compensación sí llegó, un día después.
+    expect(resultado.disponibleValorMinimo).toBe(4000n);
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n);
+    expect(resultado.cifraDiariaValorMinimo).toBe(285n);
   });
 });
