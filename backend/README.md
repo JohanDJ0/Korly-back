@@ -1012,26 +1012,55 @@ corregir el mismo gasto dos veces.
   resto (probado explícitamente contra Postgres real), incluye
   borradores, y ordena de forma determinista incluso cuando dos
   periodos comparten `fechaInicio` (desempate por `creadoEn`).
+- `crearPeriodo` nunca acumula borradores redundantes (reutiliza el
+  vigente) ni deja uno huérfano para siempre (lo reemplaza al llegar la
+  quincena que le toca) — y el único hard delete del sistema se aborta,
+  en vez de ejecutarse, si el borrador a borrar tuviera actividad
+  financiera (ver "Higiene de borradores").
+
+## Higiene de borradores
+
+Resuelve, en el origen (`crearPeriodo`), los dos huecos que quedaban
+tras la promoción de borrador a activo (ver esa sección arriba):
+duplicados sin control y borradores que quedan huérfanos para
+siempre. Antes de crear una cuenta y una fila nuevas, `crearPeriodo`
+busca si el tenant ya tiene un `'borrador'` y compara su ventana con
+la que le tocaría a uno creado ahora mismo
+(`calcularQuincenaDeCalendario` es determinista sobre la fecha real):
+
+- **Representa la misma quincena → se reutiliza tal cual**, sin crear
+  nada (idempotente, mismo criterio que `cerrarPeriodoManualmente` con
+  un periodo ya cerrado). Es el caso normal: mientras el periodo activo
+  que bloquea sigue vigente, cualquier borrador creado ese tiempo
+  comparte su rango exacto (`crearPeriodo` no puede producir todavía
+  una ventana futura genuina — ver "Promoción de borrador a activo").
+  Sin esto, cada llamada repetida a `crearPeriodo` mientras el activo
+  bloquea generaba una cuenta y una fila `'borrador'` nuevas, todas con
+  el mismo rango, acumulándose sin límite.
+- **Representa una quincena distinta → quedó huérfano y se elimina.**
+  Un borrador y el activo que lo bloqueaba comparten siempre la misma
+  `fechaFin` (ambos derivan de la misma fecha real de creación), así
+  que cuando la ventana del borrador ya no coincide con "hoy", el
+  activo que lo bloqueaba también venció — y como la promoción exige
+  que la ventana del borrador contenga genuinamente hoy (no solo que
+  ya haya empezado), no lo promovió. Este es el **único hard delete de
+  todo el sistema**, justificado porque un borrador nunca puede tener
+  actividad financiera real (invariante 10: un ingreso o gasto solo se
+  registra contra un periodo `'activo'`) — borrar su fila y su cuenta
+  no destruye ningún dato de negocio. Por seguridad, antes de borrar se
+  comprueba que la cuenta del borrador no tenga ningún asiento; si
+  llegara a tenerlo (no debería, pero la comprobación no es
+  decorativa), la operación entera aborta con un error en vez de
+  borrar datos financieros.
+
+Las tres rutas están probadas contra Postgres real
+(`test/integracion/periodos.test.ts`, describe `'higiene de
+borradores'`): reutilización cuando sigue vigente, borrado y reemplazo
+al llegar la siguiente quincena, y el aborto si el borrador tuviera
+asientos (forzado a mano contra el ledger, ya que la API pública no
+puede producir esa condición).
 
 ## Qué falta
-
-### Higiene de borradores, pendiente
-
-Dos huecos de la misma familia (acumulación sin limpieza), agrupados
-a propósito para decidirlos juntos:
-
-- **Borradores huérfanos.** Un borrador cuya ventana completa ya pasó
-  sin haber sido promovido (ver "Promoción de borrador a activo")
-  queda así para siempre — nada lo limpia ni lo marca de otra forma.
-  No es peor que antes de este punto (donde ningún borrador se
-  promovía nunca), pero tampoco se resolvió.
-- **Sin prevención de duplicados en el origen.** `crearPeriodo` puede
-  seguir generando varios `'borrador'` para el mismo tenant (no hay
-  restricción única sobre ese estado, a diferencia de `'activo'`); la
-  promoción elige uno de forma determinista, pero no evita que se sigan
-  acumulando. Resolverlo en el origen (¿rechazar? ¿devolver el
-  borrador existente?) es una decisión de diseño aparte de "cómo
-  promuevo el que ya existe".
 
 ### Después de eso
 

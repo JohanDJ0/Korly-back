@@ -1,7 +1,8 @@
-import { and, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
 import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
 import { reclamarArrastresTx } from '../cierre/materializar-arrastre.js';
+import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
@@ -32,6 +33,29 @@ const COLUMNAS_PERIODO = {
  * activo, este se crea en 'borrador' — no es un error, es el
  * comportamiento documentado (modelo-dominio.md §3, "casos límite").
  *
+ * **Higiene de borradores (ver README, "Qué falta"):** a diferencia de
+ * `'activo'`, no hay un índice único que impida varios `'borrador'` por
+ * tenant — así que, antes de crear uno nuevo, esta función busca si ya
+ * existe uno y compara su ventana con la de hoy (`calcularQuincenaDeCalendario`
+ * es determinista sobre la fecha real, no sobre cuántas veces se llamó):
+ *
+ * - Si representa exactamente la misma quincena que se está por crear,
+ *   se devuelve tal cual (idempotente, mismo criterio que
+ *   `cerrarPeriodoManualmente` con un periodo ya cerrado). Esto es lo
+ *   normal cuando ya hay un activo bloqueando: como ambos se calculan
+ *   sobre la fecha real en que se crearon y el activo sigue vigente
+ *   (si no, ya se habría cerrado), comparten la misma ventana.
+ * - Si representa una quincena distinta, quedó huérfano — su ventana
+ *   pasó sin que `promoverBorradorSiExisteTx` (cerrar-periodo.ts) lo
+ *   ascendiera a `'activo'` a tiempo — y se elimina: único hard delete
+ *   de todo el sistema, justificado porque un borrador nunca puede
+ *   tener actividad financiera (invariante 10: un gasto o ingreso solo
+ *   se registra contra un periodo `'activo'`). Nótese que esto NO
+ *   depende de si hay un activo ahora mismo: un borrador huérfano y un
+ *   activo bloqueante no pueden coexistir (comparten `fechaFin`, así
+ *   que si uno venció el otro también), así que este caso solo se ve
+ *   cuando `hayActivo` ya es `false`.
+ *
  * La comprobación de "¿hay uno activo?" y el INSERT no son atómicos por
  * sí solos: dos requests de "crear periodo" casi simultáneas podrían
  * ver ambas "no hay activo" y competir por serlo. El índice único
@@ -51,12 +75,19 @@ export async function crearPeriodo(
   const { fechaInicio, fechaFin } = calcularQuincenaDeCalendario(fechaReferencia);
 
   return conTenant(tenantId, async (tx) => {
-    const cuenta = await crearCuentaTx(tx, tenantId, 'periodo');
     const hayActivo = (await obtenerPeriodoActivoTx(tx, tenantId, fechaReferencia)) !== null;
-    const estadoDeseado: EstadoPeriodo = hayActivo ? 'borrador' : 'activo';
+
+    const borradorExistente = await obtenerBorradorTx(tx, tenantId);
+    if (borradorExistente) {
+      const representaHoy = borradorExistente.fechaInicio === fechaInicio && borradorExistente.fechaFin === fechaFin;
+      if (representaHoy) return borradorExistente;
+      await eliminarBorradorHuerfanoTx(tx, tenantId, borradorExistente);
+    }
+
+    const cuenta = await crearCuentaTx(tx, tenantId, 'periodo');
     const valoresBase = { tenantId, cuentaId: cuenta.id, tipo, fechaInicio, fechaFin };
 
-    if (estadoDeseado === 'borrador') {
+    if (hayActivo) {
       // Un periodo en borrador no es "el periodo siguiente" todavía —
       // no reclama arrastres pendientes. Los reclama el que sí llegue a
       // activo (hoy no hay mecanismo que promueva un borrador a activo
@@ -173,6 +204,40 @@ export async function obtenerPeriodoPorIdTx(tx: Ejecutor, tenantId: string, peri
     .limit(1);
 
   return fila ? { ...fila, estado: fila.estado as EstadoPeriodo } : null;
+}
+
+/**
+ * El borrador más antiguo si hay varios (mismo criterio de desempate
+ * que `promoverBorradorSiExisteTx`, modulos/cierre/cerrar-periodo.ts) —
+ * en el camino normal nunca debería haber más de uno, pero si datos de
+ * antes de este arreglo dejaron varios, no es ambiguo cuál se reutiliza.
+ */
+async function obtenerBorradorTx(tx: Ejecutor, tenantId: string): Promise<Periodo | null> {
+  const [fila] = await tx
+    .select(COLUMNAS_PERIODO)
+    .from(periodos)
+    .where(and(eq(periodos.tenantId, tenantId), eq(periodos.estado, 'borrador')))
+    .orderBy(asc(periodos.fechaInicio), asc(periodos.creadoEn))
+    .limit(1);
+
+  return fila ? { ...fila, estado: fila.estado as EstadoPeriodo } : null;
+}
+
+/**
+ * Único hard delete de todo el sistema — ver el comentario de
+ * `crearPeriodo` sobre por qué es seguro. La comprobación de "cero
+ * asientos" no es decorativa: si por algún motivo no previsto un
+ * borrador sí tuviera actividad, esto aborta en vez de borrar datos
+ * financieros por error.
+ */
+async function eliminarBorradorHuerfanoTx(tx: Ejecutor, tenantId: string, borrador: Periodo): Promise<void> {
+  const [asiento] = await tx.select({ id: asientos.id }).from(asientos).where(eq(asientos.cuentaId, borrador.cuentaId)).limit(1);
+  if (asiento) {
+    throw new Error(`El borrador ${borrador.id} tiene asientos registrados — no se puede eliminar como huérfano`);
+  }
+
+  await tx.delete(periodos).where(and(eq(periodos.tenantId, tenantId), eq(periodos.id, borrador.id)));
+  await tx.delete(cuentas).where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.id, borrador.cuentaId)));
 }
 
 async function insertarPeriodo(
