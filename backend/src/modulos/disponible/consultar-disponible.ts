@@ -48,7 +48,7 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * lo que había ANTES de cualquier gasto de hoy, y solo le resta lo
  * gastado hoy:
  *
- *   gastadoHoy        = max(0, -Σ asientos de tipo 'gasto'/'reversion' de HOY)
+ *   gastadoHoy        = max(0, -Σ asientos de actividad de tipo 'gasto' de HOY)
  *   disponibleBaseHoy = disponible + gastadoHoy   [deshace el efecto de hoy]
  *   objetivoHoy       = piso(disponibleBaseHoy / díasRestantes)
  *   cifraDiaria       = objetivoHoy - gastadoHoy  [puede ser negativa: te pasaste hoy]
@@ -57,18 +57,28 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * menos) y `díasRestantes` bajó uno - ahí es donde ocurre la
  * redistribución, nunca a mitad del mismo día.
  *
- * **Por qué el corte se restringe a los tipos `['gasto', 'reversion']`
- * y no al neto de "todo lo de hoy":** se probó primero con el neto de
- * TODOS los asientos de hoy, y falla justo en el caso más común - el
- * día 1, con el ingreso y el primer gasto fechados el mismo día. Un
- * ingreso de 5000 y un gasto de 555 el mismo día dan un neto de +4445
- * (positivo), así que "gastado hoy" habría salido en 0 - el gasto real
- * quedó escondido detrás del ingreso, más grande. Restringir a
- * `'gasto'`/`'reversion'` evita que un ingreso del mismo día tape un
- * gasto real, y sigue dejando que revertir un gasto el mismo día que se
- * registró (editar/eliminar, ver modulos/gastos) cancele exactamente su
- * propio efecto - la reversión de un gasto es del tipo `'reversion'`,
- * no `'ingreso'`, así que el neto de esos dos tipos vuelve a cero.
+ * **Por qué el corte se restringe a `['gasto']` y no al neto de "todo
+ * lo de hoy":** se probó primero con el neto de TODOS los asientos de
+ * hoy, y falla justo en el caso más común - el día 1, con el ingreso y
+ * el primer gasto fechados el mismo día. Un ingreso de 5000 y un gasto
+ * de 555 el mismo día dan un neto de +4445 (positivo), así que
+ * "gastado hoy" habría salido en 0 - el gasto real quedó escondido
+ * detrás del ingreso, más grande. Restringir a `'gasto'` evita que un
+ * ingreso del mismo día tape un gasto real.
+ *
+ * **`obtenerNetoCuentaEnFecha` resuelve una reversión a lo que
+ * revierte, no a `'reversion'` en sí (ver su comentario en
+ * modulos/ledger/registrar-movimiento.ts) — esto es lo que deja que
+ * `['gasto']` solo baste.** Revertir un gasto el mismo día que se
+ * registró (editar/eliminar, ver modulos/gastos) cancela exactamente
+ * su propio efecto, porque esa reversión cuenta como `'gasto'`. Y —
+ * bug real, encontrado por el usuario editando un ingreso — revertir
+ * un *ingreso* el mismo día (editar/eliminar, ver modulos/ingresos) NO
+ * cuenta como `'gasto'`, aunque también genere un movimiento
+ * `'reversion'`: antes de este fix, `tipos: ['gasto', 'reversion']`
+ * contaba cualquier reversión sin distinguir qué revertía, así que
+ * corregir un ingreso se veía en la app como si se hubiera gastado ese
+ * dinero hoy mismo.
  *
  * Deliberadamente NO corre dentro de una única transacción: es una
  * composición de lecturas (periodo activo, ¿hay ingreso?, saldo, corte
@@ -91,7 +101,7 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
   const disponibleValorMinimo = await obtenerSaldoCuenta(tenantId, periodo.cuentaId);
   const diasRestantes = calcularDiasRestantes(periodo.fechaFin, fechaReferencia);
 
-  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), ['gasto', 'reversion']);
+  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), ['gasto']);
   const gastadoHoyValorMinimo = netoGastosHoy < 0n ? -netoGastosHoy : 0n;
   const disponibleBaseHoy = disponibleValorMinimo + gastadoHoyValorMinimo;
   const objetivoHoy = pisoDivisionBigInt(disponibleBaseHoy, BigInt(diasRestantes));

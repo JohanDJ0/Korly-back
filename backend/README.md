@@ -349,6 +349,44 @@ azar) contra `PERIODO_NO_ENCONTRADO`.
 nuevo — ver
 [`drizzle/0005_ingresos_inmutable.sql`](drizzle/0005_ingresos_inmutable.sql).
 
+### Editar y eliminar un ingreso (`editarIngreso`, `eliminarIngreso`)
+
+Espejo exacto de "Editar y eliminar un gasto" (ver esa sección más
+abajo, con la partida invertida): revertir es crear un movimiento
+`tipo: 'reversion'` con las partidas invertidas, nunca tocar la fila
+original de `ingresos` (`ingresos_inmutables` lo impide de cualquier
+forma). La reversión (y, al editar, el ingreso nuevo con el monto
+corregido) siempre se registra contra el **periodo activo actual**, sin
+importar si el ingreso original seguía en ese mismo periodo o en uno
+ya cerrado — `ajusteGenerado` en la respuesta distingue ambos casos.
+Sin periodo activo para aterrizar la corrección: `SIN_PERIODO_ACTIVO`
+(409). Corregir el mismo ingreso dos veces: `INGRESO_YA_REVERTIDO`
+(409), detectado igual que en gastos (buscando un movimiento cuyo
+`movimientoRevertidoId` apunte al de este ingreso).
+
+**Extensión sobre `docs/openapi.yaml`, no solo sobre el código —
+distinto de editar/eliminar gasto.** `openapi.yaml` sí define
+`PATCH`/`DELETE /gastos/{gastoId}` (el contrato los contempló desde el
+principio); para ingresos no define ningún endpoint de corrección, ni
+siquiera lo menciona. `PATCH`/`DELETE /ingresos/{ingresoId}` son
+enteramente una extensión de esta implementación, con el mismo
+criterio que ya se usa para `GET /periodos` o el campo `revertido`:
+completa una asimetría real (un usuario se equivoca capturando un
+ingreso con la misma frecuencia que un gasto) sin la cual el punto
+quedaría a medias. Sin `categoriaId` en el `PATCH` — a diferencia de
+`EditarGastoRequest`, `CrearIngresoRequest` nunca tuvo ese campo.
+
+`listarIngresos` gana el mismo campo `revertido: boolean` que
+`listarGastos`, calculado igual (segunda consulta sobre
+`movimientoRevertidoId`, no un `JOIN`) — un ingreso corregido sigue
+apareciendo en el historial con su monto original, marcado para que el
+cliente no vuelva a ofrecer editarlo/eliminarlo.
+
+**Este punto rompió el motor de flujo de caja de forma sutil — ver
+"Segundo hallazgo real" en la sección Disponible más abajo.** La
+reversión que genera editar/eliminar un ingreso se contaba como gasto
+del día; ya está corregido en `obtenerNetoCuentaEnFecha`, no aquí.
+
 ## Gastos
 
 `src/db/schema/gastos.ts` define `gastos`.
@@ -584,6 +622,44 @@ propio efecto, porque la reversión también es de un tipo de esa lista
 `NO_SOPORTADO`/`revertido`): sin él, el cliente no puede mostrar "ya
 gastaste $X de tu objetivo de $Y", solo el resultado final.
 
+### Segundo hallazgo real: editar un ingreso se veía como si se hubiera gastado
+
+**Reportado por el usuario con una captura real de la app, al agregar
+"editar y eliminar un ingreso" (ver esa sección más arriba).** Editó un
+ingreso de $5,000 a $6,000 y la pantalla mostró "Te excediste hoy por
+$4,354.62" — como si hubiera gastado de más, sin haber registrado
+ningún gasto.
+
+**Causa:** el corte de `gastadoHoy` filtraba por `tipos: ['gasto',
+'reversion']` (ver más arriba) — pensado para que revertir un gasto el
+mismo día cancelara su propio efecto. Pero `editarIngreso`/
+`eliminarIngreso` (agregados en el mismo punto) también generan un
+movimiento `tipo: 'reversion'`, exactamente el mismo mecanismo que usa
+`editarGasto`/`eliminarGasto` — el filtro no distinguía **qué**
+revertía cada reversión, así que la reversión de un ingreso (una resta
+contra la cuenta, igual que un gasto real) se contaba como gasto de
+hoy.
+
+**Corregido en `obtenerNetoCuentaEnFecha`
+(modulos/ledger/registrar-movimiento.ts), no en `consultarDisponible`:**
+la función ahora resuelve, vía `LEFT JOIN` contra el movimiento
+original (`movimientoRevertidoId`), el **tipo efectivo** de cada
+asiento — el tipo del movimiento que revierte si es una reversión, o
+su propio tipo si no lo es. Con esto, `consultarDisponible` solo
+necesita pedir `tipos: ['gasto']`: una reversión de un gasto sigue
+contando (su tipo efectivo es `'gasto'`), y una reversión de un
+ingreso ya no (su tipo efectivo es `'ingreso'`). Arreglar esto en la
+función del ledger, no con un caso especial en disponible, es
+deliberado: cualquier otro consumidor futuro de este corte hereda la
+distinción correcta automáticamente.
+
+Tres tests nuevos en `test/integracion/disponible.test.ts` reproducen
+el bug exacto antes del fix (confirmado fallando) y prueban la
+corrección: editar un ingreso el mismo día dejaba `gastadoHoy` en
+`5000n` en vez de `0n`; eliminar un ingreso, igual; y un gasto real el
+mismo día que una edición de ingreso sigue contando solo por el gasto
+real, sin que la corrección del ingreso lo tape ni lo infle.
+
 ## Cierre
 
 ```
@@ -808,24 +884,25 @@ Los métodos permitidos se declaran explícitos
 (`['GET', 'POST', 'PATCH', 'DELETE']`) — el default de
 `@fastify/cors` no incluye `PATCH`/`DELETE` (comprobado contra el
 servidor real con `curl -X OPTIONS`), lo que habría bloqueado editar y
-eliminar gasto desde el navegador aunque el preflight respondiera 204.
+eliminar ingreso o gasto desde el navegador aunque el preflight
+respondiera 204.
 
 ## Capa HTTP
 
 ```
 src/shared/http.ts                     # registrarManejadorErroresDominio, montoADto/montoDesdeDto
 src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo, GET /periodos
-src/modulos/ingresos/rutas.ts          # POST/GET /periodos/:periodoId/ingresos
+src/modulos/ingresos/rutas.ts          # POST/GET /periodos/:periodoId/ingresos, PATCH/DELETE /ingresos/:ingresoId
 src/modulos/gastos/rutas.ts            # POST/GET /periodos/:periodoId/gastos, PATCH/DELETE /gastos/:gastoId
 src/modulos/disponible/rutas.ts        # GET /periodos/activo/disponible
 src/modulos/cierre/rutas.ts            # POST .../cerrar, GET .../resumen, POST .../sobrante/decision
 ```
 
-Trece endpoints para ejercer el ciclo central, corregir un gasto y ver
-de vuelta lo que se capturó (incluidos periodos ya cerrados) — no la
-API completa de `docs/openapi.yaml` (sin metas, sin categorías). Todos
-viven bajo `/v1` y detrás del mismo `authPlugin` que ya protege `/v1/me`
-desde el punto
+Quince endpoints para ejercer el ciclo central, corregir un ingreso o
+un gasto, y ver de vuelta lo que se capturó (incluidos periodos ya
+cerrados) — no la API completa de `docs/openapi.yaml` (sin metas, sin
+categorías). Todos viven bajo `/v1` y detrás del mismo `authPlugin` que
+ya protege `/v1/me` desde el punto
 1 — nada nuevo en autenticación, solo se extiende.
 
 **Cada ruta llama directo a la función de dominio que ya existía y
@@ -839,8 +916,9 @@ aquí.
 es un `setErrorHandler` global: traduce cualquier `ErrorDominio` a
 `{codigo, mensaje}` con el status correcto
 (`PERIODO_NO_ENCONTRADO`→404, `GASTO_NO_ENCONTRADO`→404,
-`PERIODO_NO_ACTIVO`→409, `SOBRANTE_YA_DECIDIDO`→409,
-`SIN_PERIODO_ACTIVO`→409, `GASTO_YA_REVERTIDO`→409, `VALIDACION`→400,
+`INGRESO_NO_ENCONTRADO`→404, `PERIODO_NO_ACTIVO`→409,
+`SOBRANTE_YA_DECIDIDO`→409, `SIN_PERIODO_ACTIVO`→409,
+`GASTO_YA_REVERTIDO`→409, `INGRESO_YA_REVERTIDO`→409, `VALIDACION`→400,
 `NO_SOPORTADO`→501 — no 400: el valor es válido según el contrato,
 simplemente no está implementado, mismo criterio que ya se usaba en
 `decidirSobrante`).
@@ -970,7 +1048,10 @@ corregir el mismo gasto dos veces.
   completo (nunca como un residuo positivo que lo esconde), y revertir
   un gasto el mismo día regresa la cifra a su objetivo íntegro. La
   redistribución real —compensar lo gastado de más— solo ocurre al día
-  siguiente, nunca a mitad del mismo día.
+  siguiente, nunca a mitad del mismo día. Editar o eliminar un
+  **ingreso** el mismo día nunca se confunde con un gasto (bug real,
+  ver "Segundo hallazgo real" en Disponible) — solo la actividad cuyo
+  tipo efectivo es `'gasto'` cuenta para `gastadoHoy`.
 - Un periodo vencido se cierra solo, sin cron, la primera vez que algo
   lo consulta — y ese cierre genera un resumen inmutable que nadie
   puede alterar salvo la única transición permitida (decidir el
@@ -991,13 +1072,16 @@ corregir el mismo gasto dos veces.
   probadas — no hay lógica nueva en las rutas. Validado de punta a
   punta contra el servidor real y un proyecto Supabase real (no solo
   con los tests), incluido el archivo `.http` versionado en el repo.
-- Editar o eliminar un gasto nunca muta ni borra su fila, ni la del
-  movimiento original (los triggers de inmutabilidad lo impiden sin
-  excepción) — siempre generan una reversión, que aterriza en el
-  periodo activo actual sin importar si el gasto era de ese mismo
-  periodo o de uno ya cerrado. Un periodo cerrado nunca vuelve a
-  cambiar de saldo por esta vía (invariantes 5 y 15), y corregir el
-  mismo gasto dos veces se rechaza explícitamente.
+- Editar o eliminar un gasto o un ingreso nunca muta ni borra su fila,
+  ni la del movimiento original (los triggers de inmutabilidad lo
+  impiden sin excepción) — siempre generan una reversión, que aterriza
+  en el periodo activo actual sin importar si el gasto/ingreso era de
+  ese mismo periodo o de uno ya cerrado. Un periodo cerrado nunca
+  vuelve a cambiar de saldo por esta vía (invariantes 5 y 15), y
+  corregir el mismo gasto o ingreso dos veces se rechaza
+  explícitamente. Un `ingresoId`/`gastoId` de otro tenant se rechaza
+  como si no existiera (BOLA, probado explícitamente contra Postgres
+  real para ambos).
 - Listar ingresos o gastos de un periodo respeta el mismo aislamiento
   por tenant que el resto (un `periodoId` ajeno no distingue "no
   existe" de "no es tuyo"); la paginación de gastos por keyset no
@@ -1005,9 +1089,10 @@ corregir el mismo gasto dos veces.
   y la siguiente, y un cursor mal formado se rechaza explícitamente en
   vez de fallar en silencio.
 - `revertido` marca correctamente una fila editada o eliminada
-  (`true`) frente a una vigente (`false`), y al editar, la fila
-  original queda `revertido: true` mientras la nueva corrección
-  aparece `false` — probado explícitamente contra Postgres real.
+  (`true`) frente a una vigente (`false`), tanto en gastos como en
+  ingresos, y al editar, la fila original queda `revertido: true`
+  mientras la nueva corrección aparece `false` — probado
+  explícitamente contra Postgres real.
 - `listarPeriodos` respeta el mismo aislamiento por tenant que el
   resto (probado explícitamente contra Postgres real), incluye
   borradores, y ordena de forma determinista incluso cuando dos
@@ -1064,10 +1149,8 @@ puede producir esa condición).
 
 ### Después de eso
 
-Editar/eliminar un **ingreso** (openapi.yaml no define ese endpoint
-todavía — solo gastos lo tienen), metas de ahorro (para activar
-`'ahorrar'` en la decisión de sobrante — hoy `NO_SOPORTADO` — y para
-que `reclamarArrastresTx` sepa qué hacer con un arrastre decidido como
-`'ahorrado'`), y el resto de la API de `docs/openapi.yaml` que los doce
-endpoints actuales no cubren (categorías, y la propia entidad de
-categorías).
+Metas de ahorro (para activar `'ahorrar'` en la decisión de sobrante —
+hoy `NO_SOPORTADO` — y para que `reclamarArrastresTx` sepa qué hacer
+con un arrastre decidido como `'ahorrado'`), y el resto de la API de
+`docs/openapi.yaml` que los quince endpoints actuales no cubren
+(categorías, y la propia entidad de categorías).

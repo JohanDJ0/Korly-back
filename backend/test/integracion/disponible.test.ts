@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
-import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
+import { editarIngreso, eliminarIngreso, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
@@ -277,5 +277,76 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     expect(resultado.disponibleValorMinimo).toBe(4000n);
     expect(resultado.gastadoHoyValorMinimo).toBe(0n);
     expect(resultado.cifraDiariaValorMinimo).toBe(285n);
+  });
+
+  it('editar un ingreso el mismo día NO cuenta como gastado hoy (bug real: su reversión se confundía con un gasto)', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
+    const { id: ingresoId } = await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 5000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: hoy,
+    });
+
+    await editarIngreso({ tenantId, ingresoId, monto: 6000n, moneda: 'MXN', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    // La edición genera una reversión de -5000 más un ingreso nuevo de
+    // +6000 — ninguna de las dos es un gasto. `gastadoHoy` debe seguir
+    // en 0, no interpretar la reversión del ingreso como si fuera gasto.
+    expect(resultado.disponibleValorMinimo).toBe(6000n);
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n);
+    expect(resultado.cifraDiariaValorMinimo).toBe(400n); // piso(6000/15)
+  });
+
+  it('eliminar un ingreso el mismo día tampoco cuenta como gastado hoy', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-01T00:00:00Z');
+    const { id: ingresoUno } = await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 5000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: hoy,
+    });
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 3000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+
+    await eliminarIngreso({ tenantId, ingresoId: ingresoUno, fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(3000n);
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n);
+  });
+
+  it('un gasto real el mismo día que una edición de ingreso sí cuenta como gastado hoy (la corrección de ingreso no lo tapa)', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-01T00:00:00Z');
+    const { id: ingresoId } = await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 5000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: hoy,
+    });
+    await editarIngreso({ tenantId, ingresoId, monto: 6000n, moneda: 'MXN', fechaReferencia: hoy });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 555n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(5445n); // 6000 - 555
+    expect(resultado.gastadoHoyValorMinimo).toBe(555n); // solo el gasto real, no la reversión del ingreso
   });
 });

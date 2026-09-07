@@ -2,12 +2,12 @@ import { Link, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { FilaGasto } from '@/components/FilaGasto';
+import { FilaIngreso } from '@/components/FilaIngreso';
 import { useGastos } from '@/hooks/use-gastos';
 import { useIngresos } from '@/hooks/use-ingresos';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { usePeriodos } from '@/hooks/use-periodos';
 import { ApiError } from '@/lib/api';
-import { formatearMonto } from '@/lib/dinero';
 import { formatearRangoFechas } from '@/lib/fechas';
 
 /**
@@ -76,19 +76,7 @@ export function Historial() {
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">Ingresos</h2>
             {cargandoIngresos && <p className="text-sm text-muted-foreground">Cargando…</p>}
             {ingresos?.length === 0 && <p className="text-sm text-muted-foreground">Sin ingresos todavía.</p>}
-            <ul>
-              {ingresos?.map((ingreso) => (
-                <li key={ingreso.id} className="flex items-center justify-between border-b py-3">
-                  <div>
-                    <p className="font-medium">{formatearMonto(ingreso.monto)}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {ingreso.fechaEfectiva}
-                      {ingreso.nota ? ` — ${ingreso.nota}` : ''}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <ul>{ingresos?.map((ingreso) => <FilaIngreso key={ingreso.id} ingreso={ingreso} />)}</ul>
           </section>
 
           <section>

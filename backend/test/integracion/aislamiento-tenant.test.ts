@@ -12,7 +12,7 @@ import { arrastres } from '../../src/db/schema/arrastres.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { crearCuenta, obtenerSaldoCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo, listarPeriodos } from '../../src/modulos/periodos/crear-periodo.js';
-import { listarIngresos, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
+import { eliminarIngreso, listarIngresos, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { eliminarGasto, listarGastos, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { conTenant, db } from '../../src/shared/db.js';
@@ -182,6 +182,31 @@ describe('aislamiento por tenant (RLS)', () => {
 
     // Y el gasto de B sigue intacto: A no logró revertirlo de rebote.
     expect(await obtenerSaldoCuenta(identidadB.tenantId, periodoB.cuentaId)).toBe(-1000n);
+  });
+
+  it('un tenant no puede eliminar el ingreso de otro tenant vía ingresoId (BOLA)', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-editar-ingreso-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-editar-ingreso-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const { id: ingresoIdB } = await registrarIngreso({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+
+    // Mismo criterio de defensa en profundidad que eliminarGasto.
+    await expect(
+      eliminarIngreso({ tenantId: identidadA.tenantId, ingresoId: ingresoIdB, fechaReferencia: new Date('2026-08-01T00:00:00Z') })
+    ).rejects.toMatchObject({
+      codigo: 'INGRESO_NO_ENCONTRADO',
+    });
+
+    // Y el ingreso de B sigue intacto: A no logró revertirlo de rebote.
+    expect(await obtenerSaldoCuenta(identidadB.tenantId, periodoB.cuentaId)).toBe(1000n);
   });
 
   it('un tenant no puede listar los ingresos ni los gastos del periodo de otro tenant', async () => {

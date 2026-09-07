@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { listarIngresos, registrarIngreso, type IngresoDetallado } from './registrar-ingreso.js';
+import { editarIngreso, eliminarIngreso, listarIngresos, registrarIngreso, type IngresoDetallado } from './registrar-ingreso.js';
 import { montoADto, montoDesdeDto, type MontoDto } from '../../shared/http.js';
 
 function ingresoADto(ingreso: IngresoDetallado) {
@@ -10,12 +10,18 @@ function ingresoADto(ingreso: IngresoDetallado) {
     fechaEfectiva: ingreso.fechaEfectiva,
     fechaRegistro: ingreso.fechaRegistro.toISOString(),
     nota: ingreso.nota ?? undefined,
+    revertido: ingreso.revertido,
   };
 }
 
 interface RegistrarIngresoBody {
   monto: MontoDto;
   fechaEfectiva: string;
+  nota?: string;
+}
+
+interface EditarIngresoBody {
+  monto: MontoDto;
   nota?: string;
 }
 
@@ -48,5 +54,36 @@ export async function rutasIngresos(app: FastifyInstance): Promise<void> {
   app.get<{ Params: { periodoId: string } }>('/periodos/:periodoId/ingresos', async (request, reply) => {
     const ingresos = await listarIngresos(request.identidad.tenantId, request.params.periodoId);
     reply.send(ingresos.map(ingresoADto));
+  });
+
+  /**
+   * Extensión sobre openapi.yaml (que solo define PATCH/DELETE para
+   * gastos) — mismo mecanismo exacto que su espejo en
+   * modulos/gastos/rutas.ts: revierte el movimiento original y, en
+   * edición, registra uno nuevo contra el periodo activo actual. Sin
+   * `categoriaId` porque `CrearIngresoRequest` nunca lo tuvo.
+   */
+  app.patch<{ Params: { ingresoId: string } }>('/ingresos/:ingresoId', async (request, reply) => {
+    const body = request.body as EditarIngresoBody;
+    const { valorMinimo, moneda } = montoDesdeDto(body.monto);
+
+    const resultado = await editarIngreso({
+      tenantId: request.identidad.tenantId,
+      ingresoId: request.params.ingresoId,
+      monto: valorMinimo,
+      moneda,
+      nota: body.nota,
+    });
+
+    reply.send({
+      ingreso: { id: resultado.id, periodoId: resultado.periodoId, monto: montoADto(valorMinimo, moneda) },
+      ajusteGenerado: resultado.ajusteGenerado,
+      periodoDelAjuste: resultado.ajusteGenerado ? resultado.periodoId : null,
+    });
+  });
+
+  app.delete<{ Params: { ingresoId: string } }>('/ingresos/:ingresoId', async (request, reply) => {
+    await eliminarIngreso({ tenantId: request.identidad.tenantId, ingresoId: request.params.ingresoId });
+    reply.code(204).send();
   });
 }

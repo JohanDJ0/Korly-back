@@ -99,6 +99,17 @@ necesitó ningún cambio — ya aceptaba cualquier `periodoId` por diseño
 desde el punto 5. Probado de punta a punta contra el backend real
 navegando a un periodo cerrado real y a su resumen.
 
+**Punto 9 — editar y eliminar un ingreso:** `FilaIngreso.tsx`, espejo
+exacto de `FilaGasto.tsx` (mismo mecanismo de reversión — ver backend
+README, "Editar y eliminar un ingreso" — misma confirmación nativa
+antes de eliminar, mismo atenuado + tachado para una fila ya
+`revertido`). Resuelve la asimetría que quedaba en "Qué falta": el
+backend nunca soportó corregir un ingreso ya capturado, así que
+tampoco había nada que exponer aquí. Probado de punta a punta contra
+el backend real: editar un ingreso deja la fila original tachada como
+"Corregido" y la nueva con el monto correcto, y el disponible total se
+actualiza de inmediato en ambos casos (edición y eliminación).
+
 ## 1. Variables de entorno
 
 ```bash
@@ -292,6 +303,15 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   activo"; "Periodos anteriores" excluye correctamente el periodo que
   se está viendo. `/resumen/:periodoId` no necesitó ningún cambio para
   funcionar con un periodo pasado — ya estaba diseñado así.
+- Editar un ingreso desde el historial deja la fila original tachada
+  como "Corregido" y agrega una nueva con el monto corregido — probado
+  contra el backend real, confirmando que el disponible total refleja
+  el neto de la corrección. Eliminar un ingreso se probó directamente
+  contra `DELETE /v1/ingresos/:id` del servidor real (el diálogo nativo
+  de confirmación se auto-cancela en el navegador automatizado usado
+  para probar, igual que ya pasaba con gastos): la fila queda
+  `revertido: true` sin desaparecer, y el disponible total baja
+  exactamente el monto eliminado.
 
 ## Qué falta
 
@@ -301,8 +321,6 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   "Periodos anteriores" (punto 8) y su resumen es un click de ahí, ya
   no hay que pegar la URL a mano. Falta la notificación proactiva, no
   la manera de encontrarlo.
-- Editar/eliminar un **ingreso** — el backend tampoco lo soporta
-  todavía (openapi.yaml no define ese endpoint, solo gastos lo tienen).
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
   shadcn/ui, deliberadamente sin definir hasta tener las pantallas
   clave funcionando (decisión explícita, ver conversación).

@@ -1,10 +1,11 @@
-import { and, desc, eq, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull } from 'drizzle-orm';
 import { ingresos } from '../../db/schema/ingresos.js';
 import { asientos, movimientos } from '../../db/schema/ledger.js';
-import { registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
-import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
-import { conTenant } from '../../shared/db.js';
+import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar-movimiento.js';
+import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
+import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
+import { fechaISO } from '../../shared/fechas.js';
 
 export interface RegistrarIngresoEntrada {
   tenantId: string;
@@ -94,6 +95,147 @@ export async function existeIngresoParaPeriodo(tenantId: string, periodoId: stri
   });
 }
 
+/**
+ * Carga lo necesario para corregir un ingreso y valida que sea
+ * corregible — mismo criterio que `cargarGastoParaCorreccionTx` en
+ * modulos/gastos/registrar-gasto.ts (que existe y no se comparte entre
+ * módulos porque cada uno lee su propia tabla de vínculo).
+ */
+async function cargarIngresoParaCorreccionTx(
+  tx: Ejecutor,
+  tenantId: string,
+  ingresoId: string
+): Promise<{ movimientoId: string; periodoId: string }> {
+  const [ingreso] = await tx
+    .select({ movimientoId: ingresos.movimientoId, periodoId: ingresos.periodoId })
+    .from(ingresos)
+    .where(and(eq(ingresos.tenantId, tenantId), eq(ingresos.id, ingresoId)))
+    .limit(1);
+  if (!ingreso) {
+    throw new ErrorDominio('INGRESO_NO_ENCONTRADO', 'El ingreso especificado no existe');
+  }
+
+  const [reversionExistente] = await tx
+    .select({ id: movimientos.id })
+    .from(movimientos)
+    .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.movimientoRevertidoId, ingreso.movimientoId)))
+    .limit(1);
+  if (reversionExistente) {
+    throw new ErrorDominio('INGRESO_YA_REVERTIDO', 'Este ingreso ya fue editado o eliminado antes');
+  }
+
+  return ingreso;
+}
+
+/** Mismo criterio que `periodoActivoObligatorioTx` en registrar-gasto.ts. */
+async function periodoActivoObligatorioTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date) {
+  const periodoActivo = await obtenerPeriodoActivoTx(tx, tenantId, fechaReferencia);
+  if (!periodoActivo) {
+    throw new ErrorDominio('SIN_PERIODO_ACTIVO', 'No hay periodo activo para aplicar el ajuste');
+  }
+  return periodoActivo;
+}
+
+export interface EliminarIngresoEntrada {
+  tenantId: string;
+  ingresoId: string;
+  fechaReferencia?: Date;
+}
+
+/**
+ * "Elimina" un ingreso sin tocar su fila jamás (`ingresos_inmutables`,
+ * migración 0005, lo impide de cualquier forma) — mismo mecanismo que
+ * `eliminarGasto`: genera la reversión de su movimiento contra el
+ * periodo activo actual.
+ */
+export async function eliminarIngreso(entrada: EliminarIngresoEntrada): Promise<void> {
+  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+
+  await conTenant(entrada.tenantId, async (tx) => {
+    const ingresoOriginal = await cargarIngresoParaCorreccionTx(tx, entrada.tenantId, entrada.ingresoId);
+    const periodoActivo = await periodoActivoObligatorioTx(tx, entrada.tenantId, fechaReferencia);
+
+    await revertirMovimientoTx(
+      tx,
+      entrada.tenantId,
+      ingresoOriginal.movimientoId,
+      periodoActivo.cuentaId,
+      fechaISO(fechaReferencia),
+      'Reversión por eliminación de ingreso'
+    );
+  });
+}
+
+export interface EditarIngresoEntrada {
+  tenantId: string;
+  ingresoId: string;
+  /** Siempre positivo — mismo criterio que registrarIngreso. */
+  monto: bigint;
+  moneda: string;
+  nota?: string;
+  fechaReferencia?: Date;
+}
+
+export interface IngresoEditado {
+  id: string;
+  movimientoId: string;
+  periodoId: string;
+  /** true si el ingreso original pertenecía a un periodo ya cerrado. */
+  ajusteGenerado: boolean;
+}
+
+/**
+ * "Edita" un ingreso revirtiendo el original (igual que
+ * `eliminarIngreso`) y registrando uno nuevo con el monto corregido —
+ * mismo mecanismo que `editarGasto` en modulos/gastos/registrar-gasto.ts.
+ */
+export async function editarIngreso(entrada: EditarIngresoEntrada): Promise<IngresoEditado> {
+  if (entrada.monto <= 0n) {
+    throw new ErrorDominio('VALIDACION', 'El monto de un ingreso debe ser positivo');
+  }
+  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+
+  return conTenant(entrada.tenantId, async (tx) => {
+    const ingresoOriginal = await cargarIngresoParaCorreccionTx(tx, entrada.tenantId, entrada.ingresoId);
+    const periodoActivo = await periodoActivoObligatorioTx(tx, entrada.tenantId, fechaReferencia);
+    const fecha = fechaISO(fechaReferencia);
+
+    await revertirMovimientoTx(
+      tx,
+      entrada.tenantId,
+      ingresoOriginal.movimientoId,
+      periodoActivo.cuentaId,
+      fecha,
+      'Reversión por edición de ingreso'
+    );
+
+    const { movimientoId } = await registrarMovimientoTx(tx, {
+      tenantId: entrada.tenantId,
+      tipo: 'ingreso',
+      moneda: entrada.moneda,
+      fechaEfectiva: fecha,
+      nota: entrada.nota,
+      partidas: [
+        { cuentaId: periodoActivo.cuentaId, montoValorMinimo: entrada.monto },
+        { cuentaId: null, montoValorMinimo: -entrada.monto },
+      ],
+    });
+
+    const [ingresoNuevo] = await tx
+      .insert(ingresos)
+      .values({ tenantId: entrada.tenantId, periodoId: periodoActivo.id, movimientoId })
+      .returning({ id: ingresos.id });
+    if (!ingresoNuevo) throw new Error('No se pudo registrar el ingreso corregido');
+
+    return {
+      id: ingresoNuevo.id,
+      movimientoId,
+      periodoId: periodoActivo.id,
+      ajusteGenerado: periodoActivo.id !== ingresoOriginal.periodoId,
+    };
+  });
+}
+
 export interface IngresoDetallado {
   id: string;
   periodoId: string;
@@ -102,6 +244,8 @@ export interface IngresoDetallado {
   fechaEfectiva: string;
   fechaRegistro: Date;
   nota: string | null;
+  /** true si `editarIngreso`/`eliminarIngreso` ya generaron una reversión de este ingreso — mismo criterio que `GastoDetallado.revertido`. */
+  revertido: boolean;
 }
 
 /**
@@ -129,6 +273,7 @@ export async function listarIngresos(
     const filas = await tx
       .select({
         id: ingresos.id,
+        movimientoId: ingresos.movimientoId,
         montoValorMinimo: asientos.montoValorMinimo,
         moneda: movimientos.moneda,
         fechaEfectiva: movimientos.fechaEfectiva,
@@ -141,6 +286,26 @@ export async function listarIngresos(
       .where(and(eq(ingresos.tenantId, tenantId), eq(ingresos.periodoId, periodoId)))
       .orderBy(desc(movimientos.fechaRegistro));
 
-    return filas.map((fila) => ({ ...fila, periodoId }));
+    // Segunda consulta, no un JOIN — mismo motivo que en listarGastos.
+    const movimientoIds = filas.map((fila) => fila.movimientoId);
+    const revertidos =
+      movimientoIds.length === 0
+        ? []
+        : await tx
+            .select({ movimientoRevertidoId: movimientos.movimientoRevertidoId })
+            .from(movimientos)
+            .where(and(eq(movimientos.tenantId, tenantId), inArray(movimientos.movimientoRevertidoId, movimientoIds)));
+    const idsRevertidos = new Set(revertidos.map((fila) => fila.movimientoRevertidoId));
+
+    return filas.map((fila) => ({
+      id: fila.id,
+      periodoId,
+      montoValorMinimo: fila.montoValorMinimo,
+      moneda: fila.moneda,
+      fechaEfectiva: fila.fechaEfectiva,
+      fechaRegistro: fila.fechaRegistro,
+      nota: fila.nota,
+      revertido: idsRevertidos.has(fila.movimientoId),
+    }));
   });
 }

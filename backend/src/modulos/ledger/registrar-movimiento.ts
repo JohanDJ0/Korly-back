@@ -1,6 +1,9 @@
 import { and, eq, inArray, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { asientos, cuentas, movimientos, type TipoCuenta, type TipoMovimiento } from '../../db/schema/ledger.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
+
+const movimientoRevertido = alias(movimientos, 'movimiento_revertido');
 
 export interface Partida {
   /** `null` = contraparte externa al sistema (ver comentario en db/schema/ledger.ts). */
@@ -172,7 +175,21 @@ export async function obtenerSaldoCuenta(tenantId: string, cuentaId: string): Pr
  * puede esconder un gasto detrás de un ingreso más grande del mismo
  * día (el caso típico del día 1) — ver el comentario en
  * consultar-disponible.ts sobre por qué el motor de flujo de caja pide
- * el neto de `['gasto', 'reversion']` específicamente, no de todo.
+ * el neto de `['gasto']`.
+ *
+ * **El "tipo efectivo" de una reversión es el tipo de lo que revierte,
+ * nunca `'reversion'` en sí — bug real, encontrado por el usuario
+ * editando un ingreso.** Antes, `tipos: ['gasto', 'reversion']`
+ * contaba CUALQUIER reversión como gasto de hoy, sin importar qué
+ * revertía. Editar/eliminar un *ingreso* (modulos/ingresos/
+ * registrar-ingreso.ts) también genera un movimiento `'reversion'`
+ * (mismo mecanismo que gastos) — y esa reversión se sumaba a
+ * `gastadoHoy` como si fuera un gasto real, aunque fuera solo una
+ * corrección de ingreso. Resuelto con un `LEFT JOIN` contra el
+ * movimiento original (`movimientoRevertidoId`): el tipo que se
+ * compara contra `tipos` es el del original si existe (una reversión
+ * de un gasto sigue contando como gasto; una reversión de un ingreso
+ * ya no), o el propio tipo del movimiento si no es una reversión.
  */
 export async function obtenerNetoCuentaEnFecha(
   tenantId: string,
@@ -181,15 +198,17 @@ export async function obtenerNetoCuentaEnFecha(
   tipos?: TipoMovimiento[]
 ): Promise<bigint> {
   return conTenant(tenantId, async (tx) => {
+    const tipoEfectivo = sql`coalesce(${movimientoRevertido.tipo}, ${movimientos.tipo})`;
     const condiciones = [eq(asientos.cuentaId, cuentaId), eq(movimientos.fechaEfectiva, fechaEfectiva)];
     if (tipos && tipos.length > 0) {
-      condiciones.push(inArray(movimientos.tipo, tipos));
+      condiciones.push(inArray(tipoEfectivo, tipos));
     }
 
     const [fila] = await tx
       .select({ neto: sql<string>`coalesce(sum(${asientos.montoValorMinimo}), 0)::text` })
       .from(asientos)
       .innerJoin(movimientos, eq(movimientos.id, asientos.movimientoId))
+      .leftJoin(movimientoRevertido, eq(movimientoRevertido.id, movimientos.movimientoRevertidoId))
       .where(and(...condiciones));
 
     return BigInt(fila?.neto ?? '0');

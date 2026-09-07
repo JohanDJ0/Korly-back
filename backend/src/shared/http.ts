@@ -21,6 +21,11 @@ const CODIGO_A_STATUS: Record<string, number> = {
   // forzarlo dentro de uno existente que significa otra cosa.
   SIN_PERIODO_ACTIVO: 409,
   GASTO_YA_REVERTIDO: 409,
+  // Editar/eliminar ingreso es una extensión sobre openapi.yaml (que no
+  // define PATCH/DELETE /ingresos/{id} todavía) — mismos códigos que su
+  // espejo en gastos, ver backend/README.md.
+  INGRESO_NO_ENCONTRADO: 404,
+  INGRESO_YA_REVERTIDO: 409,
 };
 
 /**
