@@ -19,6 +19,27 @@ dominio.md §5: "captura de gastos no se bloquea" en `sin_ingreso`). Se
 colapsa solo tras registrar con éxito. Probado de punta a punta contra
 el backend real, incluida la actualización inmediata de la cifra.
 
+**Punto 4 — historial:** lista los ingresos y gastos del periodo
+activo (`/historial`, enlazada desde "Disponible"). Editar/eliminar un
+gasto desde ahí genera la reversión correspondiente (ver backend
+README, "Editar y eliminar un gasto") — la fila original nunca cambia
+ni desaparece, la corrección aparece como una fila nueva. Eliminar
+pide confirmación nativa (`window.confirm`) antes de mandar el
+request. Probado de punta a punta contra el backend real, incluida la
+edición (fila nueva + original intacta) y la actualización de la
+cifra de disponible.
+
+**Hallazgo de UX, encontrado por el usuario probando el historial:**
+una fila ya corregida (editada o eliminada) se veía idéntica a una
+vigente y seguía invitando a Editar/Eliminar — un click ahí siempre
+iba a fallar con `GASTO_YA_REVERTIDO`. Se agregó `revertido: boolean`
+a `GET /periodos/:periodoId/gastos` (extensión sobre `openapi.yaml`,
+mismo criterio que `NO_SOPORTADO`: el contrato no lo prohíbe, solo no
+lo pedía todavía) y el frontend ahora muestra esas filas atenuadas y
+tachadas, sin botones — "nunca hard delete" sigue siendo una garantía
+de datos, no una obligación de que la pantalla invite a repetir una
+acción que ya no aplica.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -67,13 +88,17 @@ src/
   stores/
     auth-store.ts # Zustand — la sesión de Supabase, sincronizada vía onAuthStateChange
   hooks/
-    use-disponible.ts, use-crear-periodo.ts, use-registrar-ingreso.ts, use-registrar-gasto.ts  # un hook de TanStack Query por endpoint
+    use-disponible.ts, use-periodo-activo.ts, use-crear-periodo.ts,
+    use-ingresos.ts, use-gastos.ts (paginado, useInfiniteQuery),
+    use-registrar-ingreso.ts, use-registrar-gasto.ts,
+    use-editar-gasto.ts, use-eliminar-gasto.ts  # un hook de TanStack Query por endpoint
   routes/
     Login.tsx
     Home.tsx          # "disponible" (punto 2) + captura de gasto (punto 3)
+    Historial.tsx     # ingresos/gastos del periodo activo (punto 4)
     ProtectedRoute.tsx
   components/
-    CifraDisponible.tsx, FormularioIngreso.tsx, FormularioGasto.tsx
+    CifraDisponible.tsx, FormularioIngreso.tsx, FormularioGasto.tsx, FilaGasto.tsx
     ui/  # primitivos de shadcn/ui
 ```
 
@@ -84,6 +109,22 @@ es el único que toca Postgres. `ApiError` en `api.ts` espeja la forma
 `{codigo, mensaje}` de `ErrorDominio` del backend (ver
 `backend/src/shared/errores.ts`) — el mismo contrato de errores en
 ambos lados.
+
+**Hallazgo real, encontrado por el usuario probando "Eliminar" en el
+historial:** `apiFetch` mandaba `Content-Type: application/json` en
+TODA request, incluidas las que no llevan body (`DELETE`) — Fastify
+rechaza eso (`FST_ERR_CTP_EMPTY_JSON_BODY`, "Body cannot be empty when
+content-type is set to..."), el mismo hallazgo que ya se había
+documentado del lado del backend (ver `backend/README.md`, "Capa
+HTTP") pero que no se había aplicado aquí, en el cliente. Se corrigió
+poniendo el header solo cuando `init.body` existe. De paso apareció un
+segundo bug, más sutil: el error de un `Eliminar` fallido se quedaba
+visible en la fila aunque el usuario después editara con éxito — el
+estado de error de una mutation de TanStack Query no se limpia solo
+hasta que esa misma mutation se vuelve a invocar. `FilaGasto.tsx` ahora
+llama `.reset()` en la mutation contraria al cambiar de modo (editar
+↔ ver ↔ eliminar), para que un error de una acción nunca sobreviva a
+una acción distinta que sí funcionó.
 
 **Sesión como estado de Zustand, no como contexto de React.** La
 sesión de Supabase es estado global de cliente (`CLAUDE.md` ya reparte
@@ -147,6 +188,20 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   `['disponible']`) y el formulario se colapsa solo — probado con un
   gasto real contra un periodo con sobregiro, confirmando que el
   disponible total y la cifra diaria bajan exactamente lo esperado.
+- Editar un gasto desde el historial deja la fila original intacta y
+  agrega una nueva con el monto corregido — probado contra el backend
+  real, confirmando que ninguna fila se sobrescribe (ver backend
+  README, "Editar y eliminar un gasto") — y que el disponible total
+  refleja el neto de la corrección.
+- Eliminar un gasto pide confirmación nativa antes de mandar el
+  request — probado cancelando el diálogo: sin confirmar, no se manda
+  ningún `DELETE` y la lista no cambia. Confirmando el diálogo (probado
+  sobreescribiendo `window.confirm` para la prueba), el `DELETE` real
+  funciona y no manda `Content-Type` sin body — ver el hallazgo arriba.
+- Intentar corregir el mismo gasto dos veces muestra
+  `GASTO_YA_REVERTIDO` con su mensaje real del backend, y ese error
+  desaparece de la fila al entrar a modo edición o al cancelar — no se
+  queda "pegado" tras una acción distinta que sí funcionó.
 
 ## Qué falta
 
@@ -154,9 +209,12 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   dashboard de Supabase — construirlo es una pantalla más, no una
   decisión de arquitectura; se agrega cuando haga falta probar con
   gente real.
-- Historial (listar/editar/eliminar gasto), cierre/resumen/decisión de
-  sobrante — ver la propuesta completa de puntos discutida con el
-  usuario.
+- Cierre/resumen/decisión de sobrante — ver la propuesta completa de
+  puntos discutida con el usuario.
+- El historial solo muestra el periodo **activo** — no hay pantalla
+  para ver periodos ya cerrados (el backend sí lo soporta).
+- Editar/eliminar un **ingreso** — el backend tampoco lo soporta
+  todavía (openapi.yaml no define ese endpoint, solo gastos lo tienen).
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
   shadcn/ui, deliberadamente sin definir hasta tener las pantallas
   clave funcionando (decisión explícita, ver conversación).

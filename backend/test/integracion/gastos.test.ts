@@ -381,7 +381,7 @@ describe('gastos', () => {
       await expect(listarGastos(tenantId, randomUUID())).rejects.toMatchObject({ codigo: 'PERIODO_NO_ENCONTRADO' });
     });
 
-    it('un gasto eliminado sigue apareciendo en la lista (nunca hard delete), aunque su efecto ya esté anulado', async () => {
+    it('un gasto eliminado sigue apareciendo en la lista (nunca hard delete), marcado como revertido', async () => {
       const { tenantId, periodo } = await tenantConPeriodoActivo();
       const { id: gastoId } = await registrarGasto({
         tenantId,
@@ -395,7 +395,44 @@ describe('gastos', () => {
       await eliminarGasto({ tenantId, gastoId, fechaReferencia: HOY_DE_PRUEBA });
 
       const resultado = await listarGastos(tenantId, periodo.id, { fechaReferencia: HOY_DE_PRUEBA });
-      expect(resultado.datos.map((g) => g.id)).toContain(gastoId);
+      const fila = resultado.datos.find((g) => g.id === gastoId);
+      expect(fila).toMatchObject({ revertido: true });
+    });
+
+    it('un gasto sin corregir aparece con revertido: false', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      const resultado = await listarGastos(tenantId, periodo.id, { fechaReferencia: HOY_DE_PRUEBA });
+      expect(resultado.datos).toHaveLength(1);
+      expect(resultado.datos[0]).toMatchObject({ revertido: false });
+    });
+
+    it('al editar un gasto, la fila original queda revertido: true y la nueva revertido: false', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      const editado = await editarGasto({ tenantId, gastoId, monto: 800n, moneda: 'MXN', fechaReferencia: HOY_DE_PRUEBA });
+
+      const resultado = await listarGastos(tenantId, periodo.id, { fechaReferencia: HOY_DE_PRUEBA });
+      const original = resultado.datos.find((g) => g.id === gastoId);
+      const nuevo = resultado.datos.find((g) => g.id === editado.id);
+      expect(original).toMatchObject({ revertido: true });
+      expect(nuevo).toMatchObject({ revertido: false, montoValorMinimo: 800n });
     });
   });
 });

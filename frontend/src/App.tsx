@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { queryClient } from '@/lib/query-client';
+import { Historial } from '@/routes/Historial';
 import { Home } from '@/routes/Home';
 import { Login } from '@/routes/Login';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
@@ -14,6 +15,7 @@ export function App() {
           <Route path="/login" element={<Login />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
+            <Route path="/historial" element={<Historial />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -11,6 +11,7 @@ function gastoADto(gasto: GastoDetallado) {
     fechaEfectiva: gasto.fechaEfectiva,
     fechaRegistro: gasto.fechaRegistro.toISOString(),
     nota: gasto.nota ?? undefined,
+    revertido: gasto.revertido,
   };
 }
 

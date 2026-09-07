@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, lt, or } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNotNull, lt, or } from 'drizzle-orm';
 import { gastos } from '../../db/schema/gastos.js';
 import { asientos, movimientos } from '../../db/schema/ledger.js';
 import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar-movimiento.js';
@@ -240,6 +240,14 @@ export interface GastoDetallado {
   fechaEfectiva: string;
   fechaRegistro: Date;
   nota: string | null;
+  /**
+   * true si `editarGasto`/`eliminarGasto` ya generaron una reversión de
+   * este gasto — la fila sigue existiendo tal cual (nunca hard delete),
+   * pero ya no representa un gasto vigente. El cliente decide qué hacer
+   * con eso (atenuarla, ocultar sus acciones); el contrato solo expone
+   * el hecho, no cómo mostrarlo.
+   */
+  revertido: boolean;
 }
 
 export interface ListarGastosOpciones {
@@ -314,6 +322,7 @@ export async function listarGastos(
     const filas = await tx
       .select({
         id: gastos.id,
+        movimientoId: gastos.movimientoId,
         montoValorMinimo: asientos.montoValorMinimo,
         moneda: movimientos.moneda,
         fechaEfectiva: movimientos.fechaEfectiva,
@@ -331,6 +340,22 @@ export async function listarGastos(
     const pagina = hayMas ? filas.slice(0, limite) : filas;
     const ultima = pagina[pagina.length - 1];
 
+    // Segunda consulta, no un JOIN: "¿cuáles de estos movimientos ya
+    // tienen una reversión?" es una pregunta sobre la MISMA tabla
+    // (movimientos.movimiento_revertido_id apunta a otra fila de
+    // movimientos) — un JOIN directo duplicaría filas si algún día un
+    // movimiento admite más de una reversión, y este IN es igual de
+    // barato con el volumen de una sola página.
+    const movimientoIds = pagina.map((fila) => fila.movimientoId);
+    const revertidos =
+      movimientoIds.length === 0
+        ? []
+        : await tx
+            .select({ movimientoRevertidoId: movimientos.movimientoRevertidoId })
+            .from(movimientos)
+            .where(and(eq(movimientos.tenantId, tenantId), inArray(movimientos.movimientoRevertidoId, movimientoIds)));
+    const idsRevertidos = new Set(revertidos.map((fila) => fila.movimientoRevertidoId));
+
     return {
       datos: pagina.map((fila) => ({
         id: fila.id,
@@ -340,6 +365,7 @@ export async function listarGastos(
         fechaEfectiva: fila.fechaEfectiva,
         fechaRegistro: fila.fechaRegistro,
         nota: fila.nota,
+        revertido: idsRevertidos.has(fila.movimientoId),
       })),
       siguienteCursor: hayMas && ultima ? codificarCursorGasto(ultima.fechaRegistro, ultima.id) : null,
     };

@@ -436,10 +436,19 @@ no un 500 ni resultados silenciosamente vacíos.
 **Un gasto editado o eliminado sigue apareciendo en la lista**, con su
 monto original — nunca hard delete (Documento Maestro §7.6). La lista
 es el historial honesto de lo que se capturó, no el estado económico
-vigente (eso lo da el ledger, vía `disponible`/`resumen`); mostrar
-cuál de estos gastos ya fue corregido es un problema de presentación
-que le toca al cliente, no algo que este endpoint resuelva — `Gasto` en
-`openapi.yaml` no define ningún campo para eso todavía.
+vigente (eso lo da el ledger, vía `disponible`/`resumen`).
+
+**`revertido: boolean` en cada fila — extensión sobre `openapi.yaml`,
+agregada al construir el frontend.** El usuario probando el historial
+notó que una fila ya corregida se veía idéntica a una vigente y seguía
+invitando a editarla/eliminarla — un click ahí siempre iba a fallar
+con `GASTO_YA_REVERTIDO`, porque el cliente no tenía forma de saberlo
+de antemano. Se resuelve con una segunda consulta (no un `JOIN`,
+para no duplicar filas si algún día un movimiento admite más de una
+reversión): "¿cuáles de los `movimientoId` de esta página ya tienen un
+movimiento cuyo `movimientoRevertidoId` apunte a ellos?". Mismo
+criterio que `NO_SOPORTADO`: el contrato no lo prohíbe, solo no lo
+pedía todavía.
 
 ## Disponible (el motor de flujo de caja)
 
@@ -916,6 +925,10 @@ corregir el mismo gasto dos veces.
   pierde ni repite filas si se inserta un gasto nuevo entre una página
   y la siguiente, y un cursor mal formado se rechaza explícitamente en
   vez de fallar en silencio.
+- `revertido` marca correctamente una fila editada o eliminada
+  (`true`) frente a una vigente (`false`), y al editar, la fila
+  original queda `revertido: true` mientras la nueva corrección
+  aparece `false` — probado explícitamente contra Postgres real.
 
 ## Qué falta
 

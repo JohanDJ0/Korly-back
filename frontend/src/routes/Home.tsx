@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,6 +82,12 @@ export function Home() {
             <FormularioGasto periodoId={periodoId} onRegistrado={() => setMostrarFormularioGasto(false)} />
           </CardContent>
         </Card>
+      )}
+
+      {periodoId && (
+        <Button asChild variant="link" size="sm">
+          <Link to="/historial">Ver historial</Link>
+        </Button>
       )}
 
       <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>
