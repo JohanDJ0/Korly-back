@@ -1,6 +1,9 @@
+import { useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CifraDisponible } from '@/components/CifraDisponible';
+import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
@@ -16,9 +19,15 @@ import { supabase } from '@/lib/supabase';
 export function Home() {
   const { data, isLoading, error } = useDisponible();
   const crearPeriodo = useCrearPeriodo();
+  const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
 
   const sinPeriodoActivo = error instanceof ApiError && error.codigo === 'PERIODO_NO_ENCONTRADO';
   const errorInesperado = error && !sinPeriodoActivo;
+  // Un gasto se puede registrar con o sin ingreso todavía (modelo-dominio.md
+  // §5: "captura de gastos no se bloquea" en sin_ingreso) — el único
+  // requisito real es tener un periodo activo, que es justo cuando `data`
+  // existe sin error.
+  const periodoId = !error ? data?.periodoId : undefined;
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
@@ -56,6 +65,23 @@ export function Home() {
       )}
 
       {!error && data?.estado === 'ok' && <CifraDisponible disponible={data} />}
+
+      {periodoId && !mostrarFormularioGasto && (
+        <Button onClick={() => setMostrarFormularioGasto(true)} className="w-full max-w-sm">
+          Registrar gasto
+        </Button>
+      )}
+
+      {periodoId && mostrarFormularioGasto && (
+        <Card className="w-full max-w-sm">
+          <CardHeader>
+            <CardTitle>Nuevo gasto</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <FormularioGasto periodoId={periodoId} onRegistrado={() => setMostrarFormularioGasto(false)} />
+          </CardContent>
+        </Card>
+      )}
 
       <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>
         Cerrar sesión

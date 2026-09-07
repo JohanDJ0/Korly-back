@@ -11,6 +11,14 @@ crearlo; con periodo pero sin ingreso → formulario mínimo; con ingreso
 → la cifra real. Probado de punta a punta contra el backend real, con
 un usuario nuevo (sin datos) para ejercer los tres estados.
 
+**Punto 3 — captura de gasto:** el evento de mayor frecuencia del
+sistema (modelo-dominio.md §4), en la misma pantalla — un botón
+"Registrar gasto" despliega un formulario de un solo campo obligatorio
+(monto), disponible con o sin ingreso registrado todavía (modelo-
+dominio.md §5: "captura de gastos no se bloquea" en `sin_ingreso`). Se
+colapsa solo tras registrar con éxito. Probado de punta a punta contra
+el backend real, incluida la actualización inmediata de la cifra.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -59,13 +67,13 @@ src/
   stores/
     auth-store.ts # Zustand — la sesión de Supabase, sincronizada vía onAuthStateChange
   hooks/
-    use-disponible.ts, use-crear-periodo.ts, use-registrar-ingreso.ts  # un hook de TanStack Query por endpoint
+    use-disponible.ts, use-crear-periodo.ts, use-registrar-ingreso.ts, use-registrar-gasto.ts  # un hook de TanStack Query por endpoint
   routes/
     Login.tsx
-    Home.tsx          # la pantalla de "disponible" (punto 2) — sin periodo / sin ingreso / cifra real
+    Home.tsx          # "disponible" (punto 2) + captura de gasto (punto 3)
     ProtectedRoute.tsx
   components/
-    CifraDisponible.tsx, FormularioIngreso.tsx
+    CifraDisponible.tsx, FormularioIngreso.tsx, FormularioGasto.tsx
     ui/  # primitivos de shadcn/ui
 ```
 
@@ -135,6 +143,10 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
 - Cambiar de usuario (cerrar sesión + iniciar con otra cuenta) nunca
   deja datos del usuario anterior visibles, ni mezclados con los del
   nuevo — ver el hallazgo de `queryClient.clear()` arriba.
+- Registrar un gasto actualiza la cifra de inmediato (invalidación de
+  `['disponible']`) y el formulario se colapsa solo — probado con un
+  gasto real contra un periodo con sobregiro, confirmando que el
+  disponible total y la cifra diaria bajan exactamente lo esperado.
 
 ## Qué falta
 
@@ -142,8 +154,9 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   dashboard de Supabase — construirlo es una pantalla más, no una
   decisión de arquitectura; se agrega cuando haga falta probar con
   gente real.
-- Captura de gasto, historial, cierre/resumen/decisión de sobrante —
-  ver la propuesta completa de puntos discutida con el usuario.
+- Historial (listar/editar/eliminar gasto), cierre/resumen/decisión de
+  sobrante — ver la propuesta completa de puntos discutida con el
+  usuario.
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
   shadcn/ui, deliberadamente sin definir hasta tener las pantallas
   clave funcionando (decisión explícita, ver conversación).
