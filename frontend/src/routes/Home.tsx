@@ -99,11 +99,14 @@ export function Home() {
         </Card>
       )}
 
-      {periodoId && (
-        <Button asChild variant="link" size="sm">
-          <Link to="/historial">Ver historial</Link>
-        </Button>
-      )}
+      {
+        // Sin gate en periodoId a propósito: el historial puede seguir
+        // teniendo periodos anteriores que ver aunque ahora mismo no
+        // haya uno activo (p. ej. justo después de cerrar el último).
+      }
+      <Button asChild variant="link" size="sm">
+        <Link to="/historial">Ver historial</Link>
+      </Button>
 
       {periodoId && (
         <Button

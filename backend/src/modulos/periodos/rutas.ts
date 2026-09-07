@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { crearPeriodo, obtenerPeriodoActivo } from './crear-periodo.js';
+import { crearPeriodo, listarPeriodos, obtenerPeriodoActivo } from './crear-periodo.js';
 import type { TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 
 interface CrearPeriodoBody {
@@ -26,5 +26,10 @@ export async function rutasPeriodos(app: FastifyInstance): Promise<void> {
       return reply.code(404).send({ codigo: 'PERIODO_NO_ENCONTRADO', mensaje: 'No hay periodo activo' });
     }
     reply.send(periodo);
+  });
+
+  app.get('/periodos', async (request, reply) => {
+    const periodos = await listarPeriodos(request.identidad.tenantId);
+    reply.send(periodos);
   });
 }

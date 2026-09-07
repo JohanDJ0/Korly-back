@@ -11,7 +11,7 @@ import { resumenes } from '../../src/db/schema/cierre.js';
 import { arrastres } from '../../src/db/schema/arrastres.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { crearCuenta, obtenerSaldoCuenta, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
-import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
+import { crearPeriodo, listarPeriodos } from '../../src/modulos/periodos/crear-periodo.js';
 import { listarIngresos, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { eliminarGasto, listarGastos, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
@@ -106,6 +106,17 @@ describe('aislamiento por tenant (RLS)', () => {
     const filas = await conTenant(identidadA.tenantId, (tx) => tx.select().from(periodos).where(eq(periodos.id, periodoB.id)));
 
     expect(filas).toHaveLength(0);
+  });
+
+  it('listarPeriodos nunca devuelve periodos de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-listar-periodos-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-listar-periodos-b-${randomUUID()}`);
+
+    await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+
+    const resultado = await listarPeriodos(identidadA.tenantId, new Date('2026-08-01T00:00:00Z'));
+
+    expect(resultado).toEqual([]);
   });
 
   it('un tenant no puede leer el ingreso de otro tenant', async () => {

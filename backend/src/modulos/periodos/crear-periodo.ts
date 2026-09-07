@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
 import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
 import { reclamarArrastresTx } from '../cierre/materializar-arrastre.js';
@@ -89,6 +89,37 @@ export async function crearPeriodo(
 
 export async function obtenerPeriodoActivo(tenantId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
   return conTenant(tenantId, (tx) => obtenerPeriodoActivoTx(tx, tenantId, fechaReferencia));
+}
+
+/**
+ * Extensión sobre openapi.yaml (que solo define `POST /periodos` y
+ * `GET /periodos/activo`, nunca un listado) — agregada para que el
+ * historial pueda enlazar a periodos ya cerrados: `GET /periodos/:id/
+ * {resumen,ingresos,gastos}` ya aceptan cualquier `periodoId`, lo único
+ * que faltaba era una forma de saber cuáles existen.
+ *
+ * Devuelve todos los estados (incluido `'borrador'`) — filtrar cuáles
+ * mostrar como "periodos anteriores" es una decisión de presentación
+ * del cliente, no algo que este endpoint deba imponer. Mismo cierre
+ * perezoso que el resto: si el periodo que iba a salir como `'activo'`
+ * ya venció, esta llamada lo cierra primero.
+ */
+export async function listarPeriodos(tenantId: string, fechaReferencia: Date = new Date()): Promise<Periodo[]> {
+  return conTenant(tenantId, async (tx) => {
+    await resolverPendientesTx(tx, tenantId, fechaReferencia);
+
+    // Desempate por `creadoEn`: dos periodos pueden compartir la misma
+    // `fechaInicio` (un borrador creado el mismo día que el activo, misma
+    // quincena de calendario) — sin un segundo criterio, el orden entre
+    // ellos queda a discreción de Postgres, no del más reciente primero.
+    const filas = await tx
+      .select(COLUMNAS_PERIODO)
+      .from(periodos)
+      .where(eq(periodos.tenantId, tenantId))
+      .orderBy(desc(periodos.fechaInicio), desc(periodos.creadoEn));
+
+    return filas.map((fila) => ({ ...fila, estado: fila.estado as EstadoPeriodo }));
+  });
 }
 
 /**

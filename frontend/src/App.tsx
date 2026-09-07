@@ -19,6 +19,7 @@ export function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
             <Route path="/historial" element={<Historial />} />
+            <Route path="/historial/:periodoId" element={<Historial />} />
             <Route path="/resumen/:periodoId" element={<Resumen />} />
           </Route>
         </Routes>

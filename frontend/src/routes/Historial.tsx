@@ -1,31 +1,48 @@
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { FilaGasto } from '@/components/FilaGasto';
 import { useGastos } from '@/hooks/use-gastos';
 import { useIngresos } from '@/hooks/use-ingresos';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
+import { usePeriodos } from '@/hooks/use-periodos';
 import { ApiError } from '@/lib/api';
 import { formatearMonto } from '@/lib/dinero';
+import { formatearRangoFechas } from '@/lib/fechas';
 
 /**
- * Historial del periodo ACTIVO únicamente — no hay todavía forma de ver
- * periodos cerrados desde el frontend (el backend sí los soporta, ver
- * GET /periodos/:periodoId/{ingresos,gastos}, pero no hay una pantalla
- * que liste periodos pasados). Se agrega cuando haga falta.
+ * Sin `:periodoId` en la URL, muestra el periodo activo (comportamiento
+ * de siempre). Con uno, muestra ESE periodo — cerrado o no — vía
+ * `GET /periodos/:id/{ingresos,gastos}`, que ya aceptaban cualquier
+ * `periodoId` desde que se construyeron; lo único que faltaba era
+ * `GET /periodos` (extensión sobre openapi.yaml, ver backend/README.md)
+ * para poder enlazar a ellos. Editar/eliminar un gasto de un periodo ya
+ * cerrado sigue funcionando igual que siempre — el backend decide solo
+ * a qué periodo va a parar la corrección (ver "Editar y eliminar un
+ * gasto" en el README del backend), esta pantalla no necesita saberlo.
  */
 export function Historial() {
-  const { data: periodo, error: errorPeriodo } = usePeriodoActivo();
-  const sinPeriodoActivo = errorPeriodo instanceof ApiError && errorPeriodo.codigo === 'PERIODO_NO_ENCONTRADO';
+  const { periodoId: periodoIdDeUrl } = useParams<{ periodoId?: string }>();
+  const { data: periodoActivo, error: errorPeriodoActivo } = usePeriodoActivo();
+  const { data: periodos } = usePeriodos();
 
-  const { data: ingresos, isLoading: cargandoIngresos } = useIngresos(periodo?.id);
+  const sinPeriodoActivo =
+    !periodoIdDeUrl && errorPeriodoActivo instanceof ApiError && errorPeriodoActivo.codigo === 'PERIODO_NO_ENCONTRADO';
+  const periodoId = periodoIdDeUrl ?? (!errorPeriodoActivo ? periodoActivo?.id : undefined);
+  const periodoViendose = periodoIdDeUrl ? periodos?.find((p) => p.id === periodoIdDeUrl) : periodoActivo;
+
+  const { data: ingresos, isLoading: cargandoIngresos } = useIngresos(periodoId);
   const {
     data: gastos,
     isLoading: cargandoGastos,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useGastos(periodo?.id);
+  } = useGastos(periodoId);
+
+  const periodosAnteriores = (periodos ?? []).filter(
+    (p) => (p.estado === 'cerrado' || p.estado === 'archivado') && p.id !== periodoId
+  );
 
   return (
     <div className="mx-auto flex min-h-svh max-w-lg flex-col gap-6 p-6">
@@ -36,9 +53,24 @@ export function Historial() {
         <h1 className="text-xl font-semibold">Historial</h1>
       </div>
 
+      {periodoViendose && (
+        <p className="text-sm text-muted-foreground">
+          Quincena del {formatearRangoFechas(periodoViendose.fechaInicio, periodoViendose.fechaFin)}
+          {periodoViendose.estado !== 'activo' && ` · ${periodoViendose.estado}`}
+          {periodoIdDeUrl && periodoActivo && periodoActivo.id !== periodoIdDeUrl && (
+            <>
+              {' · '}
+              <Link to="/historial" className="underline-offset-4 hover:underline">
+                ver periodo activo
+              </Link>
+            </>
+          )}
+        </p>
+      )}
+
       {sinPeriodoActivo && <p className="text-muted-foreground">No hay periodo activo todavía.</p>}
 
-      {periodo && (
+      {periodoId && (
         <>
           <section>
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">Ingresos</h2>
@@ -73,6 +105,24 @@ export function Historial() {
             )}
           </section>
         </>
+      )}
+
+      {periodosAnteriores.length > 0 && (
+        <section>
+          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Periodos anteriores</h2>
+          <ul>
+            {periodosAnteriores.map((p) => (
+              <li key={p.id} className="flex items-center justify-between gap-2 border-b py-3">
+                <Link to={`/historial/${p.id}`} className="underline-offset-4 hover:underline">
+                  {formatearRangoFechas(p.fechaInicio, p.fechaFin)}
+                </Link>
+                <Button asChild variant="outline" size="sm">
+                  <Link to={`/resumen/${p.id}`}>Ver resumen</Link>
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
     </div>
   );

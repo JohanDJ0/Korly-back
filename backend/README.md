@@ -291,6 +291,27 @@ mismo y deja de devolverse como `'activo'`. Ver la sección "Cierre"
 más abajo para el detalle de cómo se evitó el ciclo de imports que
 esto habría creado.
 
+### Listar periodos (`listarPeriodos`)
+
+`GET /periodos` — extensión sobre `openapi.yaml`, que solo define
+`POST /periodos` y `GET /periodos/activo`, nunca un listado. Se agregó
+para que el frontend pudiera enlazar el historial a periodos ya
+cerrados: `GET /periodos/:id/{resumen,ingresos,gastos}` ya aceptaban
+cualquier `periodoId` desde que se construyeron (nunca estuvieron
+atados al periodo activo) — lo único que faltaba era una forma de
+saber cuáles `periodoId` existen para poder enlazarlos.
+
+Devuelve **todos** los estados, incluido `'borrador'` — decidir cuáles
+mostrar como "periodos anteriores" es una decisión de presentación del
+cliente, no algo que este endpoint deba filtrar por él. Mismo cierre
+perezoso que el resto (`resolverPendientesTx` antes de leer), y mismo
+orden por `fechaInicio` descendente con `creadoEn` como desempate — dos
+periodos pueden compartir la misma `fechaInicio` (un borrador creado el
+mismo día que el activo, misma quincena de calendario) y sin el
+desempate el orden entre ellos quedaba a discreción de Postgres, no
+"más reciente primero" — encontrado escribiendo el test, no en
+producción.
+
 ## Ingresos
 
 `src/db/schema/ingresos.ts` define `ingresos`.
@@ -793,17 +814,18 @@ eliminar gasto desde el navegador aunque el preflight respondiera 204.
 
 ```
 src/shared/http.ts                     # registrarManejadorErroresDominio, montoADto/montoDesdeDto
-src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo
+src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo, GET /periodos
 src/modulos/ingresos/rutas.ts          # POST/GET /periodos/:periodoId/ingresos
 src/modulos/gastos/rutas.ts            # POST/GET /periodos/:periodoId/gastos, PATCH/DELETE /gastos/:gastoId
 src/modulos/disponible/rutas.ts        # GET /periodos/activo/disponible
 src/modulos/cierre/rutas.ts            # POST .../cerrar, GET .../resumen, POST .../sobrante/decision
 ```
 
-Doce endpoints para ejercer el ciclo central, corregir un gasto y ver
-de vuelta lo que se capturó — no la API completa de
-`docs/openapi.yaml` (sin metas, sin categorías). Todos viven bajo `/v1`
-y detrás del mismo `authPlugin` que ya protege `/v1/me` desde el punto
+Trece endpoints para ejercer el ciclo central, corregir un gasto y ver
+de vuelta lo que se capturó (incluidos periodos ya cerrados) — no la
+API completa de `docs/openapi.yaml` (sin metas, sin categorías). Todos
+viven bajo `/v1` y detrás del mismo `authPlugin` que ya protege `/v1/me`
+desde el punto
 1 — nada nuevo en autenticación, solo se extiende.
 
 **Cada ruta llama directo a la función de dominio que ya existía y
@@ -964,7 +986,7 @@ corregir el mismo gasto dos veces.
   (su ventana contiene hoy), tanto al cerrarse perezosamente el que lo
   bloqueaba como al tocar el tenant después de un cierre manual — sin
   activar uno cuya ventana ya quedó completamente atrás.
-- Los doce endpoints exponen el ciclo completo sobre HTTP real,
+- Los trece endpoints exponen el ciclo completo sobre HTTP real,
   con el mismo `authPlugin` y las mismas funciones de dominio ya
   probadas — no hay lógica nueva en las rutas. Validado de punta a
   punta contra el servidor real y un proyecto Supabase real (no solo
@@ -986,6 +1008,10 @@ corregir el mismo gasto dos veces.
   (`true`) frente a una vigente (`false`), y al editar, la fila
   original queda `revertido: true` mientras la nueva corrección
   aparece `false` — probado explícitamente contra Postgres real.
+- `listarPeriodos` respeta el mismo aislamiento por tenant que el
+  resto (probado explícitamente contra Postgres real), incluye
+  borradores, y ordena de forma determinista incluso cuando dos
+  periodos comparten `fechaInicio` (desempate por `creadoEn`).
 
 ## Qué falta
 

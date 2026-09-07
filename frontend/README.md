@@ -87,6 +87,18 @@ y un sobregiro de $4,000 sobre un objetivo de $555.55 muestra "Te
 excediste hoy por $4,000.00" en rojo, con el disponible total
 ($444.45) en negro por separado.
 
+**Punto 8 — periodos anteriores:** `/historial/:periodoId` (parámetro
+opcional) reusa exactamente los mismos endpoints y componentes que ya
+existían — `GET /periodos/:id/{ingresos,gastos}` nunca estuvieron
+atados al periodo activo, solo faltaba una forma de saber qué
+`periodoId` existen. `GET /periodos` (extensión sobre `openapi.yaml`,
+ver backend/README.md) resuelve eso: una sección "Periodos anteriores"
+en el historial enlaza a cada uno (excluyendo el que se está viendo),
+con un link directo a su resumen si ya cerró. `Resumen.tsx` no
+necesitó ningún cambio — ya aceptaba cualquier `periodoId` por diseño
+desde el punto 5. Probado de punta a punta contra el backend real
+navegando a un periodo cerrado real y a su resumen.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -140,12 +152,13 @@ src/
     use-ingresos.ts, use-gastos.ts (paginado, useInfiniteQuery),
     use-registrar-ingreso.ts, use-registrar-gasto.ts,
     use-editar-gasto.ts, use-eliminar-gasto.ts,
-    use-cerrar-periodo.ts, use-resumen.ts, use-decidir-sobrante.ts  # un hook de TanStack Query por endpoint
+    use-cerrar-periodo.ts, use-resumen.ts, use-decidir-sobrante.ts,
+    use-periodos.ts  # un hook de TanStack Query por endpoint
   routes/
     Login.tsx
     Registro.tsx      # registro público (punto 6)
     Home.tsx          # "disponible" (punto 2) + captura de gasto (punto 3) + cerrar periodo (punto 5)
-    Historial.tsx     # ingresos/gastos del periodo activo (punto 4)
+    Historial.tsx     # ingresos/gastos de cualquier periodo (punto 4, extendido en el punto 8) + "Periodos anteriores"
     Resumen.tsx       # resumen + decisión de sobrante (punto 5)
     ProtectedRoute.tsx
   components/
@@ -273,21 +286,21 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   disponible total ($444.45, todavía positivo) se muestra en negro por
   separado — las dos cifras se colorean por su propio signo, nunca por
   el signo de la otra.
+- Navegar a `/historial/:periodoId` de un periodo cerrado real muestra
+  sus propios ingresos/gastos (no los del periodo activo), su estado
+  ("cerrado") junto al rango de fechas, y un link a "ver periodo
+  activo"; "Periodos anteriores" excluye correctamente el periodo que
+  se está viendo. `/resumen/:periodoId` no necesitó ningún cambio para
+  funcionar con un periodo pasado — ya estaba diseñado así.
 
 ## Qué falta
 
-- El historial solo muestra el periodo **activo** — no hay pantalla
-  para ver periodos ya cerrados, incluido su resumen histórico (el
-  backend sí lo soporta; `/resumen/:periodoId` solo se llega a través
-  del botón "Cerrar periodo" o pegando la URL a mano).
 - Si un periodo cierra de forma perezosa (pasó su `fechaFin` sin que
-  nadie lo cerrara a mano) en vez de vía el botón, el usuario nunca ve
-  su resumen — `Home.tsx` solo navega a `/resumen` cuando ÉL disparó el
-  cierre. El backend sigue decidiendo todo correctamente (déficit
-  auto-arrastrado, sobrante con el default de 7 días), pero la pantalla
-  de resumen de ESE periodo específico no aparece sola. Requeriría que
-  el backend exponga de algún modo "hay un resumen reciente sin ver"
-  — no existe ese endpoint todavía.
+  nadie lo cerrara a mano) en vez de vía el botón, nada le avisa al
+  usuario de forma proactiva — pero ya no queda enterrado: aparece en
+  "Periodos anteriores" (punto 8) y su resumen es un click de ahí, ya
+  no hay que pegar la URL a mano. Falta la notificación proactiva, no
+  la manera de encontrarlo.
 - Editar/eliminar un **ingreso** — el backend tampoco lo soporta
   todavía (openapi.yaml no define ese endpoint, solo gastos lo tienen).
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
