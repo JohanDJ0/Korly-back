@@ -6,6 +6,7 @@ import { Historial } from '@/routes/Historial';
 import { Home } from '@/routes/Home';
 import { Login } from '@/routes/Login';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
+import { Registro } from '@/routes/Registro';
 import { Resumen } from '@/routes/Resumen';
 
 export function App() {
@@ -14,6 +15,7 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/registro" element={<Registro />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
             <Route path="/historial" element={<Historial />} />

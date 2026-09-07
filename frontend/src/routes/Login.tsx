@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -18,11 +18,6 @@ const esquemaLogin = z.object({
 
 type LoginForm = z.infer<typeof esquemaLogin>;
 
-/**
- * Sin registro público todavía (ver README del frontend, "Qué falta") —
- * los usuarios de prueba se crean a mano en el dashboard de Supabase,
- * igual que se ha probado el backend hasta ahora.
- */
 export function Login() {
   const session = useAuthStore((s) => s.session);
   const navigate = useNavigate();
@@ -69,6 +64,12 @@ export function Login() {
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Entrando…' : 'Entrar'}
             </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              ¿No tienes cuenta?{' '}
+              <Link to="/registro" className="text-primary underline-offset-4 hover:underline">
+                Regístrate
+              </Link>
+            </p>
           </form>
         </CardContent>
       </Card>

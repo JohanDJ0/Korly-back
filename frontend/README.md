@@ -58,6 +58,17 @@ descontado) y un sobrante positivo (cierre → decidir arrastrar →
 periodo siguiente con el sobrante ya sumado) — la aritmética de
 `disponible` coincidió exactamente en ambos casos.
 
+**Punto 6 — registro público (`/registro`):** `supabase.auth.signUp`
+directo — no toca el backend en absoluto, la identidad se aprovisiona
+sola en el primer request autenticado (`resolverOcrearIdentidad`,
+backend, desde el punto 1). Maneja los dos casos reales de Supabase
+Auth: si el proyecto no exige confirmar correo, `signUp` ya devuelve
+sesión y entra directo; si la exige (el caso de este proyecto,
+comprobado en vivo), muestra "revisa tu correo" en vez de asumir que
+ya hay sesión. Probado de punta a punta: cuenta nueva → confirmación
+(vía Admin API, sin acceso al correo real) → login → identidad
+aprovisionada sola, con "Empecemos" para un tenant genuinamente nuevo.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -113,6 +124,7 @@ src/
     use-cerrar-periodo.ts, use-resumen.ts, use-decidir-sobrante.ts  # un hook de TanStack Query por endpoint
   routes/
     Login.tsx
+    Registro.tsx      # registro público (punto 6)
     Home.tsx          # "disponible" (punto 2) + captura de gasto (punto 3) + cerrar periodo (punto 5)
     Historial.tsx     # ingresos/gastos del periodo activo (punto 4)
     Resumen.tsx       # resumen + decisión de sobrante (punto 5)
@@ -227,13 +239,14 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   (decidido explícitamente como "arrastrar") — en ambos casos, el
   periodo siguiente nace con el monto ya reflejado en su disponible,
   con la aritmética exacta.
+- Registro público probado de punta a punta con una cuenta real: el
+  proyecto exige confirmar correo (comprobado en vivo, no asumido) y
+  la pantalla lo maneja sin intentar entrar sin sesión; tras confirmar
+  y entrar, el backend aprovisiona la identidad sola, sin ningún
+  cambio de código ahí — mismo mecanismo que ya prueba el punto 1.
 
 ## Qué falta
 
-- **Registro público.** Los usuarios de prueba se crean a mano en el
-  dashboard de Supabase — construirlo es una pantalla más, no una
-  decisión de arquitectura; se agrega cuando haga falta probar con
-  gente real.
 - El historial solo muestra el periodo **activo** — no hay pantalla
   para ver periodos ya cerrados, incluido su resumen histórico (el
   backend sí lo soporta; `/resumen/:periodoId` solo se llega a través
