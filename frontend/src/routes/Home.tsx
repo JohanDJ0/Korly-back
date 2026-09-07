@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CifraDisponible } from '@/components/CifraDisponible';
 import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
+import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
 import { ApiError } from '@/lib/api';
@@ -20,6 +21,8 @@ import { supabase } from '@/lib/supabase';
 export function Home() {
   const { data, isLoading, error } = useDisponible();
   const crearPeriodo = useCrearPeriodo();
+  const cerrarPeriodo = useCerrarPeriodo();
+  const navigate = useNavigate();
   const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
 
   const sinPeriodoActivo = error instanceof ApiError && error.codigo === 'PERIODO_NO_ENCONTRADO';
@@ -89,6 +92,23 @@ export function Home() {
           <Link to="/historial">Ver historial</Link>
         </Button>
       )}
+
+      {periodoId && (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={cerrarPeriodo.isPending}
+          onClick={() => {
+            if (!window.confirm('¿Cerrar este periodo ahora? No se puede deshacer.')) return;
+            cerrarPeriodo.mutate(periodoId, {
+              onSuccess: (resumen) => navigate(`/resumen/${resumen.periodoId}`),
+            });
+          }}
+        >
+          {cerrarPeriodo.isPending ? 'Cerrando…' : 'Cerrar periodo'}
+        </Button>
+      )}
+      {cerrarPeriodo.isError && <p className="text-sm text-destructive">{cerrarPeriodo.error.message}</p>}
 
       <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>
         Cerrar sesión

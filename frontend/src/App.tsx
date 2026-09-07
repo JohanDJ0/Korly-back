@@ -6,6 +6,7 @@ import { Historial } from '@/routes/Historial';
 import { Home } from '@/routes/Home';
 import { Login } from '@/routes/Login';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
+import { Resumen } from '@/routes/Resumen';
 
 export function App() {
   return (
@@ -16,6 +17,7 @@ export function App() {
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
             <Route path="/historial" element={<Historial />} />
+            <Route path="/resumen/:periodoId" element={<Resumen />} />
           </Route>
         </Routes>
       </BrowserRouter>

@@ -40,6 +40,24 @@ tachadas, sin botones — "nunca hard delete" sigue siendo una garantía
 de datos, no una obligación de que la pantalla invite a repetir una
 acción que ya no aplica.
 
+**Punto 5 — cierre, resumen y decisión de sobrante:** un botón "Cerrar
+periodo" en "Disponible" (cierre manual — modelo-dominio.md §3 lo
+describe como automático al pasar `fechaFin`, pero cerrar antes no
+rompe ninguna invariante, y es como el propio backend se prueba desde
+el punto 7) navega a `/resumen/:periodoId` con el resultado. Un
+déficit ya viene auto-decidido (`arrastrado`, sin pedir nada — §3: "no
+existe la opción 'ahorrar' para un déficit"); un sobrante positivo
+`pendiente` muestra "Arrastrar al periodo siguiente" (real) y "Ahorrar"
+(deshabilitado — `501 NO_SOPORTADO`, no existen las metas todavía).
+"Crear periodo siguiente" desde ahí reclama el arrastre ya decidido en
+la misma operación (`materializar-arrastre.ts`, backend).
+
+Probado de punta a punta contra el backend real, dos ciclos completos:
+un déficit (cierre → resumen auto-decidido → periodo siguiente ya
+descontado) y un sobrante positivo (cierre → decidir arrastrar →
+periodo siguiente con el sobrante ya sumado) — la aritmética de
+`disponible` coincidió exactamente en ambos casos.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -91,11 +109,13 @@ src/
     use-disponible.ts, use-periodo-activo.ts, use-crear-periodo.ts,
     use-ingresos.ts, use-gastos.ts (paginado, useInfiniteQuery),
     use-registrar-ingreso.ts, use-registrar-gasto.ts,
-    use-editar-gasto.ts, use-eliminar-gasto.ts  # un hook de TanStack Query por endpoint
+    use-editar-gasto.ts, use-eliminar-gasto.ts,
+    use-cerrar-periodo.ts, use-resumen.ts, use-decidir-sobrante.ts  # un hook de TanStack Query por endpoint
   routes/
     Login.tsx
-    Home.tsx          # "disponible" (punto 2) + captura de gasto (punto 3)
+    Home.tsx          # "disponible" (punto 2) + captura de gasto (punto 3) + cerrar periodo (punto 5)
     Historial.tsx     # ingresos/gastos del periodo activo (punto 4)
+    Resumen.tsx       # resumen + decisión de sobrante (punto 5)
     ProtectedRoute.tsx
   components/
     CifraDisponible.tsx, FormularioIngreso.tsx, FormularioGasto.tsx, FilaGasto.tsx
@@ -202,6 +222,11 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   `GASTO_YA_REVERTIDO` con su mensaje real del backend, y ese error
   desaparece de la fila al entrar a modo edición o al cancelar — no se
   queda "pegado" tras una acción distinta que sí funcionó.
+- Ciclo de cierre completo probado dos veces contra el backend real:
+  un déficit (auto-decidido, sin pedir nada) y un sobrante positivo
+  (decidido explícitamente como "arrastrar") — en ambos casos, el
+  periodo siguiente nace con el monto ya reflejado en su disponible,
+  con la aritmética exacta.
 
 ## Qué falta
 
@@ -209,10 +234,18 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   dashboard de Supabase — construirlo es una pantalla más, no una
   decisión de arquitectura; se agrega cuando haga falta probar con
   gente real.
-- Cierre/resumen/decisión de sobrante — ver la propuesta completa de
-  puntos discutida con el usuario.
 - El historial solo muestra el periodo **activo** — no hay pantalla
-  para ver periodos ya cerrados (el backend sí lo soporta).
+  para ver periodos ya cerrados, incluido su resumen histórico (el
+  backend sí lo soporta; `/resumen/:periodoId` solo se llega a través
+  del botón "Cerrar periodo" o pegando la URL a mano).
+- Si un periodo cierra de forma perezosa (pasó su `fechaFin` sin que
+  nadie lo cerrara a mano) en vez de vía el botón, el usuario nunca ve
+  su resumen — `Home.tsx` solo navega a `/resumen` cuando ÉL disparó el
+  cierre. El backend sigue decidiendo todo correctamente (déficit
+  auto-arrastrado, sobrante con el default de 7 días), pero la pantalla
+  de resumen de ESE periodo específico no aparece sola. Requeriría que
+  el backend exponga de algún modo "hay un resumen reciente sin ver"
+  — no existe ese endpoint todavía.
 - Editar/eliminar un **ingreso** — el backend tampoco lo soporta
   todavía (openapi.yaml no define ese endpoint, solo gastos lo tienen).
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
