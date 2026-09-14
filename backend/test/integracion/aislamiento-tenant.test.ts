@@ -15,6 +15,8 @@ import { crearPeriodo, listarPeriodos } from '../../src/modulos/periodos/crear-p
 import { eliminarIngreso, listarIngresos, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { eliminarGasto, listarGastos, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
+import { obtenerResumenPendiente } from '../../src/modulos/cierre/generar-resumen.js';
+import { aportarAMeta, crearMeta, listarMetas, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 import { conTenant, db } from '../../src/shared/db.js';
 
 /**
@@ -278,6 +280,59 @@ describe('aislamiento por tenant (RLS)', () => {
     );
 
     expect(filas).toHaveLength(0);
+  });
+
+  it('obtenerResumenPendiente nunca devuelve el sobrante pendiente de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-pendiente-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-pendiente-b-${randomUUID()}`);
+
+    const periodoB = await crearPeriodo(identidadB.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({
+      tenantId: identidadB.tenantId,
+      periodoId: periodoB.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+    await cerrarPeriodoManualmente(identidadB.tenantId, periodoB.id, new Date('2026-08-10T00:00:00Z'));
+    // Sobrante de B sigue 'pendiente' — nadie lo decidió.
+
+    expect(await obtenerResumenPendiente(identidadA.tenantId)).toBeNull();
+  });
+
+  it('listarMetas nunca devuelve metas de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-metas-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-metas-b-${randomUUID()}`);
+    await crearMeta(identidadB.tenantId, 'Meta de B', 1000n, 'MXN');
+
+    expect(await listarMetas(identidadA.tenantId)).toEqual([]);
+  });
+
+  it('un tenant no puede aportar ni retirar de la meta de otro tenant vía metaId (BOLA)', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-aportar-meta-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-aportar-meta-b-${randomUUID()}`);
+
+    await crearPeriodo(identidadA.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const metaDeB = await crearMeta(identidadB.tenantId, 'Meta de B', 1000n, 'MXN');
+
+    await expect(
+      aportarAMeta({ tenantId: identidadA.tenantId, metaId: metaDeB.id, monto: 100n, moneda: 'MXN', fechaReferencia: new Date('2026-08-01T00:00:00Z') })
+    ).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+
+    await expect(
+      retirarDeMeta({
+        tenantId: identidadA.tenantId,
+        metaId: metaDeB.id,
+        monto: 100n,
+        moneda: 'MXN',
+        motivo: 'Intento BOLA',
+        fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+      })
+    ).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+
+    // La meta de B sigue intacta: A no logró tocarla de rebote.
+    expect(await obtenerSaldoCuenta(identidadB.tenantId, metaDeB.cuentaId)).toBe(0n);
   });
 
   it('dos requests concurrentes con la misma identidad nueva resuelven al mismo tenant', async () => {

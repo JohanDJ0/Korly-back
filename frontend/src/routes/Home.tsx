@@ -10,7 +10,9 @@ import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
+import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
+import { formatearMonto } from '@/lib/dinero';
 import { formatearRangoFechas } from '@/lib/fechas';
 import { supabase } from '@/lib/supabase';
 
@@ -23,6 +25,7 @@ import { supabase } from '@/lib/supabase';
 export function Home() {
   const { data, isLoading, error } = useDisponible();
   const { data: periodoActivo } = usePeriodoActivo();
+  const { data: resumenPendiente } = useResumenPendiente();
   const crearPeriodo = useCrearPeriodo();
   const cerrarPeriodo = useCerrarPeriodo();
   const navigate = useNavigate();
@@ -47,6 +50,27 @@ export function Home() {
         // restantes reales son menos de 15. Mostrar el rango explica
         // por qué, en vez de dejar que el usuario asuma un conteo fijo.
         <p className="text-sm text-muted-foreground">Quincena del {formatearRangoFechas(periodoActivo.fechaInicio, periodoActivo.fechaFin)}</p>
+      )}
+
+      {
+        // Hallazgo real de un usuario: cerrar un periodo y crear el
+        // siguiente sin decidir el sobrante lo dejaba `pendiente` sin
+        // ningún aviso — parecía que el dinero simplemente había
+        // desaparecido (aunque nunca se pierde: el barrido de N días lo
+        // arrastra solo si nadie decide). Este aviso es la corrección.
+      }
+      {resumenPendiente && (
+        <Card className="w-full max-w-sm border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
+          <CardContent className="flex flex-col gap-2 pt-6">
+            <p className="text-sm">
+              Tienes un sobrante de <span className="font-semibold">{formatearMonto(resumenPendiente.sobrante)}</span> sin decidir de un
+              periodo anterior.
+            </p>
+            <Button asChild size="sm" variant="outline" className="w-full">
+              <Link to={`/resumen/${resumenPendiente.periodoId}`}>Decidir ahora</Link>
+            </Button>
+          </CardContent>
+        </Card>
       )}
 
       {isLoading && <p className="text-muted-foreground">Cargando…</p>}
@@ -106,6 +130,9 @@ export function Home() {
       }
       <Button asChild variant="link" size="sm">
         <Link to="/historial">Ver historial</Link>
+      </Button>
+      <Button asChild variant="link" size="sm">
+        <Link to="/metas">Ver metas</Link>
       </Button>
 
       {periodoId && (

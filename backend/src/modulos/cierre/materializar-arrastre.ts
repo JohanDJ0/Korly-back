@@ -4,7 +4,7 @@ import { resumenes } from '../../db/schema/cierre.js';
 import { cuentas } from '../../db/schema/ledger.js';
 import { crearCuentaTx, registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
 import type { Ejecutor } from '../../shared/db.js';
-import { esViolacionDeIndiceUnico } from '../../shared/errores.js';
+import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
 import type { ResumenGenerado } from './generar-resumen.js';
 
@@ -135,6 +135,78 @@ export async function reclamarArrastresTx(
 
     await tx.update(arrastres).set({ movimientoSalidaId: movimientoId }).where(eq(arrastres.id, elegible.id));
   }
+}
+
+/**
+ * Reclamo inmediato de un arrastre `'ahorrado'` hacia la cuenta de la
+ * meta elegida — a diferencia de `reclamarArrastresTx` (perezoso,
+ * espera a que exista el periodo siguiente), aquí no hay nada que
+ * esperar: la meta ya existe en el momento de decidir (ver
+ * modulos/cierre/decidir-sobrante.ts y README, "Metas de ahorro"). Se
+ * llama dentro de la misma transacción que marca `decisionSobrante =
+ * 'ahorrado'`, nunca antes.
+ *
+ * Mismo guard de concurrencia que `reclamarArrastresTx`: el `UPDATE`
+ * exige que ambos destinos sigan `NULL` (nadie reclamó esta fila
+ * todavía), y si afecta 0 filas, es que otra transacción ganó la
+ * carrera — lanza `SOBRANTE_YA_DECIDIDO` en vez de mover dinero dos
+ * veces. En la práctica no debería ocurrir: `decidirSobrante` ya reservó
+ * el propio `resumen` con su propio `UPDATE ... WHERE decision_sobrante
+ * = 'pendiente'` en la misma transacción, así que ambas reservas viven
+ * o mueren juntas — esta es la comprobación cinturón y tirantes, no el
+ * mecanismo principal.
+ */
+export async function reclamarArrastreComoAporteMetaTx(
+  tx: Ejecutor,
+  tenantId: string,
+  resumenId: string,
+  metaDestinoId: string,
+  metaCuentaId: string,
+  fechaReferencia: Date
+): Promise<void> {
+  const [arrastre] = await tx
+    .select({ id: arrastres.id, montoValorMinimo: arrastres.montoValorMinimo, moneda: arrastres.moneda })
+    .from(arrastres)
+    .where(and(eq(arrastres.tenantId, tenantId), eq(arrastres.resumenId, resumenId)))
+    .limit(1);
+  if (!arrastre) {
+    throw new Error(`Resumen ${resumenId} no tiene fila de arrastre — estado inconsistente (¿sobrante era 0?)`);
+  }
+
+  const [reservado] = await tx
+    .update(arrastres)
+    .set({ metaDestinoId })
+    .where(and(eq(arrastres.id, arrastre.id), isNull(arrastres.periodoDestinoId), isNull(arrastres.metaDestinoId)))
+    .returning({ id: arrastres.id });
+  if (!reservado) {
+    throw new ErrorDominio('SOBRANTE_YA_DECIDIDO', 'El sobrante de este periodo ya fue decidido');
+  }
+
+  const { movimientoId } = await registrarMovimientoTx(tx, {
+    tenantId,
+    tipo: 'aporte_meta',
+    moneda: arrastre.moneda,
+    fechaEfectiva: fechaISO(fechaReferencia),
+    nota: `Sobrante arrastrado a meta (resumen ${resumenId})`,
+    partidas: [
+      { cuentaId: await obtenerCuentaArrastrePendienteExistenteTx(tx, tenantId), montoValorMinimo: -arrastre.montoValorMinimo },
+      { cuentaId: metaCuentaId, montoValorMinimo: arrastre.montoValorMinimo },
+    ],
+  });
+
+  await tx.update(arrastres).set({ movimientoSalidaId: movimientoId }).where(eq(arrastres.id, arrastre.id));
+}
+
+async function obtenerCuentaArrastrePendienteExistenteTx(tx: Ejecutor, tenantId: string): Promise<string> {
+  const [cuentaPuente] = await tx
+    .select({ id: cuentas.id })
+    .from(cuentas)
+    .where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.tipo, 'arrastre_pendiente')))
+    .limit(1);
+  if (!cuentaPuente) {
+    throw new Error(`Tenant ${tenantId} tiene un arrastre elegible pero no tiene cuenta arrastre_pendiente — estado inconsistente`);
+  }
+  return cuentaPuente.id;
 }
 
 /**

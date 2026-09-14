@@ -57,14 +57,18 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * menos) y `díasRestantes` bajó uno - ahí es donde ocurre la
  * redistribución, nunca a mitad del mismo día.
  *
- * **Por qué el corte se restringe a `['gasto']` y no al neto de "todo
- * lo de hoy":** se probó primero con el neto de TODOS los asientos de
- * hoy, y falla justo en el caso más común - el día 1, con el ingreso y
- * el primer gasto fechados el mismo día. Un ingreso de 5000 y un gasto
- * de 555 el mismo día dan un neto de +4445 (positivo), así que
- * "gastado hoy" habría salido en 0 - el gasto real quedó escondido
- * detrás del ingreso, más grande. Restringir a `'gasto'` evita que un
- * ingreso del mismo día tape un gasto real.
+ * **Por qué el corte se restringe a `['gasto', 'aporte_meta']` y no al
+ * neto de "todo lo de hoy":** se probó primero con el neto de TODOS los
+ * asientos de hoy, y falla justo en el caso más común - el día 1, con
+ * el ingreso y el primer gasto fechados el mismo día. Un ingreso de
+ * 5000 y un gasto de 555 el mismo día dan un neto de +4445 (positivo),
+ * así que "gastado hoy" habría salido en 0 - el gasto real quedó
+ * escondido detrás del ingreso, más grande. Restringir a tipos
+ * específicos evita que un ingreso (o un retiro de meta) del mismo día
+ * tape un gasto real. `'aporte_meta'` se cuenta junto con `'gasto'`
+ * porque modelo-dominio.md §6 confirma que un aporte "se trata como un
+ * gasto más" — sin esto, aportar a una meta el mismo día no bajaría
+ * "puedes gastar hoy" aunque sí baje `disponible`.
  *
  * **`obtenerNetoCuentaEnFecha` resuelve una reversión a lo que
  * revierte, no a `'reversion'` en sí (ver su comentario en
@@ -101,7 +105,7 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
   const disponibleValorMinimo = await obtenerSaldoCuenta(tenantId, periodo.cuentaId);
   const diasRestantes = calcularDiasRestantes(periodo.fechaFin, fechaReferencia);
 
-  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), ['gasto']);
+  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), ['gasto', 'aporte_meta']);
   const gastadoHoyValorMinimo = netoGastosHoy < 0n ? -netoGastosHoy : 0n;
   const disponibleBaseHoy = disponibleValorMinimo + gastadoHoyValorMinimo;
   const objetivoHoy = pisoDivisionBigInt(disponibleBaseHoy, BigInt(diasRestantes));

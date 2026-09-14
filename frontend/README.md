@@ -110,6 +110,47 @@ el backend real: editar un ingreso deja la fila original tachada como
 "Corregido" y la nueva con el monto correcto, y el disponible total se
 actualiza de inmediato en ambos casos (edición y eliminación).
 
+**Punto 10 — metas de ahorro:** pantalla nueva (`/metas`, enlazada
+desde "Disponible") con `Metas.tsx` + `FormularioMeta.tsx` (crear,
+React Hook Form + Zod, mismo patrón que `FormularioGasto.tsx`) +
+`FilaMeta.tsx` (aportar/retirar inline, un `<select>` de modo en vez de
+dos formularios separados — retirar además exige un motivo, requisito
+del backend). `montoAcumulado`/`porcentajeAvance` de cada meta vienen
+del backend ya calculados en vivo, nunca cacheados aquí tampoco.
+
+El botón "Ahorrar" en `Resumen.tsx` (antes deshabilitado, "próximamente")
+ahora despliega un selector nativo con las metas del tenant; confirmar
+llama a `decidirSobrante` con el `metaId` elegido — el backend reclama
+el sobrante de inmediato hacia esa meta, así que `['metas']` se
+invalida junto con el resumen (ver `use-decidir-sobrante.ts`).
+
+Probado de punta a punta contra el backend real: crear una meta,
+aportar (confirmando que `gastadoHoy` en Disponible refleja el aporte,
+igual que un gasto), retirar sin motivo (rechazado sin llegar a
+mandarse) y con motivo (aumenta el disponible), cerrar un periodo y
+decidir "ahorrar" — la meta recibe el sobrante de inmediato, visible
+al volver a `/metas` sin haber creado ningún periodo nuevo.
+
+**Punto 11 — aviso de sobrante pendiente:** resuelve un hueco de "Qué
+falta" de la mano dura — reportado por un usuario real probando la
+app. Cerró un periodo manualmente, creó el siguiente sin decidir qué
+hacer con el sobrante del primero, y al no ver ningún aviso pensó que
+el dinero simplemente había desaparecido (no era así: el resumen
+seguía `'pendiente'`, recuperable desde "Periodos anteriores" — solo
+que nada se lo recordaba). `use-resumen-pendiente.ts` consulta
+`GET /resumenes/pendiente` (extensión sobre `openapi.yaml`, ver
+backend/README.md) y `Home.tsx` muestra una tarjeta de aviso —
+"Tienes un sobrante de $X sin decidir de un periodo anterior" con un
+botón directo a su resumen — cada vez que exista uno. Se invalida
+junto con `['resumen']` al cerrar un periodo y al decidir un sobrante,
+para que aparezca y desaparezca sin que el usuario tenga que refrescar
+nada.
+
+Probado de punta a punta contra el backend real reproduciendo el
+reporte exacto: cerrar un periodo, crear el siguiente sin decidir, ver
+el aviso en Home con el monto correcto, seguir el link a su resumen,
+decidir "arrastrar", y confirmar que el aviso desaparece de Home.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -312,15 +353,21 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   para probar, igual que ya pasaba con gastos): la fila queda
   `revertido: true` sin desaparecer, y el disponible total baja
   exactamente el monto eliminado.
+- Crear una meta, aportar y retirar funcionan de punta a punta contra
+  el backend real: aportar baja el disponible Y `gastadoHoy` (como un
+  gasto); retirar sin motivo no manda ningún request (validado en el
+  cliente antes de llegar al backend); `montoAcumulado`/`porcentajeAvance`
+  se actualizan de inmediato tras cada operación. Decidir "ahorrar" un
+  sobrante hacia una meta elegida la actualiza sin crear ningún periodo
+  nuevo — probado navegando a `/metas` justo después de confirmar.
+- El aviso de sobrante pendiente en Home aparece con el monto correcto
+  cuando existe uno, sin importar que ya haya un periodo activo más
+  reciente (reproduce el reporte real de un usuario), y desaparece de
+  inmediato al decidirlo desde su resumen — probado de punta a punta
+  contra el backend real, el mismo escenario exacto que se reportó.
 
 ## Qué falta
 
-- Si un periodo cierra de forma perezosa (pasó su `fechaFin` sin que
-  nadie lo cerrara a mano) en vez de vía el botón, nada le avisa al
-  usuario de forma proactiva — pero ya no queda enterrado: aparece en
-  "Periodos anteriores" (punto 8) y su resumen es un click de ahí, ya
-  no hay que pegar la URL a mano. Falta la notificación proactiva, no
-  la manera de encontrarlo.
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
   shadcn/ui, deliberadamente sin definir hasta tener las pantallas
   clave funcionando (decisión explícita, ver conversación).

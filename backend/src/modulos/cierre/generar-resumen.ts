@@ -1,6 +1,7 @@
-import { and, eq } from 'drizzle-orm';
-import { asientos, movimientos } from '../../db/schema/ledger.js';
+import { and, asc, eq } from 'drizzle-orm';
+import { type TipoMovimiento } from '../../db/schema/ledger.js';
 import { resumenes, type EstadoDecisionSobrante } from '../../db/schema/cierre.js';
+import { obtenerNetoPorTipoEfectivoTx } from '../ledger/registrar-movimiento.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 
 export interface ResumenGenerado {
@@ -84,6 +85,34 @@ export async function obtenerResumenTx(tx: Ejecutor, tenantId: string, periodoId
   return fila ? { ...fila, decisionSobrante: fila.decisionSobrante as EstadoDecisionSobrante } : null;
 }
 
+/**
+ * El resumen `'pendiente'` más antiguo del tenant, si hay alguno —
+ * usado para avisar proactivamente en el frontend (ver
+ * frontend/README.md, "Qué falta": "nada le avisa al usuario"; hueco
+ * real, encontrado por el usuario probando la app: cerró un periodo,
+ * creó el siguiente sin decidir el sobrante, y sin este aviso parecía
+ * que el dinero simplemente había desaparecido — aunque
+ * `resolverDecisionesVencidasTx` ya garantizaba que a los N días se
+ * arrastra solo, nunca se pierde).
+ *
+ * El más antiguo, no cualquiera: si llegaran a acumularse varios
+ * (cerrar periodos repetidamente sin decidir ninguno), es el que menos
+ * le queda antes de que el barrido de N días lo decida por el usuario —
+ * el más urgente de mostrar.
+ */
+export async function obtenerResumenPendiente(tenantId: string): Promise<ResumenGenerado | null> {
+  return conTenant(tenantId, async (tx) => {
+    const [fila] = await tx
+      .select()
+      .from(resumenes)
+      .where(and(eq(resumenes.tenantId, tenantId), eq(resumenes.decisionSobrante, 'pendiente')))
+      .orderBy(asc(resumenes.generadoEn))
+      .limit(1);
+
+    return fila ? { ...fila, decisionSobrante: fila.decisionSobrante as EstadoDecisionSobrante } : null;
+  });
+}
+
 interface TotalesPeriodo {
   totalIngresosValorMinimo: bigint;
   totalGastadoValorMinimo: bigint;
@@ -91,44 +120,73 @@ interface TotalesPeriodo {
 }
 
 /**
- * `totalGastado` incluye solo movimientos `tipo = 'gasto'` — no
- * `'aporte_meta'`, que modelo-dominio.md §6 también resta del
- * disponible. No es un descuido: `aporte_meta` no existe todavía
- * (Metas está fuera del walking skeleton), así que ningún movimiento de
- * ese tipo puede aparecer aquí hoy. Cuando exista, esta función necesita
- * decidir si lo reporta junto con `totalGastado` o aparte — decisión de
- * producto, no algo que resolver ahora sin ese módulo enfrente.
+ * Tipos que suman como "ingreso" o "gasto" para efectos del resumen —
+ * deliberadamente exhaustivo sobre `TIPOS_MOVIMIENTO` (sin contar
+ * `'reversion'`, que `obtenerNetoPorTipoEfectivoTx` ya resuelve al tipo
+ * de lo que revierte antes de llegar aquí): un tipo nuevo que se le
+ * agregue al ledger sin clasificarlo aquí debe fallar fuerte, no
+ * perderse en silencio (ver el bug de abajo).
+ *
+ * `'arrastre_sobrante'` cuenta como ingreso porque, en el momento en que
+ * ESTE periodo genera SU PROPIO resumen, cualquier asiento de ese tipo
+ * en su cuenta solo puede ser un arrastre que heredó al crearse
+ * (`reclamarArrastresTx`) — el asiento de SALIDA que drena su propio
+ * sobrante se registra después de este cálculo, no antes (ver
+ * `cerrarYGenerarResumenTx`). `'aporte_meta'` cuenta como gasto y
+ * `'retiro_meta'` como ingreso — modelo-dominio.md §6: "el aporte se
+ * trata como un gasto más"; el retiro es su simétrico.
+ */
+const TIPOS_INGRESO: ReadonlySet<TipoMovimiento> = new Set(['ingreso', 'retiro_meta', 'arrastre_sobrante']);
+const TIPOS_GASTO: ReadonlySet<TipoMovimiento> = new Set(['gasto', 'aporte_meta']);
+
+/**
+ * **Bug real, encontrado antes de construir Metas — no hipotético.**
+ * La versión anterior solo sumaba `tipo = 'ingreso'`/`'gasto'` desde
+ * `movimientos`/`asientos` directo. Un periodo que **hereda un
+ * arrastre** (créditado con `tipo = 'arrastre_sobrante'` al crearse) y
+ * luego cierra con su propia actividad calculaba un sobrante que
+ * ignoraba por completo ese arrastre heredado — el saldo real de la
+ * cuenta y `totalIngresos - totalGastado` divergían. Al drenar, el
+ * periodo cerrado quedaba con el arrastre heredado atorado para
+ * siempre (nunca llegaba al periodo siguiente): dinero perdido en un
+ * ciclo de vida normal de dos o más periodos consecutivos, sin que
+ * hiciera falta Metas para disparrarlo. Confirmado con un test antes
+ * del fix (`sobranteValorMinimo` daba 300 en vez de 1300, saldo
+ * heredado de 1000 nunca drenado).
+ *
+ * **Corregido usando `obtenerNetoPorTipoEfectivoTx`**: agrupa TODOS los
+ * asientos de la cuenta por su tipo efectivo (una reversión ya resuelta
+ * al tipo de lo que revierte), y clasifica cada uno como ingreso o
+ * gasto vía `TIPOS_INGRESO`/`TIPOS_GASTO` de arriba — nunca se limita a
+ * una lista fija de dos tipos. Esto garantiza, por construcción, que
+ * `totalIngresos - totalGastado` siempre sea exactamente el saldo real
+ * de la cuenta (invariante ahora verificado con un test que compara
+ * contra `obtenerSaldoCuenta` directamente), así que drenar SIEMPRE
+ * deja el periodo cerrado en 0.
  *
  * `moneda`: en la práctica siempre 'MXN' (multi-moneda fuera del MVP,
  * documento-maestro-v2.md §4.2), pero nada en el schema lo obliga
- * todavía. Si un periodo no tuvo ningún movimiento, no hay de dónde
- * derivarla — se usa 'MXN' como default explícito en vez de inventar un
- * concepto de "moneda del tenant" que no existe en ningún otro lado.
+ * todavía — de ahí el chequeo explícito de abajo (mismo que ya existía
+ * antes de este fix, preservado). Si la cuenta no tuvo ningún
+ * movimiento, no hay de dónde derivarla — se usa 'MXN' como default.
  */
 async function calcularTotalesTx(tx: Ejecutor, cuentaId: string): Promise<TotalesPeriodo> {
-  const filas = await tx
-    .select({
-      tipo: movimientos.tipo,
-      moneda: asientos.moneda,
-      suma: asientos.montoValorMinimo,
-    })
-    .from(asientos)
-    .innerJoin(movimientos, eq(asientos.movimientoId, movimientos.id))
-    .where(eq(asientos.cuentaId, cuentaId));
+  const netosPorTipo = await obtenerNetoPorTipoEfectivoTx(tx, cuentaId);
 
   let totalIngresosValorMinimo = 0n;
   let totalGastadoValorMinimo = 0n;
   const monedas = new Set<string>();
 
-  for (const fila of filas) {
-    monedas.add(fila.moneda);
-    if (fila.tipo === 'ingreso') {
-      totalIngresosValorMinimo += fila.suma;
-    } else if (fila.tipo === 'gasto') {
-      // Los gastos llegan a la cuenta del periodo como partidas
-      // negativas (registrar-gasto.ts); totalGastado se reporta como
-      // magnitud positiva.
-      totalGastadoValorMinimo += -fila.suma;
+  for (const { tipoEfectivo, moneda, neto } of netosPorTipo) {
+    monedas.add(moneda);
+    if (TIPOS_INGRESO.has(tipoEfectivo)) {
+      totalIngresosValorMinimo += neto;
+    } else if (TIPOS_GASTO.has(tipoEfectivo)) {
+      // Los gastos (y aportes a meta) llegan como partidas negativas;
+      // totalGastado se reporta como magnitud positiva.
+      totalGastadoValorMinimo += -neto;
+    } else {
+      throw new Error(`Tipo de movimiento no clasificado para el resumen de cierre: '${tipoEfectivo}'`);
     }
   }
 
@@ -136,9 +194,5 @@ async function calcularTotalesTx(tx: Ejecutor, cuentaId: string): Promise<Totale
     throw new Error(`La cuenta ${cuentaId} mezcla más de una moneda entre sus movimientos (fuera de alcance del MVP)`);
   }
 
-  return {
-    totalIngresosValorMinimo,
-    totalGastadoValorMinimo,
-    moneda: monedas.values().next().value ?? 'MXN',
-  };
+  return { totalIngresosValorMinimo, totalGastadoValorMinimo, moneda: monedas.values().next().value ?? 'MXN' };
 }

@@ -7,6 +7,7 @@ import { rutasIngresos } from './modulos/ingresos/rutas.js';
 import { rutasGastos } from './modulos/gastos/rutas.js';
 import { rutasDisponible } from './modulos/disponible/rutas.js';
 import { rutasCierre } from './modulos/cierre/rutas.js';
+import { rutasMetas } from './modulos/metas/rutas.js';
 
 export function crearApp() {
   const app = Fastify({ logger: true });
@@ -54,6 +55,7 @@ export function crearApp() {
       v1.register(rutasGastos);
       v1.register(rutasDisponible);
       v1.register(rutasCierre);
+      v1.register(rutasMetas);
     },
     { prefix: '/v1' }
   );

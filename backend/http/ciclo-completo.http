@@ -176,3 +176,77 @@ Authorization: Bearer {{authToken}}
 ### 25. Intentar eliminar el gasto del paso 8 otra vez — 409 GASTO_YA_REVERTIDO. No es un bug: ya se corrigió en el paso 22, no se puede corregir dos veces el mismo.
 DELETE {{baseUrl}}/gastos/{{registrarGasto2.response.body.id}}
 Authorization: Bearer {{authToken}}
+
+### --- Metas de ahorro (agregado al agregar el módulo) ---
+### Todo lo de aquí en adelante opera sobre el SEGUNDO periodo
+### ({{periodoSiguienteId}}, el activo de hoy) — aportar/retirar
+### siempre necesitan un periodo activo del cual descontar/depositar.
+
+### 26. Crear una meta de ahorro.
+# @name crearMeta
+POST {{baseUrl}}/metas
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "nombre": "Vacaciones",
+  "montoObjetivo": { "valorMinimo": 1000000, "moneda": "MXN" }
+}
+
+### 27. Listar metas — montoAcumulado y porcentajeAvance en 0, todavía sin aportes.
+GET {{baseUrl}}/metas
+Authorization: Bearer {{authToken}}
+
+### 28. Aportar a la meta. Reduce el disponible del periodo activo como si fuera un gasto (modelo-dominio.md §6).
+POST {{baseUrl}}/metas/{{crearMeta.response.body.id}}/aportes
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 50000, "moneda": "MXN" }
+}
+
+### 29. Disponible del periodo activo — gastadoHoy debe incluir el aporte del paso 28, no solo gastos.
+GET {{baseUrl}}/periodos/activo/disponible
+Authorization: Bearer {{authToken}}
+
+### 30. Listar metas otra vez — montoAcumulado ahora 50000, porcentajeAvance 5.
+GET {{baseUrl}}/metas
+Authorization: Bearer {{authToken}}
+
+### 31. Retirar de la meta — motivo obligatorio. Aumenta el disponible del periodo activo, tratado como un ingreso más.
+POST {{baseUrl}}/metas/{{crearMeta.response.body.id}}/retiros
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 20000, "moneda": "MXN" },
+  "motivo": "Imprevisto"
+}
+
+### 32. Retirar sin motivo — 400 VALIDACION (el motivo es obligatorio, requisito original del producto).
+POST {{baseUrl}}/metas/{{crearMeta.response.body.id}}/retiros
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 1000, "moneda": "MXN" }
+}
+
+### 33. Cerrar el segundo periodo, con el sobrante que dejaron los pasos 28/31 encima de lo que ya tenía.
+POST {{baseUrl}}/periodos/{{periodoSiguienteId}}/cerrar
+Authorization: Bearer {{authToken}}
+
+### 34. Decidir "ahorrar" el sobrante hacia la meta — a diferencia de "arrastrar", el reclamo es inmediato (no hace falta crear el periodo siguiente para verlo reflejado en la meta).
+POST {{baseUrl}}/periodos/{{periodoSiguienteId}}/sobrante/decision
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "decision": "ahorrar",
+  "metaId": "{{crearMeta.response.body.id}}"
+}
+
+### 35. Listar metas una última vez — montoAcumulado ya incluye el sobrante recién decidido, sumado al saldo que dejaron los pasos 28/31.
+GET {{baseUrl}}/metas
+Authorization: Bearer {{authToken}}

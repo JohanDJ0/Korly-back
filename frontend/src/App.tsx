@@ -5,6 +5,7 @@ import { queryClient } from '@/lib/query-client';
 import { Historial } from '@/routes/Historial';
 import { Home } from '@/routes/Home';
 import { Login } from '@/routes/Login';
+import { Metas } from '@/routes/Metas';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { Registro } from '@/routes/Registro';
 import { Resumen } from '@/routes/Resumen';
@@ -21,6 +22,7 @@ export function App() {
             <Route path="/historial" element={<Historial />} />
             <Route path="/historial/:periodoId" element={<Historial />} />
             <Route path="/resumen/:periodoId" element={<Resumen />} />
+            <Route path="/metas" element={<Metas />} />
           </Route>
         </Routes>
       </BrowserRouter>

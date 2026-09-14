@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { cerrarPeriodoManualmente } from './cerrar-periodo.js';
 import { decidirSobrante, type DecisionSobranteEntrada } from './decidir-sobrante.js';
-import { obtenerResumen, type ResumenGenerado } from './generar-resumen.js';
+import { obtenerResumen, obtenerResumenPendiente, type ResumenGenerado } from './generar-resumen.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { montoADto } from '../../shared/http.js';
 
@@ -44,14 +44,32 @@ export async function rutasCierre(app: FastifyInstance): Promise<void> {
     reply.send(resumenADto(resumen));
   });
 
+  /**
+   * Extensión sobre openapi.yaml — avisa proactivamente si el tenant
+   * tiene un sobrante `'pendiente'` de decidir, sin que el cliente
+   * tenga que recorrer todos los periodos cerrados uno por uno para
+   * encontrarlo. `200` con `null` si no hay ninguno: "nada pendiente"
+   * es el estado normal, no un error (ver README, "Aviso de sobrante
+   * pendiente").
+   */
+  app.get('/resumenes/pendiente', async (request, reply) => {
+    const resumen = await obtenerResumenPendiente(request.identidad.tenantId);
+    reply.send(resumen ? resumenADto(resumen) : null);
+  });
+
   app.post<{ Params: { periodoId: string } }>('/periodos/:periodoId/sobrante/decision', async (request, reply) => {
-    const body = request.body as { decision?: string } | undefined;
+    const body = request.body as { decision?: string; metaId?: string } | undefined;
     const decision = body?.decision;
     if (decision !== 'ahorrar' && decision !== 'arrastrar') {
       throw new ErrorDominio('VALIDACION', "El campo 'decision' debe ser 'ahorrar' o 'arrastrar'");
     }
 
-    const resultado = await decidirSobrante(request.identidad.tenantId, request.params.periodoId, decision as DecisionSobranteEntrada);
+    const resultado = await decidirSobrante(
+      request.identidad.tenantId,
+      request.params.periodoId,
+      decision as DecisionSobranteEntrada,
+      body?.metaId
+    );
     reply.send({
       periodoId: resultado.periodoId,
       decision: resultado.decision,

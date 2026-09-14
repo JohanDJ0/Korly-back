@@ -7,6 +7,7 @@ import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
 import { obtenerSaldoCuenta } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { obtenerResumen } from '../../src/modulos/cierre/generar-resumen.js';
 
 /**
  * El mecanismo de materialización (modulos/cierre/materializar-arrastre.ts):
@@ -115,6 +116,49 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
 
     // Reclama los dos: +1000 (de p1) y -200 (de p2) = 800.
     expect(await obtenerSaldoCuenta(tenantId, p3.cuentaId)).toBe(800n);
+  });
+
+  it('un periodo que hereda un arrastre y luego cierra con su propia actividad calcula su sobrante correctamente (bug real, ver README)', async () => {
+    const tenantId = await tenantNuevo();
+
+    const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({
+      tenantId,
+      periodoId: p1.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+    await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
+    await decidirSobrante(tenantId, p1.id, 'arrastrar'); // decidido ANTES de crear p2, para que el reclamo sea inmediato
+
+    const p2 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(1000n); // heredó el arrastre al crearse
+
+    await registrarIngreso({
+      tenantId,
+      periodoId: p2.id,
+      monto: 500n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-16',
+      fechaReferencia: new Date('2026-08-16T00:00:00Z'),
+    });
+    await registrarGasto({ tenantId, periodoId: p2.id, monto: 200n, moneda: 'MXN', fechaEfectiva: '2026-08-16', fechaReferencia: new Date('2026-08-16T00:00:00Z') });
+
+    const saldoRealAntesDeCerrar = await obtenerSaldoCuenta(tenantId, p2.cuentaId);
+    expect(saldoRealAntesDeCerrar).toBe(1300n); // 1000 heredado + 500 - 200
+
+    await cerrarPeriodoManualmente(tenantId, p2.id, new Date('2026-08-25T00:00:00Z'));
+
+    const resumen = await obtenerResumen(tenantId, p2.id);
+    // El sobrante calculado debe coincidir con el saldo real de la
+    // cuenta ANTES de drenar — no solo con su ingreso/gasto propios,
+    // ignorando lo heredado.
+    expect(resumen?.sobranteValorMinimo).toBe(1300n);
+    // Y drenar debe dejar el periodo cerrado en exactamente 0 — nada
+    // atorado para siempre en una cuenta que ya nunca se vuelve a tocar.
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(0n);
   });
 
   it('el arrastre de un tenant nunca se filtra al periodo nuevo de otro tenant (filtro explícito por tenant, no solo RLS)', async () => {

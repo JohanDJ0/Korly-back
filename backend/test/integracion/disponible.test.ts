@@ -5,6 +5,7 @@ import { editarIngreso, eliminarIngreso, registrarIngreso } from '../../src/modu
 import { eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
+import { aportarAMeta, crearMeta } from '../../src/modulos/metas/metas.js';
 
 describe('consultarDisponible (motor de flujo de caja)', () => {
   async function tenantNuevo() {
@@ -348,5 +349,22 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
 
     expect(resultado.disponibleValorMinimo).toBe(5445n); // 6000 - 555
     expect(resultado.gastadoHoyValorMinimo).toBe(555n); // solo el gasto real, no la reversión del ingreso
+  });
+
+  it('un aporte a una meta el mismo día cuenta como gastado hoy (modelo-dominio.md §6: "se trata como un gasto más")', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+    const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+
+    await aportarAMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(4700n); // 5000 - 300
+    expect(resultado.gastadoHoyValorMinimo).toBe(300n);
+    expect(resultado.cifraDiariaValorMinimo).toBe(33n); // objetivoHoy = piso(5000/15) = 333; 333 - 300 = 33
   });
 });

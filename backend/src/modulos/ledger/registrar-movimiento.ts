@@ -215,6 +215,37 @@ export async function obtenerNetoCuentaEnFecha(
   });
 }
 
+/**
+ * Neto de una cuenta agrupado por "tipo efectivo" — mismo concepto que
+ * `obtenerNetoCuentaEnFecha` (una reversión cuenta como el tipo de lo
+ * que revierte, nunca como `'reversion'` en sí), pero sobre toda la
+ * vida de la cuenta (sin filtro de fecha) y sin restringir a una lista
+ * de tipos: trae todos los que de verdad tocaron la cuenta, agrupados.
+ *
+ * `Tx` únicamente: lo usa `calcularTotalesTx` (generar-resumen.ts)
+ * dentro de la transacción de cierre — nada más lo necesita todavía,
+ * así que no tiene variante top-level.
+ */
+export interface NetoPorTipoEfectivo {
+  tipoEfectivo: TipoMovimiento;
+  moneda: string;
+  neto: bigint;
+}
+
+export async function obtenerNetoPorTipoEfectivoTx(tx: Ejecutor, cuentaId: string): Promise<NetoPorTipoEfectivo[]> {
+  const tipoEfectivo = sql<TipoMovimiento>`coalesce(${movimientoRevertido.tipo}, ${movimientos.tipo})`;
+
+  const filas = await tx
+    .select({ tipoEfectivo, moneda: asientos.moneda, neto: sql<string>`sum(${asientos.montoValorMinimo})::text` })
+    .from(asientos)
+    .innerJoin(movimientos, eq(movimientos.id, asientos.movimientoId))
+    .leftJoin(movimientoRevertido, eq(movimientoRevertido.id, movimientos.movimientoRevertidoId))
+    .where(eq(asientos.cuentaId, cuentaId))
+    .groupBy(tipoEfectivo, asientos.moneda);
+
+  return filas.map((fila) => ({ tipoEfectivo: fila.tipoEfectivo, moneda: fila.moneda, neto: BigInt(fila.neto) }));
+}
+
 function validarPartidasBalanceadas(partidas: Partida[]): void {
   if (partidas.length < 2) {
     throw new Error('Un movimiento necesita al menos dos partidas (partida doble)');

@@ -709,13 +709,12 @@ al usuario — no existe "ahorrar" una deuda. Si es positivo, queda
 `'pendiente'` hasta que `decidirSobrante` (decisión explícita) o
 `resolverDecisionesVencidasTx` (el barrido de N días) lo resuelvan.
 
-**`'ahorrar'` declarado pero rechazado, a propósito.** El tipo
-`DecisionSobranteEntrada` incluye `'ahorrar'` (coincide con
-`openapi.yaml`), pero `decidirSobrante` lanza
-`ErrorDominio('NO_SOPORTADO', ...)` si se elige — el módulo de Metas no
-existe todavía. Mismo patrón que `crearPeriodo` con tipos de periodo
-no-quincenales: la firma pública ya tiene la forma correcta, activarlo
-de verdad no debería requerir cambiarla.
+**`'ahorrar'` ya está implementado — ver "Metas de ahorro" más abajo.**
+Quedó documentado aquí como rechazado (`NO_SOPORTADO`) mientras el
+módulo de Metas no existía; el tipo `DecisionSobranteEntrada` ya tenía
+la forma correcta desde entonces (mismo patrón que `crearPeriodo` con
+tipos de periodo no-quincenales), así que activarlo de verdad no
+requirió cambiar la firma pública, solo implementar el caso.
 
 **N = 7 días para el default de arrastre — propuesta propia, no un
 dato.** No está en ningún documento. Es una intuición razonable
@@ -745,6 +744,51 @@ pendiente" cuando ninguna de las dos cambió el valor.
 `decisionSobrante='arrastrado'` solo registraba la decisión; el dinero
 no se movía todavía a ninguna cuenta. Ver la sección "Arrastre" más
 abajo para el mecanismo completo.
+
+### Bug real: un periodo que hereda un arrastre calculaba mal su propio sobrante
+
+**Encontrado antes de construir Metas, no por Metas — es el ciclo de
+vida normal de dos o más periodos consecutivos con arrastre.**
+`calcularTotalesTx` sumaba solo `tipo = 'ingreso'`/`'gasto'` desde
+`movimientos`/`asientos` directo. Un periodo que **hereda** un arrastre
+al crearse (`reclamarArrastresTx` lo acredita con
+`tipo = 'arrastre_sobrante'`) y luego cierra con su propia actividad
+normal calculaba un sobrante que **ignoraba por completo ese crédito
+heredado** — `totalIngresos - totalGastado` y el saldo real de la
+cuenta divergían.
+
+**Consecuencia real, no solo un número mal reportado:** al drenar, el
+periodo cerrado quedaba con el arrastre heredado **atorado para
+siempre** dentro de una cuenta que la invariante 5 prohíbe volver a
+tocar — ese dinero nunca llegaba al periodo siguiente. Confirmado con
+un test antes del fix: periodo 1 con sobrante $1,000 (arrastrado);
+periodo 2 lo hereda (saldo real $1,000), registra ingreso $500 y gasto
+$200 (saldo real $1,300); al cerrar, el resumen decía sobrante `$300`
+y el drenado dejaba el periodo cerrado con `$1,000` fantasma en vez de
+`$0`.
+
+**Corregido con `obtenerNetoPorTipoEfectivoTx`
+(modulos/ledger/registrar-movimiento.ts):** agrupa TODOS los asientos
+de la cuenta por su tipo efectivo (mismo concepto que ya resolvía el
+bug de `gastadoHoy` — una reversión cuenta como el tipo de lo que
+revierte), sin restringir a una lista fija de tipos. `calcularTotalesTx`
+ahora clasifica cada tipo que aparezca como ingreso o gasto vía dos
+`Set` exhaustivos sobre `TIPOS_MOVIMIENTO` (`'arrastre_sobrante'` y
+`'retiro_meta'` cuentan como ingreso; `'gasto'` y `'aporte_meta'` como
+gasto) y **lanza un error explícito si aparece un tipo sin clasificar**
+— en vez de ignorarlo en silencio, que es exactamente como se coló
+este bug. Esto garantiza, por construcción, que
+`totalIngresos - totalGastado` sea siempre el saldo real de la cuenta,
+así que drenar SIEMPRE deja el periodo cerrado en exactamente 0 —
+probado explícitamente reproduciendo el escenario de arriba
+(`test/integracion/arrastre.test.ts`).
+
+**Por qué se adelantó la clasificación de `'aporte_meta'`/`'retiro_meta'`
+sin que Metas existiera todavía:** son exactamente el mismo tipo de
+bug — un movimiento nuevo tocando la cuenta de un periodo sin que
+`calcularTotalesTx` supiera clasificarlo — así que se corrigió de raíz
+para los dos tipos reservados que Metas va a usar, no solo para
+`'arrastre_sobrante'`. Ver la sección "Metas de ahorro" más abajo.
 
 ## Arrastre (cuenta `arrastre_pendiente`)
 
@@ -866,6 +910,142 @@ directamente con las fechas que quieren ejercitar (bypaseando
 `crearPeriodo`), en vez de depender de que el mecanismo actual llegue
 a producir esa condición por sí solo.
 
+## Aviso de sobrante pendiente
+
+`GET /resumenes/pendiente` — extensión sobre `openapi.yaml`, agregada
+tras un reporte real de un usuario probando la app: cerró un periodo
+manualmente, creó el siguiente sin haber decidido "arrastrar" o
+"ahorrar" el sobrante del primero, y al no ver ninguna pantalla que se
+lo recordara, el dinero le pareció simplemente desaparecido. No era un
+bug de pérdida de datos — el resumen seguía `'pendiente'` exactamente
+donde debía, recuperable desde "Periodos anteriores" — pero nada
+avisaba de forma proactiva que quedaba algo por decidir, hueco que ya
+documentaba este README ("Qué falta" del punto original del frontend).
+
+`obtenerResumenPendiente(tenantId)` (`modulos/cierre/generar-resumen.ts`)
+devuelve el resumen `'pendiente'` más antiguo del tenant, o `null` si no
+hay ninguno — `null` es la respuesta normal (la mayoría del tiempo no
+hay nada pendiente), no un error, así que el endpoint responde `200`
+en ambos casos, no `404`. El más antiguo, no cualquiera: si llegaran a
+acumularse varios (cerrar periodos repetidamente sin decidir ninguno),
+es el que menos le queda antes de que `resolverDecisionesVencidasTx`
+(el barrido de N días) lo decida por el usuario — el más urgente de
+mostrar primero.
+
+Probado explícitamente: sin nada pendiente devuelve `null`; con un
+sobrante sin decidir lo encuentra aunque ya exista un periodo siguiente
+activo (reproduce el reporte real); deja de aparecer en cuanto se
+decide (arrastrar o ahorrar); con varios pendientes acumulados,
+devuelve el más antiguo; y nunca cruza de un tenant a otro (BOLA).
+
+## Metas de ahorro
+
+```
+src/db/schema/metas.ts                # metas
+src/modulos/metas/metas.ts            # crearMeta, listarMetas, aportarAMeta, retirarDeMeta
+src/modulos/metas/rutas.ts            # POST/GET /metas, POST /metas/:id/{aportes,retiros}
+```
+
+**El contrato ya existía completo desde antes — nunca se había
+implementado.** `docs/openapi.yaml` define `POST/GET /metas`,
+`POST /metas/{id}/aportes` y `POST /metas/{id}/retiros` desde el
+diseño original, y el ledger ya reservaba `'meta'` como tipo de cuenta
+y `'aporte_meta'`/`'retiro_meta'` como tipos de movimiento — ninguno se
+había usado hasta este punto. `crearMeta` crea la meta y su cuenta de
+ledger (tipo `'meta'`) en una sola transacción, mismo patrón que
+`crearPeriodo`. `montoAcumulado`/`porcentajeAvance` nunca se guardan:
+se calculan en cada `listarMetas` desde el saldo real de la cuenta (una
+sola consulta agrupada, no una por meta) — mismo principio de "nunca
+cacheado, siempre recalculado" que `disponible`. `porcentajeAvance` no
+se recorta en 100 si se aportó de más: es información real, no un
+error de presentación.
+
+**Sin tablas `aportes`/`retiros`.** El contrato no define ningún `GET`
+para listarlos — solo `POST` — así que `movimientos`/`asientos` ya
+alcanzan para todo lo que se pide hoy; el `id` que devuelve un
+`POST .../aportes` o `.../retiros` es el `movimientoId` del ledger, no
+una fila propia. Si algún día se agrega un `GET` para listarlos, ahí sí
+hace falta la tabla — no antes (mismo criterio que ya se aplicó a
+`categoriaId` en gastos: no construir para un requisito que no existe
+todavía).
+
+**Aportar reduce el disponible "como un gasto" — confirmado, no
+inventado.** modelo-dominio.md §6 lo dice explícito. Mismas partidas
+que un gasto (negativa contra el periodo activo), solo que la
+contraparte es una cuenta real (la meta) en vez de externa. Requiere
+periodo activo — `409 SIN_PERIODO_ACTIVO`, documentado en
+`openapi.yaml` para este endpoint — y cuenta en el filtro de
+`gastadoHoy` de `consultarDisponible` (`['gasto', 'aporte_meta']`):
+sin esto, aportar el mismo día no bajaría "puedes gastar hoy" aunque sí
+bajara `disponible`, la misma inconsistencia que ya se corrigió para
+`gastadoHoy` con la reversión de un ingreso.
+
+**Retirar es simétrico de aportar — decisión propia, no documentada en
+ningún lado.** `modelo-dominio.md` solo confirma el caso de aportar; el
+catálogo de eventos dice apenas "Retiro de meta | Cuenta ← meta", sin
+precisar cuál cuenta. Se decidió que un retiro **aumenta el disponible
+del periodo activo, tratado como un ingreso más** — mismo requisito de
+periodo activo que aportar (aunque `openapi.yaml` no documenta un 409
+para este endpoint), porque el dinero retirado tiene que aterrizar en
+una cuenta real que exista, y la única "tuya" que hay hoy es la del
+periodo activo. La alternativa considerada — que saliera a una
+contraparte externa, sin rastro en ningún disponible — se descartó por
+menos útil: el usuario retira dinero de una meta específicamente para
+poder gastarlo, y dejarlo fuera del disponible habría hecho el retiro
+invisible para el propio producto.
+
+**Sin validar `monto <= montoAcumulado` en un retiro.** Mismo criterio
+que el sobregiro permitido en gastos (modelo-dominio.md §5): ninguna
+otra cuenta del sistema tiene guardarraíles artificiales sobre su
+saldo, y una meta no es distinta. Probado explícitamente: una meta
+puede quedar con saldo negativo tras un retiro que exceda lo
+acumulado.
+
+**Bug real, encontrado al construir este punto — no exclusivo de
+Metas, ver "Cierre" más arriba.** Antes de escribir código de Metas se
+encontró que `calcularTotalesTx` (el cálculo del sobrante al cerrar)
+solo sabía sumar `'ingreso'`/`'gasto'` — un periodo que hereda un
+arrastre calculaba mal su propio sobrante, con dinero heredado
+quedando atorado para siempre. Se corrigió de raíz (clasificación
+exhaustiva y explícita de todos los `TIPOS_MOVIMIENTO`, lanzando error
+si aparece uno sin clasificar) ANTES de agregar `'aporte_meta'`/
+`'retiro_meta'` a esa clasificación — así, cuando Metas empezó a tocar
+la cuenta de un periodo, ya había un mecanismo correcto esperándola en
+vez de repetir el mismo bug con un tipo nuevo.
+
+**Decidir "ahorrar" el sobrante: reclamo inmediato, no perezoso — a
+propósito, diferente del mecanismo de arrastre.** `decidirSobrante`
+(`modulos/cierre/decidir-sobrante.ts`) ya no rechaza `'ahorrar'` con
+`NO_SOPORTADO`: valida `metaId` (obligatorio para esta decisión,
+`404 META_NO_ENCONTRADA` si no existe o no es de este tenant) y, en la
+MISMA transacción que marca `decisionSobrante = 'ahorrado'`, reclama el
+arrastre que `drenarACuentaPuenteTx` ya dejó esperando en la cuenta
+`arrastre_pendiente` — directo hacia la cuenta de la meta
+(`reclamarArrastreComoAporteMetaTx`, `modulos/cierre/materializar-arrastre.ts`).
+A diferencia de `'arrastrar'` (perezoso: espera a que exista el
+periodo siguiente, porque ese destino no existe todavía al momento de
+decidir), una meta ya existe en el momento de decidir — no hay nada
+que esperar, y dejarlo pendiente solo agregaría un estado intermedio
+sin ningún beneficio. `arrastres.metaDestinoId` es la contraparte de
+`periodoDestinoId` para este caso (`CHECK` que exige que a lo sumo uno
+de los dos esté lleno, nunca ambos).
+
+**Por qué `decidir-sobrante.ts` lee `db/schema/metas.ts` directo, no
+`modulos/metas/metas.ts`.** Mismo motivo, exactamente, que ya documenta
+este README para `cierre`/`periodos`: `modulos/metas/metas.ts` importa
+`obtenerPeriodoActivoTx` de `modulos/periodos/crear-periodo.ts`, que a
+su vez importa `resolverPendientesTx`/`reclamarArrastresTx` de este
+mismo módulo `cierre` — importar el módulo completo de metas desde
+`decidir-sobrante.ts` habría cerrado ese ciclo. Se detectó ANTES de que
+`tsc`/los tests lo sufrieran, razonando el grafo de imports a mano.
+
+**Validado de punta a punta contra el servidor real y Supabase real**
+(no solo con los tests): crear meta → aportar (`gastadoHoy` reflejado
+en `/disponible`) → listar (`montoAcumulado`/`porcentajeAvance`
+correctos) → retirar (con y sin motivo) → cerrar periodo → decidir
+"ahorrar" → la meta recibe el sobrante de inmediato, sin crear ningún
+periodo siguiente — ver `http/ciclo-completo.http`, pasos 26-35.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable
@@ -895,14 +1075,16 @@ src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo, G
 src/modulos/ingresos/rutas.ts          # POST/GET /periodos/:periodoId/ingresos, PATCH/DELETE /ingresos/:ingresoId
 src/modulos/gastos/rutas.ts            # POST/GET /periodos/:periodoId/gastos, PATCH/DELETE /gastos/:gastoId
 src/modulos/disponible/rutas.ts        # GET /periodos/activo/disponible
-src/modulos/cierre/rutas.ts            # POST .../cerrar, GET .../resumen, POST .../sobrante/decision
+src/modulos/cierre/rutas.ts            # POST .../cerrar, GET .../resumen, POST .../sobrante/decision, GET /resumenes/pendiente
+src/modulos/metas/rutas.ts             # POST/GET /metas, POST /metas/:id/aportes, POST /metas/:id/retiros
 ```
 
-Quince endpoints para ejercer el ciclo central, corregir un ingreso o
-un gasto, y ver de vuelta lo que se capturó (incluidos periodos ya
-cerrados) — no la API completa de `docs/openapi.yaml` (sin metas, sin
-categorías). Todos viven bajo `/v1` y detrás del mismo `authPlugin` que
-ya protege `/v1/me` desde el punto
+Veinte endpoints para ejercer el ciclo central, corregir un ingreso o
+un gasto, ahorrar hacia una meta, y ver de vuelta lo que se capturó
+(incluidos periodos ya cerrados y sobrantes sin decidir) — no la API
+completa de `docs/openapi.yaml` (sin categorías). Todos viven bajo
+`/v1` y detrás del mismo `authPlugin` que ya protege `/v1/me` desde el
+punto
 1 — nada nuevo en autenticación, solo se extiende.
 
 **Cada ruta llama directo a la función de dominio que ya existía y
@@ -916,9 +1098,10 @@ aquí.
 es un `setErrorHandler` global: traduce cualquier `ErrorDominio` a
 `{codigo, mensaje}` con el status correcto
 (`PERIODO_NO_ENCONTRADO`→404, `GASTO_NO_ENCONTRADO`→404,
-`INGRESO_NO_ENCONTRADO`→404, `PERIODO_NO_ACTIVO`→409,
-`SOBRANTE_YA_DECIDIDO`→409, `SIN_PERIODO_ACTIVO`→409,
-`GASTO_YA_REVERTIDO`→409, `INGRESO_YA_REVERTIDO`→409, `VALIDACION`→400,
+`INGRESO_NO_ENCONTRADO`→404, `META_NO_ENCONTRADA`→404,
+`PERIODO_NO_ACTIVO`→409, `SOBRANTE_YA_DECIDIDO`→409,
+`SIN_PERIODO_ACTIVO`→409, `GASTO_YA_REVERTIDO`→409,
+`INGRESO_YA_REVERTIDO`→409, `VALIDACION`→400,
 `NO_SOPORTADO`→501 — no 400: el valor es válido según el contrato,
 simplemente no está implementado, mismo criterio que ya se usaba en
 `decidirSobrante`).
@@ -972,9 +1155,13 @@ confirmar que heredó el arrastre (pasos 1-17) — y a partir de ahí,
 listar ingresos/gastos del primer periodo (con paginación), editar y
 eliminar dos de esos gastos ya en un periodo cerrado (para ver el
 ajuste cruzar al periodo activo de hoy), y confirmar que siguen
-apareciendo en la lista aunque ya estén corregidos (pasos 18-25). El
-archivo se sigue extendiendo así, en el mismo orden en que se van
-agregando módulos — no hace falta un archivo nuevo por cada punto.
+apareciendo en la lista aunque ya estén corregidos (pasos 18-25); y
+crear una meta, aportar (con su efecto en `gastadoHoy`), retirar (con
+motivo obligatorio), cerrar el periodo y decidir "ahorrar" el sobrante
+— confirmando que la meta lo recibe de inmediato, sin esperar a un
+periodo siguiente (pasos 26-35). El archivo se sigue extendiendo así,
+en el mismo orden en que se van agregando módulos — no hace falta un
+archivo nuevo por cada punto.
 
 **Cómo correrlo:**
 
@@ -1063,6 +1250,10 @@ corregir el mismo gasto dos veces.
   mismo instante de cerrar, y el periodo siguiente solo reclama lo que
   ya está decidido como `arrastrar` — nunca adelanta una decisión
   pendiente, y nunca cruza al periodo nuevo de otro tenant.
+- Un periodo que hereda un arrastre y luego cierra con su propia
+  actividad calcula su sobrante correctamente, incluyendo lo heredado
+  (bug real, ver "Cierre") — el drenado siempre deja el periodo cerrado
+  en exactamente 0, nunca con un residuo atorado para siempre.
 - Un periodo en borrador transiciona a activo cuando le toca de verdad
   (su ventana contiene hoy), tanto al cerrarse perezosamente el que lo
   bloqueaba como al tocar el tenant después de un cierre manual — sin
@@ -1102,6 +1293,23 @@ corregir el mismo gasto dos veces.
   quincena que le toca) — y el único hard delete del sistema se aborta,
   en vez de ejecutarse, si el borrador a borrar tuviera actividad
   financiera (ver "Higiene de borradores").
+- Aportar a una meta reduce el disponible del periodo activo (y cuenta
+  para `gastadoHoy`, igual que un gasto); retirar lo aumenta (igual que
+  un ingreso) — ambos exigen un periodo activo, y una meta de otro
+  tenant se rechaza como si no existiera (BOLA, probado explícitamente).
+  `montoAcumulado`/`porcentajeAvance` siempre reflejan el saldo real de
+  la cuenta de la meta, nunca un valor cacheado.
+- Decidir "ahorrar" el sobrante reclama la cuenta puente hacia la meta
+  de inmediato, en la misma transacción de la decisión — sin esperar a
+  que exista un periodo siguiente, a diferencia de "arrastrar". Decidir
+  dos veces el mismo sobrante (con cualquier combinación de
+  ahorrar/arrastrar) se rechaza explícitamente.
+- Un sobrante `'pendiente'` de un periodo cerrado siempre se puede
+  encontrar (`GET /resumenes/pendiente`), incluso si ya existe un
+  periodo siguiente activo — reproduce y corrige el reporte real de un
+  usuario que creyó que su dinero había desaparecido. Con varios
+  pendientes acumulados, siempre devuelve el más antiguo, y nunca
+  cruza de un tenant a otro.
 
 ## Higiene de borradores
 
@@ -1149,8 +1357,5 @@ puede producir esa condición).
 
 ### Después de eso
 
-Metas de ahorro (para activar `'ahorrar'` en la decisión de sobrante —
-hoy `NO_SOPORTADO` — y para que `reclamarArrastresTx` sepa qué hacer
-con un arrastre decidido como `'ahorrado'`), y el resto de la API de
-`docs/openapi.yaml` que los quince endpoints actuales no cubren
-(categorías, y la propia entidad de categorías).
+El resto de la API de `docs/openapi.yaml` que los diecinueve endpoints
+actuales no cubren: categorías, y la propia entidad de categorías.

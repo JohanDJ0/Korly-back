@@ -26,6 +26,7 @@ const CODIGO_A_STATUS: Record<string, number> = {
   // espejo en gastos, ver backend/README.md.
   INGRESO_NO_ENCONTRADO: 404,
   INGRESO_YA_REVERTIDO: 409,
+  META_NO_ENCONTRADA: 404,
 };
 
 /**

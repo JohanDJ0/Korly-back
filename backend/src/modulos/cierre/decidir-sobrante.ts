@@ -1,8 +1,10 @@
 import { and, eq, lt } from 'drizzle-orm';
 import { resumenes } from '../../db/schema/cierre.js';
+import { metas } from '../../db/schema/metas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { obtenerResumenTx } from './generar-resumen.js';
+import { reclamarArrastreComoAporteMetaTx } from './materializar-arrastre.js';
 
 /** Lo que el usuario elige (openapi.yaml `DecisionSobranteRequest`). Distinto de `EstadoDecisionSobrante`, que es lo que queda guardado. */
 export type DecisionSobranteEntrada = 'ahorrar' | 'arrastrar';
@@ -18,19 +20,25 @@ export interface DecisionSobranteResultado {
  * (modelo-dominio.md §3). Un déficit nunca llega aquí: se decide solo,
  * automáticamente, al generar el resumen (ver generar-resumen.ts).
  *
- * `'ahorrar'` está en el tipo de entrada porque así lo define
- * openapi.yaml, pero no está implementado: requiere una meta real
- * (metaId) y el módulo de Metas no existe todavía en el walking
- * skeleton. Rechazarlo aquí, explícito, es mejor que fingir soporte a
- * medias — mismo patrón que `crearPeriodo` con tipos no-quincenales.
+ * **`'ahorrar'` ya está implementado — ver README, "Metas de ahorro"
+ * para el diseño completo.** `metaId` (openapi.yaml
+ * `DecisionSobranteRequest.metaId`, "requerido si decision = ahorrar")
+ * se valida aquí: sin él, o si la meta no existe/no es de este tenant,
+ * se rechaza antes de tocar `resumenes`. El reclamo hacia la cuenta de
+ * la meta ocurre en la MISMA transacción que marca `decisionSobrante =
+ * 'ahorrado'` — a diferencia de `'arrastrar'` (perezoso, espera al
+ * periodo siguiente), la meta ya existe ahora mismo, no hay nada que
+ * esperar.
  */
 export async function decidirSobrante(
   tenantId: string,
   periodoId: string,
-  decision: DecisionSobranteEntrada
+  decision: DecisionSobranteEntrada,
+  metaId?: string,
+  fechaReferencia: Date = new Date()
 ): Promise<DecisionSobranteResultado> {
-  if (decision === 'ahorrar') {
-    throw new ErrorDominio('NO_SOPORTADO', 'Ahorrar el sobrante requiere el módulo de metas, que todavía no existe');
+  if (decision === 'ahorrar' && !metaId) {
+    throw new ErrorDominio('VALIDACION', "El campo 'metaId' es obligatorio para decidir 'ahorrar'");
   }
 
   return conTenant(tenantId, async (tx) => {
@@ -45,13 +53,20 @@ export async function decidirSobrante(
       throw new ErrorDominio('SOBRANTE_YA_DECIDIDO', 'El sobrante de este periodo no está pendiente de decisión');
     }
 
+    const meta = decision === 'ahorrar' ? await obtenerMetaParaReclamoTx(tx, tenantId, metaId!) : null;
+    if (decision === 'ahorrar' && !meta) {
+      throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    }
+
+    const decisionGuardada = decision === 'ahorrar' ? 'ahorrado' : 'arrastrado';
+
     // UPDATE ... WHERE decision_sobrante = 'pendiente': si algo más
     // (el barrido de N días, u otra request) decidió entre el SELECT de
     // arriba y este UPDATE, aquí no afecta ninguna fila — se detecta
     // por 0 resultados, no por una excepción del trigger de la migración.
     const [actualizado] = await tx
       .update(resumenes)
-      .set({ decisionSobrante: 'arrastrado', decisionSobranteFecha: new Date() })
+      .set({ decisionSobrante: decisionGuardada, decisionSobranteFecha: new Date() })
       .where(and(eq(resumenes.id, resumen.id), eq(resumenes.decisionSobrante, 'pendiente')))
       .returning({ id: resumenes.id });
 
@@ -59,8 +74,31 @@ export async function decidirSobrante(
       throw new ErrorDominio('SOBRANTE_YA_DECIDIDO', 'El sobrante de este periodo ya fue decidido');
     }
 
-    return { periodoId, decision: 'arrastrado', montoAplicadoValorMinimo: resumen.sobranteValorMinimo };
+    if (meta) {
+      await reclamarArrastreComoAporteMetaTx(tx, tenantId, resumen.id, meta.id, meta.cuentaId, fechaReferencia);
+    }
+
+    return { periodoId, decision: decisionGuardada, montoAplicadoValorMinimo: resumen.sobranteValorMinimo };
   });
+}
+
+/**
+ * Lee `db/schema/metas.ts` directamente, no `modulos/metas/metas.ts` —
+ * deliberado, mismo motivo que ya documenta el README para
+ * `cierre`/`periodos`: `modulos/metas/metas.ts` importa
+ * `obtenerPeriodoActivoTx` de `modulos/periodos/crear-periodo.ts`, que a
+ * su vez importa `resolverPendientesTx`/`reclamarArrastresTx` de este
+ * mismo módulo `cierre` — importar el módulo completo de metas desde
+ * aquí cerraría ese ciclo. `tenantId` en el `WHERE` es la misma defensa
+ * en profundidad que el resto (RLS es la autoridad real).
+ */
+async function obtenerMetaParaReclamoTx(tx: Ejecutor, tenantId: string, metaId: string): Promise<{ id: string; cuentaId: string } | null> {
+  const [fila] = await tx
+    .select({ id: metas.id, cuentaId: metas.cuentaId })
+    .from(metas)
+    .where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId)))
+    .limit(1);
+  return fila ?? null;
 }
 
 /**

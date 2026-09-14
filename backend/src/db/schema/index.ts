@@ -6,4 +6,5 @@ export * from './periodos.js';
 export * from './ingresos.js';
 export * from './gastos.js';
 export * from './cierre.js';
+export * from './metas.js';
 export * from './arrastres.js';

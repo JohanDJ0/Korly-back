@@ -1,9 +1,11 @@
+import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDecidirSobrante } from '@/hooks/use-decidir-sobrante';
+import { useMetas } from '@/hooks/use-metas';
 import { useResumen } from '@/hooks/use-resumen';
 import { formatearMonto } from '@/lib/dinero';
 import { cn } from '@/lib/utils';
@@ -18,9 +20,12 @@ import { cn } from '@/lib/utils';
 export function Resumen() {
   const { periodoId } = useParams<{ periodoId: string }>();
   const { data: resumen, isLoading, error } = useResumen(periodoId);
+  const { data: metas } = useMetas();
   const decidirSobrante = useDecidirSobrante();
   const crearPeriodo = useCrearPeriodo();
   const navigate = useNavigate();
+  const [mostrarSelectorMeta, setMostrarSelectorMeta] = useState(false);
+  const [metaSeleccionada, setMetaSeleccionada] = useState('');
 
   const esDeficit = resumen ? resumen.sobrante.valorMinimo < 0 : false;
 
@@ -68,9 +73,46 @@ export function Resumen() {
                 >
                   {decidirSobrante.isPending ? 'Guardando…' : 'Arrastrar al periodo siguiente'}
                 </Button>
-                <Button variant="outline" disabled title="Todavía no existen las metas de ahorro">
-                  Ahorrar (próximamente)
-                </Button>
+
+                {!mostrarSelectorMeta && (
+                  <Button
+                    variant="outline"
+                    disabled={decidirSobrante.isPending || metas?.length === 0}
+                    title={metas?.length === 0 ? 'Primero crea una meta en "Ver metas"' : undefined}
+                    onClick={() => setMostrarSelectorMeta(true)}
+                  >
+                    Ahorrar
+                  </Button>
+                )}
+
+                {mostrarSelectorMeta && (
+                  <div className="flex flex-col gap-2">
+                    <select
+                      value={metaSeleccionada}
+                      onChange={(evento) => setMetaSeleccionada(evento.target.value)}
+                      className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                    >
+                      <option value="">Elige una meta…</option>
+                      {metas?.map((meta) => (
+                        <option key={meta.id} value={meta.id}>
+                          {meta.nombre}
+                        </option>
+                      ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={!metaSeleccionada || decidirSobrante.isPending}
+                        onClick={() => decidirSobrante.mutate({ periodoId: resumen.periodoId, decision: 'ahorrar', metaId: metaSeleccionada })}
+                      >
+                        {decidirSobrante.isPending ? 'Guardando…' : 'Confirmar'}
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => setMostrarSelectorMeta(false)}>
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
                 {decidirSobrante.isError && <p className="text-sm text-destructive">{decidirSobrante.error.message}</p>}
               </CardContent>
             </Card>

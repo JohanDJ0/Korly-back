@@ -8,6 +8,7 @@ import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { crearPeriodo, obtenerPeriodoActivo, obtenerPeriodoPorId } from '../../src/modulos/periodos/crear-periodo.js';
 import { cerrarPeriodoManualmente, DIAS_DEFAULT_ARRASTRE } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
+import { obtenerResumenPendiente } from '../../src/modulos/cierre/generar-resumen.js';
 import { conTenant } from '../../src/shared/db.js';
 
 describe('cierre', () => {
@@ -149,7 +150,7 @@ describe('cierre', () => {
 
   // --- Decisión explícita del sobrante ---
 
-  it('"ahorrar" no está soportado: requiere el módulo de metas', async () => {
+  it('"ahorrar" sin metaId se rechaza (requerido, ver modulos/metas)', async () => {
     const { tenantId, periodo } = await tenantConPeriodoActivo();
     await registrarIngreso({
       tenantId,
@@ -161,7 +162,22 @@ describe('cierre', () => {
     });
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
 
-    await expect(decidirSobrante(tenantId, periodo.id, 'ahorrar')).rejects.toMatchObject({ codigo: 'NO_SOPORTADO' });
+    await expect(decidirSobrante(tenantId, periodo.id, 'ahorrar')).rejects.toMatchObject({ codigo: 'VALIDACION' });
+  });
+
+  it('"ahorrar" con una meta inexistente se rechaza', async () => {
+    const { tenantId, periodo } = await tenantConPeriodoActivo();
+    await registrarIngreso({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 1000n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+    });
+    await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
+
+    await expect(decidirSobrante(tenantId, periodo.id, 'ahorrar', randomUUID())).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
   });
 
   it('decide arrastrar un sobrante positivo pendiente', async () => {
@@ -347,5 +363,74 @@ describe('cierre', () => {
     await expect(
       conTenant(tenantId, (tx) => tx.execute(sql`update resumenes set decision_sobrante = 'pendiente' where periodo_id = ${periodo.id}`))
     ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/ya tiene una decisión de sobrante/) } });
+  });
+
+  describe('obtenerResumenPendiente', () => {
+    it('sin ningún periodo cerrado, devuelve null', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      expect(await obtenerResumenPendiente(tenantId)).toBeNull();
+    });
+
+    it('devuelve el sobrante pendiente — bug real reportado por el usuario: cerrar y crear el periodo siguiente sin decidir parecía perder el dinero', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 900000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+      });
+      await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
+      // A propósito: nadie decidió nada, igual que en el reporte real.
+      await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+
+      const pendiente = await obtenerResumenPendiente(tenantId);
+      expect(pendiente?.periodoId).toBe(periodo.id);
+      expect(pendiente?.sobranteValorMinimo).toBe(900000n);
+    });
+
+    it('ya decidido (arrastrar o ahorrar), deja de aparecer como pendiente', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+      });
+      await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
+      await decidirSobrante(tenantId, periodo.id, 'arrastrar');
+
+      expect(await obtenerResumenPendiente(tenantId)).toBeNull();
+    });
+
+    it('con varios pendientes, devuelve el más antiguo (el más urgente para el barrido de N días)', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+      });
+      await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-05T00:00:00Z'));
+      // El primero ya está 'cerrado' (no bloquea), así que este nace 'activo' directo — sin decidir el sobrante del primero.
+      const segundo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-08T00:00:00Z'));
+      await registrarIngreso({
+        tenantId,
+        periodoId: segundo.id,
+        monto: 2000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-08',
+        fechaReferencia: new Date('2026-08-08T00:00:00Z'),
+      });
+      await cerrarPeriodoManualmente(tenantId, segundo.id, new Date('2026-08-09T00:00:00Z'));
+
+      const pendiente = await obtenerResumenPendiente(tenantId);
+      expect(pendiente?.periodoId).toBe(periodo.id); // el primero, generado antes
+    });
   });
 });

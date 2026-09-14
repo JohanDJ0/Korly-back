@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { bigint, pgPolicy, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { bigint, check, pgPolicy, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 import { movimientos } from './ledger.js';
+import { metas } from './metas.js';
 import { periodos } from './periodos.js';
 import { resumenes } from './cierre.js';
 import { appBackend } from './roles.js';
@@ -17,6 +18,15 @@ import { tenants } from './tenants.js';
  * sigue sin reclamarse — no hay límite de tiempo para eso, a diferencia
  * del default de N días de la decisión de sobrante (decidir-sobrante.ts),
  * que es un asunto de UX, no de dónde vive el dinero.
+ *
+ * `metaDestinoId` es la contraparte de `periodoDestinoId` para una
+ * decisión `'ahorrado'` (ver modulos/cierre/decidir-sobrante.ts): a
+ * diferencia de `'arrastrado'` (reclamo perezoso, espera a que exista
+ * el periodo siguiente), una meta ya existe al momento de decidir, así
+ * que ese reclamo ocurre de inmediato, en la misma transacción de la
+ * decisión — nunca queda un arrastre `'ahorrado'` con ambos destino en
+ * NULL esperando. Exactamente uno de los dos (`periodoDestinoId`,
+ * `metaDestinoId`) queda lleno, nunca ambos.
  *
  * Por qué existe esta tabla y no basta con el saldo de la cuenta
  * `arrastre_pendiente`: esa cuenta es un pozo común de TODOS los
@@ -45,11 +55,16 @@ export const arrastres = pgTable(
       .notNull()
       .references(() => movimientos.id),
     periodoDestinoId: uuid('periodo_destino_id').references(() => periodos.id),
+    metaDestinoId: uuid('meta_destino_id').references(() => metas.id),
     movimientoSalidaId: uuid('movimiento_salida_id').references(() => movimientos.id),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     unique('arrastres_resumen_unico').on(t.resumenId),
+    check(
+      'arrastres_un_solo_destino',
+      sql`${t.periodoDestinoId} is null or ${t.metaDestinoId} is null`
+    ),
     pgPolicy('arrastres_aislamiento_tenant', {
       for: 'all',
       to: appBackend,

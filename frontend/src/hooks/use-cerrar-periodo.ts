@@ -19,6 +19,7 @@ export function useCerrarPeriodo() {
     onSuccess: (resumen) => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
       void queryClient.invalidateQueries({ queryKey: ['periodo-activo'] });
+      void queryClient.invalidateQueries({ queryKey: ['resumen-pendiente'] });
       queryClient.setQueryData(['resumen', resumen.periodoId], resumen);
     },
   });
