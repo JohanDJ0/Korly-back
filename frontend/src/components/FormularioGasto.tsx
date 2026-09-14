@@ -1,10 +1,12 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SelectorCategoria } from '@/components/SelectorCategoria';
 import { useRegistrarGasto } from '@/hooks/use-registrar-gasto';
 
 const esquemaGasto = z.object({
@@ -35,6 +37,7 @@ interface FormularioGastoProps {
  */
 export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProps) {
   const registrarGasto = useRegistrarGasto();
+  const [categoriaId, setCategoriaId] = useState('');
 
   const {
     register,
@@ -52,10 +55,12 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
         periodoId,
         monto: { valorMinimo: Math.round(datos.monto * 100), moneda: 'MXN' },
         fechaEfectiva: datos.fechaEfectiva,
+        categoriaId: categoriaId || undefined,
       },
       {
         onSuccess: () => {
           reset({ fechaEfectiva: hoyISO() });
+          setCategoriaId('');
           onRegistrado?.();
         },
       }
@@ -73,6 +78,10 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
         <Label htmlFor="fecha-gasto">Fecha</Label>
         <Input id="fecha-gasto" type="date" {...register('fechaEfectiva')} />
         {errors.fechaEfectiva && <p className="text-sm text-destructive">{errors.fechaEfectiva.message}</p>}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="categoria-gasto">Categoría (opcional)</Label>
+        <SelectorCategoria id="categoria-gasto" value={categoriaId} onChange={setCategoriaId} />
       </div>
       {registrarGasto.isError && <p className="text-sm text-destructive">{registrarGasto.error.message}</p>}
       <Button type="submit" disabled={registrarGasto.isPending}>

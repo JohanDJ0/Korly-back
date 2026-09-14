@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, sql } from 'drizzle-orm';
 import { db, type Ejecutor } from '../../shared/db.js';
+import { categorias, NOMBRES_CATEGORIAS_PREDETERMINADAS } from '../../db/schema/categorias.js';
 import { identidadesExternas } from '../../db/schema/identidad.js';
 import { tenants } from '../../db/schema/tenants.js';
 import { usuarios } from '../../db/schema/identidad.js';
@@ -73,6 +74,14 @@ async function aprovisionarIdentidadNueva(idEnProveedor: string): Promise<Identi
 
     const [usuario] = await tx.insert(usuarios).values({ tenantId }).returning({ id: usuarios.id });
     if (!usuario) throw new Error('No se pudo crear el usuario durante el aprovisionamiento');
+
+    // Categorías predeterminadas, sembradas por tenant (ver
+    // db/schema/categorias.ts) — así el tenant nuevo ya tiene algo con
+    // qué clasificar su primer gasto, sin depender de un endpoint de
+    // "inicializar categorías" aparte.
+    await tx.insert(categorias).values(
+      NOMBRES_CATEGORIAS_PREDETERMINADAS.map((nombre) => ({ tenantId, nombre, esPredeterminada: true }))
+    );
 
     // La restricción única (proveedor, id_en_proveedor) en el schema
     // queda como respaldo a nivel de base de datos si este código se

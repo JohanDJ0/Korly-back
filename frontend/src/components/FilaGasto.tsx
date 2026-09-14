@@ -2,6 +2,8 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { SelectorCategoria } from '@/components/SelectorCategoria';
+import { useCategorias } from '@/hooks/use-categorias';
 import { useEditarGasto } from '@/hooks/use-editar-gasto';
 import { useEliminarGasto } from '@/hooks/use-eliminar-gasto';
 import type { Gasto } from '@/hooks/use-gastos';
@@ -22,14 +24,22 @@ interface FilaGastoProps {
 export function FilaGasto({ gasto }: FilaGastoProps) {
   const [editando, setEditando] = useState(false);
   const [monto, setMonto] = useState(() => (gasto.monto.valorMinimo / 100).toString());
+  // Precargada con la categoría actual: a diferencia de dejarla vacía,
+  // esto evita que "solo corregir el monto" borre la categoría por
+  // accidente con solo abrir y guardar sin tocarla (sigue siendo
+  // posible quitarla a propósito, eligiendo "Sin categoría").
+  const [categoriaId, setCategoriaId] = useState(() => gasto.categoriaId ?? '');
+  const { data: categorias } = useCategorias();
   const editarGasto = useEditarGasto();
   const eliminarGasto = useEliminarGasto();
+
+  const nombreCategoria = categorias?.find((c) => c.id === gasto.categoriaId)?.nombre;
 
   function guardar() {
     const valor = Number(monto);
     if (!Number.isFinite(valor) || valor <= 0) return;
     editarGasto.mutate(
-      { gastoId: gasto.id, monto: { valorMinimo: Math.round(valor * 100), moneda: gasto.monto.moneda } },
+      { gastoId: gasto.id, monto: { valorMinimo: Math.round(valor * 100), moneda: gasto.monto.moneda }, categoriaId: categoriaId || undefined },
       { onSuccess: () => setEditando(false) }
     );
   }
@@ -52,6 +62,7 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
           <p className="font-medium line-through">{formatearMonto(gasto.monto)}</p>
           <p className="text-sm text-muted-foreground">
             {gasto.fechaEfectiva}
+            {nombreCategoria ? ` — ${nombreCategoria}` : ''}
             {gasto.nota ? ` — ${gasto.nota}` : ''}
           </p>
         </div>
@@ -72,6 +83,9 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
           autoFocus
           className="w-28"
         />
+        <div className="w-40">
+          <SelectorCategoria value={categoriaId} onChange={setCategoriaId} />
+        </div>
         <Button size="sm" onClick={guardar} disabled={editarGasto.isPending}>
           {editarGasto.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
@@ -96,6 +110,7 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
         <p className="font-medium">{formatearMonto(gasto.monto)}</p>
         <p className="text-sm text-muted-foreground">
           {gasto.fechaEfectiva}
+          {nombreCategoria ? ` — ${nombreCategoria}` : ''}
           {gasto.nota ? ` — ${gasto.nota}` : ''}
         </p>
         {eliminarGasto.isError && <p className="text-sm text-destructive">{eliminarGasto.error.message}</p>}

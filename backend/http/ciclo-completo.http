@@ -250,3 +250,54 @@ Content-Type: application/json
 ### 35. Listar metas una última vez — montoAcumulado ya incluye el sobrante recién decidido, sumado al saldo que dejaron los pasos 28/31.
 GET {{baseUrl}}/metas
 Authorization: Bearer {{authToken}}
+
+### --- Categorías (agregado al agregar el módulo) ---
+
+### 36. Listar categorías — cualquier tenant ya tiene las 10 predeterminadas sembradas desde que se aprovisionó (ver modulos/identidad/resolver-identidad.ts), sin necesidad de este paso.
+GET {{baseUrl}}/categorias
+Authorization: Bearer {{authToken}}
+
+### 37. Crear una categoría personalizada.
+# @name crearCategoria
+POST {{baseUrl}}/categorias
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "nombre": "Mascota"
+}
+
+### 38. Registrar un gasto con esa categoría, en el segundo periodo (el activo).
+# @name registrarGastoConCategoria
+POST {{baseUrl}}/periodos/{{periodoSiguienteId}}/gastos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 15000, "moneda": "MXN" },
+  "fechaEfectiva": "2026-08-20",
+  "categoriaId": "{{crearCategoria.response.body.id}}"
+}
+
+### 39. Listar gastos del periodo — el gasto del paso 38 debe traer ese mismo categoriaId.
+GET {{baseUrl}}/periodos/{{periodoSiguienteId}}/gastos
+Authorization: Bearer {{authToken}}
+
+### 40. Editar ese gasto cambiando la categoría — al ser una fila nueva (nunca se muta la original), la categoría vieja no se "conserva" si no se reenvía; aquí sí se reenvía, apuntando a otra.
+PATCH {{baseUrl}}/gastos/{{registrarGastoConCategoria.response.body.id}}
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "monto": { "valorMinimo": 18000, "moneda": "MXN" },
+  "categoriaId": "{{crearCategoria.response.body.id}}"
+}
+
+### 41. Crear una categoría con un nombre repetido — 400 VALIDACION (nombre único por tenant).
+POST {{baseUrl}}/categorias
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "nombre": "Mascota"
+}

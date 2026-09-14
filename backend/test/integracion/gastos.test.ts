@@ -7,6 +7,7 @@ import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { editarGasto, eliminarGasto, listarGastos, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
+import { crearCategoriaPersonalizada, listarCategorias } from '../../src/modulos/categorias/categorias.js';
 import { conTenant } from '../../src/shared/db.js';
 
 describe('gastos', () => {
@@ -433,6 +434,105 @@ describe('gastos', () => {
       const nuevo = resultado.datos.find((g) => g.id === editado.id);
       expect(original).toMatchObject({ revertido: true });
       expect(nuevo).toMatchObject({ revertido: false, montoValorMinimo: 800n });
+    });
+  });
+
+  describe('categoriaId', () => {
+    it('registra un gasto con una categoría válida', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const categorias = await listarCategorias(tenantId);
+      const comida = categorias.find((c) => c.nombre === 'Comida')!;
+
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        categoriaId: comida.id,
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      const resultado = await listarGastos(tenantId, periodo.id, { fechaReferencia: HOY_DE_PRUEBA });
+      expect(resultado.datos.find((g) => g.id === gastoId)).toMatchObject({ categoriaId: comida.id });
+    });
+
+    it('sin categoriaId, el gasto queda sin categoría (null)', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      const resultado = await listarGastos(tenantId, periodo.id, { fechaReferencia: HOY_DE_PRUEBA });
+      expect(resultado.datos.find((g) => g.id === gastoId)).toMatchObject({ categoriaId: null });
+    });
+
+    it('rechaza una categoría inexistente', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await expect(
+        registrarGasto({
+          tenantId,
+          periodoId: periodo.id,
+          monto: 1000n,
+          moneda: 'MXN',
+          fechaEfectiva: '2026-08-01',
+          categoriaId: randomUUID(),
+          fechaReferencia: HOY_DE_PRUEBA,
+        })
+      ).rejects.toMatchObject({ codigo: 'CATEGORIA_NO_ENCONTRADA' });
+    });
+
+    it('editar sin reenviar categoriaId la deja sin categoría en la fila nueva — mismo criterio que la nota', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const categorias = await listarCategorias(tenantId);
+      const comida = categorias.find((c) => c.nombre === 'Comida')!;
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        categoriaId: comida.id,
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      const editado = await editarGasto({ tenantId, gastoId, monto: 800n, moneda: 'MXN', fechaReferencia: HOY_DE_PRUEBA });
+
+      const resultado = await listarGastos(tenantId, periodo.id, { fechaReferencia: HOY_DE_PRUEBA });
+      expect(resultado.datos.find((g) => g.id === editado.id)).toMatchObject({ categoriaId: null });
+    });
+
+    it('editar reenviando categoriaId la asigna en la fila nueva', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const categorias = await listarCategorias(tenantId);
+      const comida = categorias.find((c) => c.nombre === 'Comida')!;
+      const transporte = categorias.find((c) => c.nombre === 'Transporte')!;
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        categoriaId: comida.id,
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      const editado = await editarGasto({
+        tenantId,
+        gastoId,
+        monto: 800n,
+        moneda: 'MXN',
+        categoriaId: transporte.id,
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      const resultado = await listarGastos(tenantId, periodo.id, { fechaReferencia: HOY_DE_PRUEBA });
+      expect(resultado.datos.find((g) => g.id === editado.id)).toMatchObject({ categoriaId: transporte.id });
     });
   });
 });

@@ -6,6 +6,8 @@ import type { MontoDto } from '@/lib/dinero';
 interface EditarGastoInput {
   gastoId: string;
   monto: MontoDto;
+  /** Igual que la nota (backend/README.md, "Categorías"): omitirlo aquí no conserva la categoría anterior, la deja sin categoría. */
+  categoriaId?: string;
 }
 
 interface EditarGastoResultado {
@@ -25,10 +27,10 @@ export function useEditarGasto() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ gastoId, monto }: EditarGastoInput) =>
+    mutationFn: ({ gastoId, ...body }: EditarGastoInput) =>
       apiFetch<EditarGastoResultado>(`/gastos/${gastoId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ monto }),
+        body: JSON.stringify(body),
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });

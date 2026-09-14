@@ -7,6 +7,7 @@ interface RegistrarGastoInput {
   periodoId: string;
   monto: MontoDto;
   fechaEfectiva: string;
+  categoriaId?: string;
 }
 
 interface GastoRegistrado {

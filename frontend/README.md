@@ -151,6 +151,33 @@ reporte exacto: cerrar un periodo, crear el siguiente sin decidir, ver
 el aviso en Home con el monto correcto, seguir el link a su resumen,
 decidir "arrastrar", y confirmar que el aviso desaparece de Home.
 
+**Punto 12 — categorías:** `SelectorCategoria.tsx`, un combobox nativo
+reutilizado en dos lugares — `FormularioGasto.tsx` (opcional, "Sin
+categoría" por defecto, cero fricción para quien no quiere usarlo:
+CLAUDE.md, "categorías opcionales, nunca obligatorias en la captura")
+y `FilaGasto.tsx` (modo edición, precargado con la categoría actual —
+ver más abajo por qué). Incluye "+ Nueva categoría…" como última
+opción: crear una personalizada nunca manda al usuario a una pantalla
+aparte, queda seleccionada de inmediato en el mismo selector al
+confirmarla.
+
+**Precargar la categoría actual al editar no es cosmético — evita una
+pérdida de datos silenciosa.** El backend trata `categoriaId` igual
+que `nota`: la fila se recrea entera en cada `PATCH`
+(`gastos_inmutables`), así que omitir el campo no "conserva" la
+categoría anterior, la deja sin categoría (ver backend/README.md,
+"Categorías"). Sin precargar el selector con el valor actual, corregir
+solo el monto de un gasto ya categorizado se lo habría quitado sin que
+el usuario lo pidiera ni se diera cuenta.
+
+Probado de punta a punta contra el backend real: un gasto sin
+categoría (selector en "Sin categoría", cero toques extra); crear una
+categoría nueva desde el formulario de captura y verla aparecer
+seleccionada; el nombre de la categoría visible en el historial; y
+editar el monto de un gasto ya categorizado sin tocar el selector —
+confirmando que la categoría se conserva en la fila nueva en vez de
+perderse.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -365,6 +392,12 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   reciente (reproduce el reporte real de un usuario), y desaparece de
   inmediato al decidirlo desde su resumen — probado de punta a punta
   contra el backend real, el mismo escenario exacto que se reportó.
+- Categorizar un gasto es opcional de verdad (registrar sin tocar el
+  selector funciona igual que antes de este punto); crear una
+  categoría nueva desde la captura queda seleccionada de inmediato; y
+  editar el monto de un gasto ya categorizado sin tocar el selector
+  conserva su categoría en la fila nueva, en vez de perderla — probado
+  de punta a punta contra el backend real.
 
 ## Qué falta
 

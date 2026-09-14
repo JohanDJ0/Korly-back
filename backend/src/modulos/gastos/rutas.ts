@@ -11,6 +11,7 @@ function gastoADto(gasto: GastoDetallado) {
     fechaEfectiva: gasto.fechaEfectiva,
     fechaRegistro: gasto.fechaRegistro.toISOString(),
     nota: gasto.nota ?? undefined,
+    categoriaId: gasto.categoriaId ?? undefined,
     revertido: gasto.revertido,
   };
 }
@@ -19,11 +20,12 @@ interface RegistrarGastoBody {
   monto: MontoDto;
   fechaEfectiva: string;
   nota?: string;
+  categoriaId?: string | null;
 }
 
 interface EditarGastoBody {
   monto?: MontoDto;
-  categoriaId?: string;
+  categoriaId?: string | null;
   nota?: string;
 }
 
@@ -40,6 +42,7 @@ export async function rutasGastos(app: FastifyInstance): Promise<void> {
       moneda,
       fechaEfectiva: body.fechaEfectiva,
       nota: body.nota,
+      categoriaId: body.categoriaId,
     });
 
     reply.code(201).send({ id: resultado.id, movimientoId: resultado.movimientoId, periodoId: request.params.periodoId });
@@ -63,22 +66,14 @@ export async function rutasGastos(app: FastifyInstance): Promise<void> {
   );
 
   /**
-   * `categoriaId` es un campo válido en el contrato (openapi.yaml
-   * EditarGastoRequest) pero no existe ninguna columna para categoría
-   * todavía (ver comentario en db/schema/gastos.ts) — 501, no 400: el
-   * campo está bien formado, simplemente no implementado.
-   *
    * `monto` se exige aquí aunque el contrato lo marca opcional: como
-   * `movimientos` también es inmutable, hasta "solo cambiar la nota"
-   * exige el mismo reverso + asiento nuevo que cambiar el monto — no
-   * hay un camino más barato para un cambio parcial. Simplificación
-   * consciente documentada en el README, "Capa HTTP".
+   * `movimientos` también es inmutable, hasta "solo cambiar la nota (o
+   * la categoría)" exige el mismo reverso + asiento nuevo que cambiar
+   * el monto — no hay un camino más barato para un cambio parcial.
+   * Simplificación consciente documentada en el README, "Capa HTTP".
    */
   app.patch<{ Params: { gastoId: string } }>('/gastos/:gastoId', async (request, reply) => {
     const body = request.body as EditarGastoBody;
-    if (body.categoriaId !== undefined) {
-      throw new ErrorDominio('NO_SOPORTADO', 'Categorías todavía no están implementadas');
-    }
     if (!body.monto) {
       throw new ErrorDominio('VALIDACION', "El campo 'monto' es obligatorio para editar un gasto");
     }
@@ -90,6 +85,7 @@ export async function rutasGastos(app: FastifyInstance): Promise<void> {
       monto: valorMinimo,
       moneda,
       nota: body.nota,
+      categoriaId: body.categoriaId,
     });
 
     reply.send({

@@ -407,10 +407,9 @@ puede dejar el saldo de la cuenta del periodo en negativo y se
 registra igual — no hay validación de "saldo suficiente". Probado
 explícitamente en `test/integracion/gastos.test.ts`.
 
-**Sin `categoriaId`.** La tabla no tiene columna de categoría: el
-módulo de categorías no existe todavía y agregar una columna sin tabla
-real a la que apuntar sería peor que omitirla. Se agrega cuando ese
-módulo exista.
+**`categoriaId` ya existe — ver "Categorías" más abajo.** Quedó
+documentado aquí como pendiente mientras el módulo no existía; la
+columna se agregó junto con el módulo, no antes.
 
 ### Editar y eliminar un gasto (`editarGasto`, `eliminarGasto`)
 
@@ -453,13 +452,12 @@ o inventar un periodo. Corregir el mismo gasto dos veces (dos
 movimiento cuyo `movimientoRevertidoId` apunte al de este gasto, sin
 necesitar una columna de estado nueva.
 
-**`categoriaId` en `PATCH` responde `NO_SOPORTADO` (501)**, mismo
-criterio que en cierre: el campo es válido según el contrato, no está
-implementado. **`monto` se exige siempre en `PATCH`**, aunque
-`openapi.yaml` lo marca opcional — como `movimientos` también es
-inmutable, hasta "solo corregir la nota" exige el mismo reverso +
-asiento nuevo que corregir el monto; no hay un camino más barato para
-un cambio parcial.
+**`categoriaId` en `PATCH` ya funciona — ver "Categorías" más abajo.**
+**`monto` se exige siempre en `PATCH`**, aunque `openapi.yaml` lo marca
+opcional — como `movimientos` también es inmutable, hasta "solo
+corregir la nota (o la categoría)" exige el mismo reverso + asiento
+nuevo que corregir el monto; no hay un camino más barato para un
+cambio parcial.
 
 **Hallazgo aparte, encontrado al escribir las pruebas de este punto:**
 `registrarIngreso` y `registrarGasto` nunca habían expuesto un
@@ -508,6 +506,84 @@ reversión): "¿cuáles de los `movimientoId` de esta página ya tienen un
 movimiento cuyo `movimientoRevertidoId` apunte a ellos?". Mismo
 criterio que `NO_SOPORTADO`: el contrato no lo prohíbe, solo no lo
 pedía todavía.
+
+## Categorías
+
+```
+src/db/schema/categorias.ts            # categorias, NOMBRES_CATEGORIAS_PREDETERMINADAS
+src/modulos/categorias/categorias.ts   # listarCategorias, crearCategoriaPersonalizada, obtenerCategoriaPorIdTx
+src/modulos/categorias/rutas.ts        # GET/POST /categorias
+```
+
+**Solo aplica a gastos, nunca a ingresos** — así lo define
+`docs/openapi.yaml` (`categoriaId` existe en `Gasto`/
+`CrearGastoRequest`/`EditarGastoRequest`, nunca en `Ingreso`). Opcional
+siempre, nunca obligatoria en la captura (CLAUDE.md, "Prioridades del
+producto": "categorías opcionales, nunca obligatorias").
+
+**Lista de predeterminadas — decisión que quedó pendiente en
+`modelo-dominio.md` §6** ("estructura de categorías predeterminadas:
+lista concreta pendiente para wireframes, no es una decisión de
+dominio"). Se definió al construir este punto, confirmada con el
+usuario: Comida, Transporte, Vivienda, Servicios, Salud,
+Entretenimiento, Ropa, Educación, Ahorro, Otros.
+
+**Predeterminadas sembradas por tenant, no una fila global
+compartida.** `resolverOcrearIdentidad` (modulos/identidad/) inserta
+las diez en la misma transacción donde ya crea el tenant nuevo — antes
+de que exista ningún `GET /categorias` que las necesite. La alternativa
+considerada — una tabla de predeterminadas sin `tenant_id`, visible a
+todos — habría sido la primera excepción al patrón estricto de "toda
+tabla de dominio tiene `tenant_id` + RLS sin excepciones" (ADR-005) y
+habría exigido una política de RLS especial (`tenant_id IS NULL OR ...`)
+solo para esta tabla. Sembrar por tenant mantiene el mismo patrón de
+RLS + llave foránea real que ya usa todo el resto del schema, a costa
+de diez filas duplicadas por tenant — un costo de almacenamiento
+irrelevante frente a la complejidad que evita.
+
+**Límite de categorías personalizadas: 30, aplicado sin sistema de
+planes.** Documento Maestro §9.1 propone "categorías personalizadas
+gratis para todos (límite alto, ~30)" — no existe ningún módulo de
+planes/suscripciones todavía (Fase 3), así que el límite se aplica
+igual para todos: es el único número que aparece en los docs, y sin él
+no habría ningún límite real hoy. Comprobado por conteo antes de
+insertar, no con un índice único de la base de datos — a diferencia de
+"un solo periodo activo por tenant" (invariante 9, protegida con un
+índice porque violarla corrompe el dominio), pasarse por una bajo una
+carrera rarísima no tiene ninguna consecuencia real.
+
+**Nombre único por tenant** (`categorias_nombre_unico_por_tenant`) —
+crear una categoría con un nombre que ya existe para ese tenant (
+predeterminada o personalizada) se rechaza con `VALIDACION`, detectado
+vía el mismo patrón de `esViolacionDeIndiceUnico` que ya usan
+`crearPeriodo`/`materializar-arrastre.ts` para sus propios índices
+únicos.
+
+**Editar la categoría de un gasto es exactamente "editar el gasto",
+sin caso especial.** `gastos_inmutables` bloquea cualquier `UPDATE`
+sin excepción — no hay forma de "solo cambiar la categoría" con un
+`UPDATE` directo, ni siquiera para eso. `editarGasto` ya recreaba la
+fila completa para corregir monto o nota; `categoriaId` es un campo
+más de esa misma fila nueva. Como consecuencia, **omitir `categoriaId`
+al editar no conserva la categoría anterior** — la fila nueva queda
+sin categoría, exactamente el mismo comportamiento que ya tenía `nota`
+al omitirse. No es una inconsistencia nueva de categorías, es el
+comportamiento ya existente de cualquier campo que no se reenvíe en un
+`PATCH` — documentado aquí explícitamente para que no sorprenda.
+
+**`CATEGORIA_NO_ENCONTRADA` (404) al registrar o editar un gasto con
+un `categoriaId` inválido o de otro tenant** — validado explícitamente
+antes de insertar (`obtenerCategoriaPorIdTx`, mismo criterio BOLA que
+`obtenerPeriodoPorIdTx`/`obtenerMetaPorIdTx`: la política RLS de
+`categorias` es la defensa real, el `tenantId` en el `WHERE` es
+cinturón y tirantes), no solo dejado para que la llave foránea lo
+rechace con un error genérico de Postgres.
+
+Validado de punta a punta contra el servidor real y Supabase real:
+un tenant nuevo ya tiene las diez predeterminadas sin llamar a ningún
+endpoint; crear una personalizada, registrar un gasto con ella,
+editarlo cambiando a otra categoría, y una categoría inexistente
+rechazada con 404 — ver `http/ciclo-completo.http`, pasos 36-41.
 
 ## Disponible (el motor de flujo de caja)
 
@@ -1071,20 +1147,22 @@ respondiera 204.
 
 ```
 src/shared/http.ts                     # registrarManejadorErroresDominio, montoADto/montoDesdeDto
-src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo, GET /periodos
+src/modulos/periodos/rutas.ts          # POST /periodos, GET /periodos/activo, GET /periodos, GET /periodos/:id
 src/modulos/ingresos/rutas.ts          # POST/GET /periodos/:periodoId/ingresos, PATCH/DELETE /ingresos/:ingresoId
 src/modulos/gastos/rutas.ts            # POST/GET /periodos/:periodoId/gastos, PATCH/DELETE /gastos/:gastoId
 src/modulos/disponible/rutas.ts        # GET /periodos/activo/disponible
 src/modulos/cierre/rutas.ts            # POST .../cerrar, GET .../resumen, POST .../sobrante/decision, GET /resumenes/pendiente
 src/modulos/metas/rutas.ts             # POST/GET /metas, POST /metas/:id/aportes, POST /metas/:id/retiros
+src/modulos/categorias/rutas.ts        # GET/POST /categorias
 ```
 
-Veinte endpoints para ejercer el ciclo central, corregir un ingreso o
-un gasto, ahorrar hacia una meta, y ver de vuelta lo que se capturó
-(incluidos periodos ya cerrados y sobrantes sin decidir) — no la API
-completa de `docs/openapi.yaml` (sin categorías). Todos viven bajo
-`/v1` y detrás del mismo `authPlugin` que ya protege `/v1/me` desde el
-punto
+Veintitrés endpoints para ejercer el ciclo central, corregir un
+ingreso o un gasto, categorizar un gasto, ahorrar hacia una meta, y ver
+de vuelta lo que se capturó (incluidos periodos ya cerrados y
+sobrantes sin decidir) — ya toda la API de `docs/openapi.yaml`, incluido
+`GET /periodos/{periodoId}`, definido desde el diseño original pero
+nunca expuesto hasta esta revisión. Todos viven bajo `/v1` y detrás del
+mismo `authPlugin` que ya protege `/v1/me` desde el punto
 1 — nada nuevo en autenticación, solo se extiende.
 
 **Cada ruta llama directo a la función de dominio que ya existía y
@@ -1099,6 +1177,7 @@ es un `setErrorHandler` global: traduce cualquier `ErrorDominio` a
 `{codigo, mensaje}` con el status correcto
 (`PERIODO_NO_ENCONTRADO`→404, `GASTO_NO_ENCONTRADO`→404,
 `INGRESO_NO_ENCONTRADO`→404, `META_NO_ENCONTRADA`→404,
+`CATEGORIA_NO_ENCONTRADA`→404, `LIMITE_CATEGORIAS_ALCANZADO`→403,
 `PERIODO_NO_ACTIVO`→409, `SOBRANTE_YA_DECIDIDO`→409,
 `SIN_PERIODO_ACTIVO`→409, `GASTO_YA_REVERTIDO`→409,
 `INGRESO_YA_REVERTIDO`→409, `VALIDACION`→400,
@@ -1310,6 +1389,12 @@ corregir el mismo gasto dos veces.
   usuario que creyó que su dinero había desaparecido. Con varios
   pendientes acumulados, siempre devuelve el más antiguo, y nunca
   cruza de un tenant a otro.
+- Un tenant nuevo ya tiene las diez categorías predeterminadas sin
+  llamar a ningún endpoint; una categoría personalizada respeta el
+  límite (30) y el nombre único por tenant; y un `categoriaId` inválido
+  o de otro tenant se rechaza explícitamente, tanto al registrar como
+  al editar un gasto, en vez de dejar que la llave foránea falle con un
+  error genérico.
 
 ## Higiene de borradores
 
@@ -1355,7 +1440,9 @@ puede producir esa condición).
 
 ## Qué falta
 
-### Después de eso
-
-El resto de la API de `docs/openapi.yaml` que los diecinueve endpoints
-actuales no cubren: categorías, y la propia entidad de categorías.
+Toda la API de `docs/openapi.yaml` está cubierta (veintitrés
+endpoints). Lo que sigue es explícitamente Fase 3 / fuera del MVP
+(documento-maestro-v2.md, CLAUDE.md "Fuera de alcance del MVP"): plan
+Business (multi-tenant completo, roles, aprobaciones), agregación
+bancaria, multi-moneda avanzada, y el resto de funcionalidades de
+reportes/exportación que §4.1 marca como "parcial" o fuera del núcleo.

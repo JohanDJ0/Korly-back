@@ -1,11 +1,29 @@
 import { and, desc, eq, inArray, isNotNull, lt, or } from 'drizzle-orm';
 import { gastos } from '../../db/schema/gastos.js';
 import { asientos, movimientos } from '../../db/schema/ledger.js';
+import { obtenerCategoriaPorIdTx } from '../categorias/categorias.js';
 import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
+
+/**
+ * `undefined` = no se especificó (queda sin categoría); `null` =
+ * quitar la categoría explícitamente; string = asignar esa categoría,
+ * validada contra este tenant. Mismo criterio de "cinturón y tirantes"
+ * que el resto: `obtenerCategoriaPorIdTx` ya filtra por tenant, pero se
+ * comprueba aquí antes de insertar, no se confía solo en la FK (una FK
+ * violada da un error de Postgres genérico, no `CATEGORIA_NO_ENCONTRADA`).
+ */
+async function resolverCategoriaIdTx(tx: Ejecutor, tenantId: string, categoriaId: string | null | undefined): Promise<string | null> {
+  if (categoriaId === undefined || categoriaId === null) return null;
+  const categoria = await obtenerCategoriaPorIdTx(tx, tenantId, categoriaId);
+  if (!categoria) {
+    throw new ErrorDominio('CATEGORIA_NO_ENCONTRADA', 'La categoría especificada no existe');
+  }
+  return categoria.id;
+}
 
 export interface RegistrarGastoEntrada {
   tenantId: string;
@@ -16,6 +34,8 @@ export interface RegistrarGastoEntrada {
   /** 'YYYY-MM-DD'. Por defecto, la fecha actual la resuelve el caller (no hay capa HTTP todavía que la infiera). */
   fechaEfectiva: string;
   nota?: string;
+  /** Opcional (docs/openapi.yaml, "categorías opcionales, nunca obligatorias" — CLAUDE.md). */
+  categoriaId?: string | null;
   /** Para el cierre perezoso del periodo destino — ver el mismo campo en registrar-ingreso.ts. */
   fechaReferencia?: Date;
 }
@@ -48,6 +68,8 @@ export async function registrarGasto(entrada: RegistrarGastoEntrada): Promise<Ga
       throw new ErrorDominio('PERIODO_NO_ACTIVO', 'El periodo especificado no está en estado Activo');
     }
 
+    const categoriaId = await resolverCategoriaIdTx(tx, entrada.tenantId, entrada.categoriaId);
+
     const { movimientoId } = await registrarMovimientoTx(tx, {
       tenantId: entrada.tenantId,
       tipo: 'gasto',
@@ -62,7 +84,7 @@ export async function registrarGasto(entrada: RegistrarGastoEntrada): Promise<Ga
 
     const [gasto] = await tx
       .insert(gastos)
-      .values({ tenantId: entrada.tenantId, periodoId: entrada.periodoId, movimientoId })
+      .values({ tenantId: entrada.tenantId, periodoId: entrada.periodoId, movimientoId, categoriaId })
       .returning({ id: gastos.id });
     if (!gasto) throw new Error('No se pudo registrar el gasto');
 
@@ -162,6 +184,15 @@ export interface EditarGastoEntrada {
   monto: bigint;
   moneda: string;
   nota?: string;
+  /**
+   * Mismo criterio que `nota`: como la fila se recrea por completo en
+   * cada edición (`gastos_inmutables`), omitirla aquí no "conserva" la
+   * categoría anterior — la nueva fila queda sin categoría, igual que
+   * quedaría sin nota si no se reenvía. No es un caso especial de
+   * `categoriaId`, es el comportamiento ya existente de cualquier campo
+   * que no se reenvíe en un `PATCH`.
+   */
+  categoriaId?: string | null;
   fechaReferencia?: Date;
 }
 
@@ -195,6 +226,7 @@ export async function editarGasto(entrada: EditarGastoEntrada): Promise<GastoEdi
     const gastoOriginal = await cargarGastoParaCorreccionTx(tx, entrada.tenantId, entrada.gastoId);
     const periodoActivo = await periodoActivoObligatorioTx(tx, entrada.tenantId, fechaReferencia);
     const fecha = fechaISO(fechaReferencia);
+    const categoriaId = await resolverCategoriaIdTx(tx, entrada.tenantId, entrada.categoriaId);
 
     await revertirMovimientoTx(
       tx,
@@ -219,7 +251,7 @@ export async function editarGasto(entrada: EditarGastoEntrada): Promise<GastoEdi
 
     const [gastoNuevo] = await tx
       .insert(gastos)
-      .values({ tenantId: entrada.tenantId, periodoId: periodoActivo.id, movimientoId })
+      .values({ tenantId: entrada.tenantId, periodoId: periodoActivo.id, movimientoId, categoriaId })
       .returning({ id: gastos.id });
     if (!gastoNuevo) throw new Error('No se pudo registrar el gasto corregido');
 
@@ -240,6 +272,7 @@ export interface GastoDetallado {
   fechaEfectiva: string;
   fechaRegistro: Date;
   nota: string | null;
+  categoriaId: string | null;
   /**
    * true si `editarGasto`/`eliminarGasto` ya generaron una reversión de
    * este gasto — la fila sigue existiendo tal cual (nunca hard delete),
@@ -328,6 +361,7 @@ export async function listarGastos(
         fechaEfectiva: movimientos.fechaEfectiva,
         fechaRegistro: movimientos.fechaRegistro,
         nota: movimientos.nota,
+        categoriaId: gastos.categoriaId,
       })
       .from(gastos)
       .innerJoin(movimientos, eq(movimientos.id, gastos.movimientoId))
@@ -365,6 +399,7 @@ export async function listarGastos(
         fechaEfectiva: fila.fechaEfectiva,
         fechaRegistro: fila.fechaRegistro,
         nota: fila.nota,
+        categoriaId: fila.categoriaId,
         revertido: idsRevertidos.has(fila.movimientoId),
       })),
       siguienteCursor: hayMas && ultima ? codificarCursorGasto(ultima.fechaRegistro, ultima.id) : null,

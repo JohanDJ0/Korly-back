@@ -17,6 +17,7 @@ import { eliminarGasto, listarGastos, registrarGasto } from '../../src/modulos/g
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { obtenerResumenPendiente } from '../../src/modulos/cierre/generar-resumen.js';
 import { aportarAMeta, crearMeta, listarMetas, retirarDeMeta } from '../../src/modulos/metas/metas.js';
+import { crearCategoriaPersonalizada, listarCategorias } from '../../src/modulos/categorias/categorias.js';
 import { conTenant, db } from '../../src/shared/db.js';
 
 /**
@@ -333,6 +334,35 @@ describe('aislamiento por tenant (RLS)', () => {
 
     // La meta de B sigue intacta: A no logró tocarla de rebote.
     expect(await obtenerSaldoCuenta(identidadB.tenantId, metaDeB.cuentaId)).toBe(0n);
+  });
+
+  it('listarCategorias nunca devuelve una categoría personalizada de otro tenant', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-categorias-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-categorias-b-${randomUUID()}`);
+    await crearCategoriaPersonalizada(identidadB.tenantId, 'Solo de B');
+
+    const categoriasDeA = await listarCategorias(identidadA.tenantId);
+    expect(categoriasDeA.find((c) => c.nombre === 'Solo de B')).toBeUndefined();
+  });
+
+  it('un tenant no puede registrar un gasto con la categoría de otro tenant vía categoriaId (BOLA)', async () => {
+    const identidadA = await resolverOcrearIdentidad(`test-aislamiento-categoria-gasto-a-${randomUUID()}`);
+    const identidadB = await resolverOcrearIdentidad(`test-aislamiento-categoria-gasto-b-${randomUUID()}`);
+
+    const periodoA = await crearPeriodo(identidadA.tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const categoriaDeB = await crearCategoriaPersonalizada(identidadB.tenantId, 'Solo de B');
+
+    await expect(
+      registrarGasto({
+        tenantId: identidadA.tenantId,
+        periodoId: periodoA.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        categoriaId: categoriaDeB.id,
+        fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+      })
+    ).rejects.toMatchObject({ codigo: 'CATEGORIA_NO_ENCONTRADA' });
   });
 
   it('dos requests concurrentes con la misma identidad nueva resuelven al mismo tenant', async () => {

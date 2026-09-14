@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { crearPeriodo, listarPeriodos, obtenerPeriodoActivo } from './crear-periodo.js';
+import { crearPeriodo, listarPeriodos, obtenerPeriodoActivo, obtenerPeriodoPorId } from './crear-periodo.js';
 import type { TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 
 interface CrearPeriodoBody {
@@ -31,5 +31,21 @@ export async function rutasPeriodos(app: FastifyInstance): Promise<void> {
   app.get('/periodos', async (request, reply) => {
     const periodos = await listarPeriodos(request.identidad.tenantId);
     reply.send(periodos);
+  });
+
+  /**
+   * Definido en `docs/openapi.yaml` desde el diseño original, nunca
+   * expuesto hasta ahora — la función de dominio (`obtenerPeriodoPorId`)
+   * ya existía y ya la usaban ingresos/gastos internamente. Fastify
+   * distingue `/periodos/activo` (ruta estática) de `/periodos/:periodoId`
+   * (paramétrica) sin importar el orden de registro, así que no hay
+   * conflicto entre ambas.
+   */
+  app.get<{ Params: { periodoId: string } }>('/periodos/:periodoId', async (request, reply) => {
+    const periodo = await obtenerPeriodoPorId(request.identidad.tenantId, request.params.periodoId);
+    if (!periodo) {
+      return reply.code(404).send({ codigo: 'PERIODO_NO_ENCONTRADO', mensaje: 'El periodo especificado no existe' });
+    }
+    reply.send(periodo);
   });
 }

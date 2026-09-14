@@ -10,6 +10,7 @@ export interface Gasto {
   fechaEfectiva: string;
   fechaRegistro: string;
   nota?: string;
+  categoriaId?: string;
   /** Extensión sobre openapi.yaml (ver backend/README.md, "Listar gastos") — true si ya se editó o eliminó. */
   revertido: boolean;
 }
