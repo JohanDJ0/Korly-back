@@ -45,8 +45,9 @@ export function Login() {
     <div className="flex min-h-svh items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Korly</CardTitle>
-          <CardDescription>Inicia sesión para ver cuánto puedes gastar hoy.</CardDescription>
+          <img src="/logo/full.svg" alt="Korly" className="mx-auto h-10" />
+          <CardTitle className="sr-only">Korly</CardTitle>
+          <CardDescription className="text-center">Inicia sesión para ver cuánto puedes gastar hoy.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>

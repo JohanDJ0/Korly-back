@@ -65,6 +65,7 @@ export function Registro() {
       <div className="flex min-h-svh items-center justify-center p-6">
         <Card className="w-full max-w-sm">
           <CardHeader>
+            <img src="/logo/full.svg" alt="Korly" className="mx-auto mb-2 h-9" />
             <CardTitle>Revisa tu correo</CardTitle>
             <CardDescription>Te mandamos un enlace para confirmar tu cuenta antes de poder entrar.</CardDescription>
           </CardHeader>
@@ -82,6 +83,7 @@ export function Registro() {
     <div className="flex min-h-svh items-center justify-center p-6">
       <Card className="w-full max-w-sm">
         <CardHeader>
+          <img src="/logo/full.svg" alt="Korly" className="mx-auto mb-2 h-9" />
           <CardTitle>Crea tu cuenta</CardTitle>
           <CardDescription>Registro para empezar a ver cuánto puedes gastar hoy.</CardDescription>
         </CardHeader>

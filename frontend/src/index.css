@@ -2,6 +2,13 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/**
+ * Paleta de marca extraída directamente del logo real de Korly (no
+ * inventada aparte) — verde-azulado como color principal, dorado como
+ * acento para momentos que necesitan destacar (avisos, progreso). Ver
+ * frontend/README.md, "Diseño/branding", para la justificación
+ * completa de cada mapeo.
+ */
 :root {
   --radius: 0.625rem;
   --background: oklch(1 0 0);
@@ -10,41 +17,45 @@
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
+  --primary: #167f6c;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf5f1;
+  --secondary-foreground: #146155;
   --muted: oklch(0.97 0 0);
   --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
+  --accent: #eaf5f1;
+  --accent-foreground: #146155;
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
+  --border: #d7e8e3;
+  --input: #d7e8e3;
+  --ring: #167f6c;
+  --brand-gold: #feb816;
+  --brand-gold-foreground: #146155;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
+  --background: #0b1614;
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
+  --card: #122420;
   --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
+  --popover: #122420;
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
+  --primary: #2fae93;
+  --primary-foreground: #06201b;
+  --secondary: #1b332d;
   --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
+  --muted: #1b332d;
   --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
+  --accent: #1b332d;
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  --ring: #2fae93;
+  --brand-gold: #feb816;
+  --brand-gold-foreground: #146155;
 }
 
 @theme inline {
@@ -72,6 +83,8 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand-gold: var(--brand-gold);
+  --color-brand-gold-foreground: var(--brand-gold-foreground);
 }
 
 @layer base {

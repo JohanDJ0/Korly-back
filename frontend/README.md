@@ -212,6 +212,52 @@ Probado de punta a punta contra el backend real: con un periodo recién
 creado y sin ningún gasto hoy, el aviso aparece con la cifra correcta;
 al registrar un gasto, desaparece de inmediato sin recargar la página.
 
+**Punto 14 — diseño y marca:** la paleta neutral quedó pospuesta a
+propósito hasta tener las pantallas clave funcionando (ver "Qué falta"
+de puntos anteriores) — ya las hay todas. El usuario aportó el logo
+real de la marca (cuatro variantes SVG, en `public/logo/`: `full`/`icon`
+con fondo claro, `full-dark`/`icon-dark` con fondo oscuro) y confirmó
+la dirección de color propuesta (verde-azulado, tono fintech calmado)
+al verla junto al logo. La paleta de `src/index.css` se reconstruyó
+extrayendo los colores exactos del propio logo, no inventándolos
+aparte:
+
+- `--primary` = `#167f6c` (el teal del logo) — botones y enlaces
+  principales en toda la app, sin tocar componente por componente:
+  como `Button`/`Input`/`Link` ya usaban las clases semánticas de
+  shadcn (`bg-primary`, `text-primary`, `ring-ring`), cambiar las
+  variables en un solo archivo bastó para todo.
+- `--secondary`/`--accent` = un tinte claro del mismo teal (`#eaf5f1`)
+  con `#146155` (el verde oscuro del logo) como texto — reemplaza el
+  gris neutro de hover/fondos secundarios sin introducir un color
+  nuevo que no viniera del logo.
+- `--brand-gold` (`#feb816`, el dorado del logo) — token nuevo,
+  registrado en `@theme inline` junto a los semánticos de shadcn, para
+  la tarjeta de "sobrante pendiente" en `Home.tsx` (antes
+  `amber-500`/`amber-50` genéricos de Tailwind, sin relación con la
+  marca).
+- El aviso de `RecordatorioContextual.tsx` (antes `blue-500`/`blue-50`,
+  un azul que no aparece en ningún lado de la marca) pasó a usar
+  `border-primary/40 bg-primary/5` — el mismo teal, no un color
+  aparte, ya que semánticamente es "información calmada", el mismo
+  tono que ya transmite el primario.
+- `--destructive` no cambió — el rojo de error es una convención
+  universal, no una decisión de marca.
+
+**Logo integrado en las pantallas de entrada, no en las de trabajo.**
+`Login.tsx`, `Registro.tsx` y `Home.tsx` muestran el wordmark completo
+(`full.svg`) reemplazando el texto plano "Korly"; `Historial.tsx`,
+`Metas.tsx` y `Resumen.tsx` mantienen su título funcional sin logo —
+decisión deliberada para no repetir la marca en pantallas de tarea
+donde compite con la información accionable. El favicon (`favicon.svg`)
+también se reemplazó — antes era el logo por defecto de Vite/React, sin
+relación con Korly.
+
+Verificado visualmente contra el servidor real en Login, Home (los
+tres estados de disponible), Metas, Historial y Resumen — colores,
+contraste y legibilidad correctos en cada uno; sin errores de consola
+nuevos.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -334,11 +380,14 @@ El CLI de `shadcn` (`npx shadcn@latest init`) resolvió mal el alias
 la raíz del proyecto. `npx shadcn@latest add <componente>` reprodujo el
 mismo problema. Los componentes base (`button`, `input`, `label`,
 `card`) están escritos a mano en `src/components/ui/`, con el mismo
-código fuente y las mismas variables CSS (`src/index.css`, paleta
-`neutral`, Tailwind v4 vía `@theme inline`) que generaría el CLI — el
-resultado es idéntico, solo cambió cómo llegó ahí. Si el CLI se vuelve
-a intentar más adelante y falla igual, agregar componentes nuevos a
-mano siguiendo el mismo patrón es la vía confiable en este entorno.
+código fuente que generaría el CLI (Tailwind v4 vía `@theme inline`
+en `src/index.css`) — el resultado es idéntico, solo cambió cómo llegó
+ahí. Las variables CSS de esa base sí cambiaron desde entonces: en el
+scaffold inicial era la paleta `neutral` por defecto; ver "Diseño y
+marca" más abajo para la paleta real que la reemplazó. Si el CLI se
+vuelve a intentar más adelante y falla igual, agregar componentes
+nuevos a mano siguiendo el mismo patrón es la vía confiable en este
+entorno.
 
 ## Qué valida este punto
 
@@ -436,6 +485,12 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   hay actividad hoy, se silencia solo en cuanto se registra un gasto
   (sin recargar), y nunca se muestra junto con el titular de "te
   excediste hoy" — probado de punta a punta contra el backend real.
+- La paleta de marca (extraída del logo real, no inventada) se aplica
+  consistentemente en toda la app con un solo cambio en
+  `src/index.css` — botones, enlaces, focos de formulario, y las
+  tarjetas de aviso (sobrante pendiente en dorado, recordatorio en
+  teal) — verificado visualmente contra el servidor real en las
+  pantallas principales, sin regresiones de contraste ni legibilidad.
 
 ## Qué falta
 
@@ -445,6 +500,3 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   todavía no existen. Con eso, también entrarían las reglas de cadencia
   que no aplican a un aviso in-app (frecuencia decreciente, ventana
   adaptada al patrón del usuario).
-- Pasada de diseño/branding — por ahora, paleta neutral por defecto de
-  shadcn/ui, deliberadamente sin definir hasta tener las pantallas
-  clave funcionando (decisión explícita, ver conversación).

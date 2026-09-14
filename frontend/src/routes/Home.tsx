@@ -42,7 +42,7 @@ export function Home() {
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
-      <h1 className="text-2xl font-semibold">Korly</h1>
+      <img src="/logo/full.svg" alt="Korly" className="h-9" />
 
       {periodoActivo && (
         // ADR-004: la quincena está anclada a calendario, no es
@@ -61,7 +61,7 @@ export function Home() {
         // arrastra solo si nadie decide). Este aviso es la corrección.
       }
       {resumenPendiente && (
-        <Card className="w-full max-w-sm border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
+        <Card className="w-full max-w-sm border-brand-gold/60 bg-brand-gold/10 dark:bg-brand-gold/15">
           <CardContent className="flex flex-col gap-2 pt-6">
             <p className="text-sm">
               Tienes un sobrante de <span className="font-semibold">{formatearMonto(resumenPendiente.sobrante)}</span> sin decidir de un
