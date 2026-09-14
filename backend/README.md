@@ -1438,6 +1438,56 @@ al llegar la siguiente quincena, y el aborto si el borrador tuviera
 asientos (forzado a mano contra el ledger, ya que la API pública no
 puede producir esa condición).
 
+## Seguridad
+
+Pase de hardening manual sobre todo el proyecto (backend + frontend),
+no atado a un diff puntual. Se revisó y confirmó seguro, sin cambios
+de código: RLS en las nueve tablas de dominio (comparado el schema de
+Drizzle contra el SQL ya aplicado en `drizzle/*.sql` — coinciden);
+verificación de JWT contra Supabase (`supabaseAdmin.auth.getUser`, no
+un decode local); que ninguna ruta confía en un `tenantId` que venga
+del cliente (todas usan `request.identidad.tenantId`); parametrización
+real en `set_config` (`shared/db.ts`, sin interpolación de string);
+roles Postgres `nosuperuser`/`nobypassrls` en `app_backend`
+(`scripts/bootstrap-roles.sql`); el handler global de errores nunca
+filtra stack traces ni errores de base de datos en un 500; el logger
+de Fastify no registra headers ni body por default; CORS por whitelist
+explícita (ver arriba); cero `dangerouslySetInnerHTML`/`eval` en el
+frontend; solo la anon key de Supabase se usa en cliente, la
+`service_role` nunca se expone; `.env` correctamente fuera de git.
+
+**Corregido en esta pasada** (`npm audit --omit=dev`, dependencias de
+producción):
+
+- `fast-uri` (HIGH, vía `ajv`) — confusión de host en el parseo de
+  URIs (IDN, IPv6, percent-decoding). Fijado con
+  `overrides: { "fast-uri": "^4.1.4" }` en `package.json`, ya que
+  `npm audit fix` falla en este proyecto con un bug interno del CLI de
+  npm (`Cannot read properties of null (reading 'edgesOut')`) —
+  workaround verificado, no hace falta reintentarlo.
+- `fastify` <=5.12.0 (MODERATE) — bypass de validación de schema y
+  spoofing de `X-Forwarded-*` bajo `trustProxy`. Corregido con el bump
+  a `fastify@5.12.4`. Contexto real: ninguna ruta de este proyecto usa
+  la opción `schema:` de Fastify ni activa `trustProxy`, así que
+  ninguna de las dos rutas de explotación estaba disponible — se
+  corrigió de todas formas porque el fix no rompe nada.
+
+Después del bump: `npm run typecheck` limpio y `npm run test:local`
+con la suite completa en verde contra Postgres real.
+
+**Deliberadamente sin corregir** — dos hallazgos MODERATE, ambos solo
+en `devDependencies` (nunca llegan a producción) y ambos con fix
+disponible solo vía cambio breaking:
+
+- `@vitest/mocker` (path traversal) — requiere subir Vitest 4 → 5.
+- `esbuild` <=0.24.2, vía la cadena `@esbuild-kit` de `drizzle-kit` —
+  requiere bajar a `drizzle-kit@0.18.1`.
+
+Ambos solo son explotables con el servidor de desarrollo corriendo en
+la máquina de un desarrollador, nunca en producción. Se dejan así a
+propósito hasta que una migración de Vitest o Drizzle-kit por otra
+razón absorba el fix sin costo extra.
+
 ## Qué falta
 
 Toda la API de `docs/openapi.yaml` está cubierta (veintitrés
