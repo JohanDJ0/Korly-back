@@ -178,6 +178,40 @@ editar el monto de un gasto ya categorizado sin tocar el selector —
 confirmando que la categoría se conserva en la fila nueva en vez de
 perderse.
 
+**Punto 13 — recordatorios contextuales (alcance acotado con el
+usuario a "solo aviso dentro de la app"):** documento-maestro-v2.md
+§13.4 marca esto como "núcleo, no accesorio", pero pide email + web
+push para el MVP web — ninguno de los dos existe en este proyecto
+(sin proveedor de email, sin VAPID/service worker, sin ningún cron:
+el backend es puro request/response). En vez de fingir soporte a
+medias, se acotó el alcance explícitamente a un aviso in-app,
+`RecordatorioContextual.tsx`, sin ningún endpoint nuevo — reutiliza
+los mismos campos que `/disponible` ya expone.
+
+**Solo dos de las cinco reglas obligatorias del documento aplican a un
+aviso in-app; las otras tres son de cadencia de *envío*, sin sentido
+sin un historial de notificaciones que todavía no existe** (frecuencia
+decreciente ante ignorancia repetida, ventana adaptada al patrón del
+usuario). Las que sí aplican y ya están implementadas:
+- **Regla 1 (entrega valor por sí sola):** siempre trae la cifra
+  accionable — días restantes, disponible, y el límite de hoy — nunca
+  solo "te falta registrar".
+- **Regla 2 (se silencia sola):** solo aparece si `gastadoHoy` es 0;
+  en cuanto se registra un gasto hoy, desaparece sin que nadie la
+  cierre a mano.
+
+**Deliberadamente no duplica la alerta de ritmo (regla 4).** Cuando
+`cifraDiaria` ya es negativa, `CifraDisponible.tsx` lo muestra como el
+titular principal en rojo ("Te excediste hoy por $X") — agregar otra
+tarjeta para el mismo hecho habría sido "regañar" dos veces por lo
+mismo, contra el principio rector del propio documento ("informa, no
+regaña"). `RecordatorioContextual` se oculta explícitamente en ese
+caso.
+
+Probado de punta a punta contra el backend real: con un periodo recién
+creado y sin ningún gasto hoy, el aviso aparece con la cifra correcta;
+al registrar un gasto, desaparece de inmediato sin recargar la página.
+
 ## 1. Variables de entorno
 
 ```bash
@@ -398,9 +432,19 @@ mano siguiendo el mismo patrón es la vía confiable en este entorno.
   editar el monto de un gasto ya categorizado sin tocar el selector
   conserva su categoría en la fila nueva, en vez de perderla — probado
   de punta a punta contra el backend real.
+- El recordatorio contextual aparece con la cifra correcta cuando no
+  hay actividad hoy, se silencia solo en cuanto se registra un gasto
+  (sin recargar), y nunca se muestra junto con el titular de "te
+  excediste hoy" — probado de punta a punta contra el backend real.
 
 ## Qué falta
 
+- Recordatorios contextuales por email/web push (documento-maestro-v2.md
+  §13.4) — el aviso in-app ya está resuelto (punto 13); el envío real
+  requiere un proveedor de email y VAPID/service worker para push, que
+  todavía no existen. Con eso, también entrarían las reglas de cadencia
+  que no aplican a un aviso in-app (frecuencia decreciente, ventana
+  adaptada al patrón del usuario).
 - Pasada de diseño/branding — por ahora, paleta neutral por defecto de
   shadcn/ui, deliberadamente sin definir hasta tener las pantallas
   clave funcionando (decisión explícita, ver conversación).

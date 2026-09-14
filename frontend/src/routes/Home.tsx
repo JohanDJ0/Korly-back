@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { CifraDisponible } from '@/components/CifraDisponible';
 import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
+import { RecordatorioContextual } from '@/components/RecordatorioContextual';
 import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
@@ -105,6 +106,7 @@ export function Home() {
       )}
 
       {!error && data?.estado === 'ok' && <CifraDisponible disponible={data} />}
+      {!error && data?.estado === 'ok' && <RecordatorioContextual disponible={data} />}
 
       {periodoId && !mostrarFormularioGasto && (
         <Button onClick={() => setMostrarFormularioGasto(true)} className="w-full max-w-sm">
