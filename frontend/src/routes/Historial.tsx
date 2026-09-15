@@ -98,8 +98,8 @@ export function Historial() {
       {periodoId && (
         <>
           <section>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-muted-foreground">Ingresos</h2>
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <h2 className="pt-1 text-sm font-medium text-muted-foreground">Ingresos</h2>
               {viendoElPeriodoActivo && periodoId && <FormularioImportar tipo="ingresos" periodoId={periodoId} />}
             </div>
             {cargandoIngresos && <p className="text-sm text-muted-foreground">Cargando…</p>}
@@ -109,8 +109,8 @@ export function Historial() {
           </section>
 
           <section>
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h2 className="text-sm font-medium text-muted-foreground">Gastos</h2>
+            <div className="mb-2 flex items-start justify-between gap-2">
+              <h2 className="pt-1 text-sm font-medium text-muted-foreground">Gastos</h2>
               {viendoElPeriodoActivo && periodoId && <FormularioImportar tipo="gastos" periodoId={periodoId} />}
             </div>
             {cargandoGastos && <p className="text-sm text-muted-foreground">Cargando…</p>}
