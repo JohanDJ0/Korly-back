@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { FilaGasto } from '@/components/FilaGasto';
 import { FilaIngreso } from '@/components/FilaIngreso';
+import { useExportar } from '@/hooks/use-exportar';
 import { useGastos } from '@/hooks/use-gastos';
 import { useIngresos } from '@/hooks/use-ingresos';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
@@ -44,6 +45,8 @@ export function Historial() {
     (p) => (p.estado === 'cerrado' || p.estado === 'archivado') && p.id !== periodoId
   );
 
+  const exportar = useExportar();
+
   return (
     <div className="mx-auto flex min-h-svh max-w-lg flex-col gap-6 p-6">
       <div className="flex items-center gap-3">
@@ -52,6 +55,21 @@ export function Historial() {
         </Button>
         <h1 className="text-xl font-semibold">Historial</h1>
       </div>
+
+      {
+        // Exporta TODO el historial del tenant (no solo el periodo que
+        // se está viendo aquí) — documento-maestro-v2.md §12,
+        // "importación/exportación" (ver backend/README.md, "Exportación").
+      }
+      <div className="flex gap-2">
+        <Button variant="outline" size="sm" disabled={exportar.isPending} onClick={() => exportar.mutate('gastos')}>
+          Exportar gastos (CSV)
+        </Button>
+        <Button variant="outline" size="sm" disabled={exportar.isPending} onClick={() => exportar.mutate('ingresos')}>
+          Exportar ingresos (CSV)
+        </Button>
+      </div>
+      {exportar.isError && <p className="text-sm text-destructive">{exportar.error.message}</p>}
 
       {periodoViendose && (
         <p className="text-sm text-muted-foreground">

@@ -58,3 +58,38 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   return cuerpo as T;
 }
+
+/**
+ * Para endpoints que devuelven un archivo (hoy solo `/exportar/*.csv`),
+ * no JSON — `apiFetch` no sirve porque siempre intenta parsear el body
+ * como JSON. Un `<a href>` normal tampoco alcanza: el archivo requiere
+ * el header `Authorization`, que un link no puede mandar. En su lugar,
+ * se pide con `fetch` directo, se arma un blob y se dispara la
+ * descarga con un `<a download>` sintético — el patrón estándar para
+ * descargar un archivo autenticado desde una SPA.
+ */
+export async function descargarArchivo(path: string, nombreArchivo: string): Promise<void> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const headers = new Headers();
+  if (session) {
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+  }
+
+  const respuesta = await fetch(`${baseUrl}${path}`, { headers });
+
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.json().catch(() => null);
+    throw new ApiError(respuesta.status, cuerpo?.codigo ?? 'ERROR_DESCONOCIDO', cuerpo?.mensaje ?? respuesta.statusText);
+  }
+
+  const blob = await respuesta.blob();
+  const url = URL.createObjectURL(blob);
+  const enlace = document.createElement('a');
+  enlace.href = url;
+  enlace.download = nombreArchivo;
+  enlace.click();
+  URL.revokeObjectURL(url);
+}

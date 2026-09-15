@@ -1177,6 +1177,48 @@ creado después no se materialice, que un periodo en `'borrador'` no
 materialice todavía, aislamiento entre tenants, propagación de
 categoría, y el índice único parcial.
 
+## Exportación
+
+Extensión sobre `docs/openapi.yaml` (documento-maestro-v2.md §12,
+"importación/exportación"). Solo exportación por ahora — importación
+queda pendiente de una conversación de diseño aparte: un CSV externo
+trae gastos con fechas pasadas, y la invariante 10 (un gasto solo se
+registra contra un periodo `'activo'`) choca con eso de una forma que
+todavía no está resuelta (¿se generan como "ajustes", igual que editar
+un gasto de un periodo cerrado? ¿se crea un periodo retroactivo?).
+
+**`GET /exportar/gastos.csv`** y **`GET /exportar/ingresos.csv`**: todo
+el historial del tenant de una vez (a diferencia de `listarGastos`/
+`listarIngresos`, que son por periodo, y de `listarGastos` en
+particular, que pagina) — un respaldo completo es justo el punto.
+Filtros opcionales `?desde=YYYY-MM-DD&hasta=YYYY-MM-DD` sobre
+`fechaEfectiva`. Un gasto/ingreso revertido aparece igual que en el
+listado normal, con `revertido=true` — nunca se oculta (mismo criterio
+de "nunca hard delete" que el resto del sistema).
+
+Los montos se formatean como decimal exacto (`shared/csv.ts`,
+`centavosADecimalCsv`) directo desde el `bigint`, sin pasar por
+`Number` — a diferencia de `montoADto` en la capa HTTP normal, que sí
+lo hace porque el contrato de openapi.yaml pide `integer` en JSON; un
+CSV no tiene esa restricción, así que no hace falta arriesgar
+precisión para montos grandes.
+
+Frontend: dos botones en Historial ("Exportar gastos/ingresos CSV").
+Como el archivo necesita el header `Authorization` (que un `<a href>`
+normal no puede mandar), se pide con `fetch` directo y se dispara la
+descarga con un `<a download>` sintético armado sobre un blob
+(`lib/api.ts`, `descargarArchivo`) — el patrón estándar para descargar
+un archivo autenticado desde una SPA.
+
+Validado contra Postgres real (`test/integracion/exportar.test.ts` +
+`test/unidad/csv.test.ts`): formato exacto de cada fila, categoría/nota
+vacías cuando no aplican, un gasto/ingreso editado aparece dos veces
+(original revertido=true, corregido revertido=false), escapado de
+comas/comillas en la nota, filtro de fechas, aislamiento entre
+tenants, y el formateo de centavos a decimal (incluido negativo y
+cero). Probado en vivo contra el servidor y la cuenta de prueba reales:
+ambos botones descargan un CSV con los datos correctos.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable
