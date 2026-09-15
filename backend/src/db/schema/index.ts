@@ -9,3 +9,4 @@ export * from './gastos.js';
 export * from './cierre.js';
 export * from './metas.js';
 export * from './arrastres.js';
+export * from './gastos-recurrentes.js';

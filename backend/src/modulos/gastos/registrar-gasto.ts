@@ -281,6 +281,8 @@ export interface GastoDetallado {
    * el hecho, no cómo mostrarlo.
    */
   revertido: boolean;
+  /** true si lo generó `materializarRecurrentesTx`, no una captura manual — ver modulos/recurrentes. */
+  esRecurrente: boolean;
 }
 
 export interface ListarGastosOpciones {
@@ -362,6 +364,7 @@ export async function listarGastos(
         fechaRegistro: movimientos.fechaRegistro,
         nota: movimientos.nota,
         categoriaId: gastos.categoriaId,
+        origenRecurrenteId: gastos.origenRecurrenteId,
       })
       .from(gastos)
       .innerJoin(movimientos, eq(movimientos.id, gastos.movimientoId))
@@ -401,6 +404,7 @@ export async function listarGastos(
         nota: fila.nota,
         categoriaId: fila.categoriaId,
         revertido: idsRevertidos.has(fila.movimientoId),
+        esRecurrente: fila.origenRecurrenteId !== null,
       })),
       siguienteCursor: hayMas && ultima ? codificarCursorGasto(ultima.fechaRegistro, ultima.id) : null,
     };

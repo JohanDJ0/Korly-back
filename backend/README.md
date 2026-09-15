@@ -1122,6 +1122,61 @@ correctos) → retirar (con y sin motivo) → cerrar periodo → decidir
 "ahorrar" → la meta recibe el sobrante de inmediato, sin crear ningún
 periodo siguiente — ver `http/ciclo-completo.http`, pasos 26-35.
 
+## Gastos recurrentes
+
+Extensión sobre `docs/openapi.yaml` (documento-maestro-v2.md §12,
+"gastos recurrentes/suscripciones" — brecha de Fase 2, adelantada por
+ser la de mejor RICE entre las brechas documentadas). Tabla nueva
+`gastos_recurrentes`: es una **plantilla**, no un hecho del ledger —
+mismo estatus que `metas`/`categorias` (mutable, se puede editar
+libremente). `activo=false` (pausar) es el "eliminar" de esta tabla:
+nunca hard delete, porque los gastos ya materializados guardan
+`gastos.origenRecurrenteId` apuntando aquí y perderían su procedencia.
+
+**Frecuencias:** `'quincenal'` (se materializa en cada periodo) o
+`'mensual'` con un `diaMes` (1-31) fijo. Como los periodos son
+quincenas ancladas a calendario (1-15, 16-fin — ADR-004), un cargo
+mensual con día fijo cae siempre en la misma mitad del mes, nunca en
+las dos: `diaMes<=15` → primera mitad, `diaMes>=16` → segunda. Esto
+resuelve sin caso especial el "día 31 no existe en abril": ese cargo
+simplemente se materializa en la segunda mitad de abril, igual que
+cualquier cobro real de fin de mes.
+
+**Materialización:** `materializarRecurrentesTx` se llama exactamente
+en los dos puntos donde un periodo se vuelve genuinamente `'activo'`
+(nunca para uno que se crea en `'borrador'`, que todavía no es "el
+periodo siguiente" — ver "Higiene de borradores" arriba): justo al
+lado de `reclamarArrastresTx` en `crearPeriodo` y en
+`promoverBorradorSiExisteTx`. Genera un gasto real (mismas partidas
+que `registrarGasto`) por cada recurrente activo que le toque a ese
+periodo, con `origenRecurrenteId` para trazabilidad — expuesto en
+`GET /periodos/{id}/gastos` como `esRecurrente`, para que el cliente
+distinga un cargo automático de uno capturado a mano.
+
+Un índice único parcial `(origenRecurrenteId, periodoId)` en `gastos`
+impide duplicar la materialización de un mismo recurrente para el
+mismo periodo — existe como invariante de base de datos (defensa en
+profundidad), aunque en el camino real no hay ningún escenario que lo
+dispare: `materializarRecurrentesTx` corre una sola vez, dentro de la
+misma transacción que crea o promueve el periodo, nunca dos veces para
+el mismo `periodo.id`.
+
+**Endpoints:** `GET/POST /gastos-recurrentes`, `PATCH
+/gastos-recurrentes/{id}` (edita cualquier campo, incluido `activo`
+para pausar/reanudar — no hay `DELETE`). Editar el monto o la
+frecuencia de un recurrente solo afecta materializaciones futuras: los
+gastos ya generados son filas de `gastos` independientes e inmutables,
+igual que cualquier otro gasto.
+
+Validado contra Postgres real (`test/integracion/recurrentes.test.ts`):
+validaciones de entrada, BOLA en categoría y en el propio recurrente,
+pausar sin borrar, cambiar de frecuencia sin arrastrar un `diaMes` que
+ya no aplica, las tres reglas de materialización (quincenal, mensual
+primera/segunda mitad, el caso de día 31), que un recurrente pausado o
+creado después no se materialice, que un periodo en `'borrador'` no
+materialice todavía, aislamiento entre tenants, propagación de
+categoría, y el índice único parcial.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

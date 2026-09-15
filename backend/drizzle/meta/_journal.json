@@ -92,6 +92,13 @@
       "when": 1789363133616,
       "tag": "0012_sturdy_gauntlet",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1789443597937,
+      "tag": "0013_rare_madripoor",
+      "breakpoints": true
     }
   ]
 }

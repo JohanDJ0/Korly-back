@@ -2,6 +2,7 @@ import { and, asc, desc, eq } from 'drizzle-orm';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
 import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
 import { reclamarArrastresTx } from '../cierre/materializar-arrastre.js';
+import { materializarRecurrentesTx } from '../recurrentes/materializar-recurrentes.js';
 import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
@@ -113,6 +114,7 @@ export async function crearPeriodo(
     // borrador — el periodo ya se creó como activo. Un error aquí debe
     // abortar toda la operación (se revierte junto con todo lo demás).
     await reclamarArrastresTx(tx, tenantId, periodoCreado.id, periodoCreado.cuentaId, fechaReferencia);
+    await materializarRecurrentesTx(tx, tenantId, periodoCreado);
 
     return periodoCreado;
   });

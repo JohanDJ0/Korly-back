@@ -136,6 +136,9 @@ export function Home() {
       <Button asChild variant="link" size="sm">
         <Link to="/metas">Ver metas</Link>
       </Button>
+      <Button asChild variant="link" size="sm">
+        <Link to="/recurrentes">Gastos recurrentes</Link>
+      </Button>
 
       {periodoId && (
         <Button

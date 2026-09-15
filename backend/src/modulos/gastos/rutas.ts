@@ -13,6 +13,7 @@ function gastoADto(gasto: GastoDetallado) {
     nota: gasto.nota ?? undefined,
     categoriaId: gasto.categoriaId ?? undefined,
     revertido: gasto.revertido,
+    esRecurrente: gasto.esRecurrente,
   };
 }
 

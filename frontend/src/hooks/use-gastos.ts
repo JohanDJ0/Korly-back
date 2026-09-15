@@ -13,6 +13,8 @@ export interface Gasto {
   categoriaId?: string;
   /** Extensión sobre openapi.yaml (ver backend/README.md, "Listar gastos") — true si ya se editó o eliminó. */
   revertido: boolean;
+  /** true si lo generó un gasto recurrente, no una captura manual (ver backend/README.md, "Gastos recurrentes"). */
+  esRecurrente: boolean;
 }
 
 interface GastosPagina {

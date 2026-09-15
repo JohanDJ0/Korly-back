@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
-import { pgPolicy, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { pgPolicy, pgTable, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { categorias } from './categorias.js';
+import { gastosRecurrentes } from './gastos-recurrentes.js';
 import { movimientos } from './ledger.js';
 import { periodos } from './periodos.js';
 import { appBackend } from './roles.js';
@@ -35,9 +36,21 @@ export const gastos = pgTable(
       .notNull()
       .references(() => movimientos.id),
     categoriaId: uuid('categoria_id').references(() => categorias.id),
+    /**
+     * No nulo solo si este gasto lo generó `materializarRecurrentesTx`
+     * (ver modulos/recurrentes/materializar-recurrentes.ts). El índice
+     * único parcial de abajo es lo que de verdad impide materializar el
+     * mismo recurrente dos veces para el mismo periodo — la lógica de
+     * la función ya evita el caso normal, esto cubre una carrera o un
+     * reintento.
+     */
+    origenRecurrenteId: uuid('origen_recurrente_id').references(() => gastosRecurrentes.id),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    uniqueIndex('gastos_recurrente_periodo_unico')
+      .on(t.origenRecurrenteId, t.periodoId)
+      .where(sql`${t.origenRecurrenteId} IS NOT NULL`),
     pgPolicy('gastos_aislamiento_tenant', {
       for: 'all',
       to: appBackend,

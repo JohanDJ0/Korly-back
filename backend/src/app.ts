@@ -9,6 +9,7 @@ import { rutasDisponible } from './modulos/disponible/rutas.js';
 import { rutasCierre } from './modulos/cierre/rutas.js';
 import { rutasMetas } from './modulos/metas/rutas.js';
 import { rutasCategorias } from './modulos/categorias/rutas.js';
+import { rutasRecurrentes } from './modulos/recurrentes/rutas.js';
 
 export function crearApp() {
   const app = Fastify({ logger: true });
@@ -58,6 +59,7 @@ export function crearApp() {
       v1.register(rutasCierre);
       v1.register(rutasMetas);
       v1.register(rutasCategorias);
+      v1.register(rutasRecurrentes);
     },
     { prefix: '/v1' }
   );

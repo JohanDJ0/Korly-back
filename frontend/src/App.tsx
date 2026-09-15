@@ -7,6 +7,7 @@ import { Home } from '@/routes/Home';
 import { Login } from '@/routes/Login';
 import { Metas } from '@/routes/Metas';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
+import { Recurrentes } from '@/routes/Recurrentes';
 import { Registro } from '@/routes/Registro';
 import { Resumen } from '@/routes/Resumen';
 
@@ -23,6 +24,7 @@ export function App() {
             <Route path="/historial/:periodoId" element={<Historial />} />
             <Route path="/resumen/:periodoId" element={<Resumen />} />
             <Route path="/metas" element={<Metas />} />
+            <Route path="/recurrentes" element={<Recurrentes />} />
           </Route>
         </Routes>
       </BrowserRouter>

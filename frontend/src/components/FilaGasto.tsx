@@ -112,6 +112,7 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
           {gasto.fechaEfectiva}
           {nombreCategoria ? ` — ${nombreCategoria}` : ''}
           {gasto.nota ? ` — ${gasto.nota}` : ''}
+          {gasto.esRecurrente ? ' — 🔄 Automático' : ''}
         </p>
         {eliminarGasto.isError && <p className="text-sm text-destructive">{eliminarGasto.error.message}</p>}
       </div>
