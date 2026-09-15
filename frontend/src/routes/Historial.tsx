@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { FilaGasto } from '@/components/FilaGasto';
 import { FilaIngreso } from '@/components/FilaIngreso';
+import { FormularioImportar } from '@/components/FormularioImportar';
 import { useExportar } from '@/hooks/use-exportar';
 import { useGastos } from '@/hooks/use-gastos';
 import { useIngresos } from '@/hooks/use-ingresos';
@@ -47,6 +48,11 @@ export function Historial() {
   );
 
   const exportar = useExportar();
+  // Importar solo tiene sentido contra el periodo activo (backend/README.md,
+  // "Importación") — al ver un periodo ya cerrado en /historial/:periodoId,
+  // no se ofrece, en vez de dejar que el usuario lo intente y falle con
+  // PERIODO_NO_ACTIVO.
+  const viendoElPeriodoActivo = periodoViendose?.estado === 'activo';
 
   return (
     <div className="mx-auto flex min-h-svh max-w-lg flex-col gap-6 p-6">
@@ -92,7 +98,10 @@ export function Historial() {
       {periodoId && (
         <>
           <section>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">Ingresos</h2>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-muted-foreground">Ingresos</h2>
+              {viendoElPeriodoActivo && periodoId && <FormularioImportar tipo="ingresos" periodoId={periodoId} />}
+            </div>
             {cargandoIngresos && <p className="text-sm text-muted-foreground">Cargando…</p>}
             {errorIngresos && <p className="text-sm text-destructive">{errorIngresos.message}</p>}
             {ingresos?.length === 0 && <p className="text-sm text-muted-foreground">Sin ingresos todavía.</p>}
@@ -100,7 +109,10 @@ export function Historial() {
           </section>
 
           <section>
-            <h2 className="mb-2 text-sm font-medium text-muted-foreground">Gastos</h2>
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-muted-foreground">Gastos</h2>
+              {viendoElPeriodoActivo && periodoId && <FormularioImportar tipo="gastos" periodoId={periodoId} />}
+            </div>
             {cargandoGastos && <p className="text-sm text-muted-foreground">Cargando…</p>}
             {errorGastos && <p className="text-sm text-destructive">{errorGastos.message}</p>}
             {gastos?.pages[0]?.datos.length === 0 && <p className="text-sm text-muted-foreground">Sin gastos todavía.</p>}

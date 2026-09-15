@@ -93,3 +93,30 @@ export async function descargarArchivo(path: string, nombreArchivo: string): Pro
   enlace.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Simétrico a `descargarArchivo`, en la otra dirección: manda el CSV
+ * como `text/csv` en el body — `apiFetch` no sirve porque siempre fuerza
+ * `Content-Type: application/json` cuando hay body. La respuesta sí es
+ * JSON (`{ creados, errores }`), así que el manejo de errores es igual
+ * que en `apiFetch`.
+ */
+export async function importarCsv<T>(path: string, csvTexto: string): Promise<T> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const headers = new Headers({ 'Content-Type': 'text/csv' });
+  if (session) {
+    headers.set('Authorization', `Bearer ${session.access_token}`);
+  }
+
+  const respuesta = await fetch(`${baseUrl}${path}`, { method: 'POST', headers, body: csvTexto });
+  const cuerpo = await respuesta.json().catch(() => null);
+
+  if (!respuesta.ok) {
+    throw new ApiError(respuesta.status, cuerpo?.codigo ?? 'ERROR_DESCONOCIDO', cuerpo?.mensaje ?? respuesta.statusText);
+  }
+
+  return cuerpo as T;
+}

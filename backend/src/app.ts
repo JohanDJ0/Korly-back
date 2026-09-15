@@ -11,10 +11,24 @@ import { rutasMetas } from './modulos/metas/rutas.js';
 import { rutasCategorias } from './modulos/categorias/rutas.js';
 import { rutasRecurrentes } from './modulos/recurrentes/rutas.js';
 import { rutasExportar } from './modulos/exportar/rutas.js';
+import { rutasImportar } from './modulos/importar/rutas.js';
 
 export function crearApp() {
   const app = Fastify({ logger: true });
   registrarManejadorErroresDominio(app);
+
+  /**
+   * Fastify solo trae parser para `application/json` de fábrica — sin
+   * esto, `POST /periodos/:id/{gastos,ingresos}/importar` (que recibe
+   * el CSV como texto plano, simétrico a como lo entrega la
+   * exportación) respondería 415 antes de que la ruta viera el body.
+   * `parseAs: 'string'` porque el CSV puede traer texto no-ASCII
+   * (acentos en `nota`/`categoria`) — un Buffer forzaría a decodificar
+   * a mano en cada ruta.
+   */
+  app.addContentTypeParser('text/csv', { parseAs: 'string' }, (_request, body, done) => {
+    done(null, body);
+  });
 
   /**
    * El frontend (Vite, otro origen) manda un preflight `OPTIONS` antes de
@@ -62,6 +76,7 @@ export function crearApp() {
       v1.register(rutasCategorias);
       v1.register(rutasRecurrentes);
       v1.register(rutasExportar);
+      v1.register(rutasImportar);
     },
     { prefix: '/v1' }
   );

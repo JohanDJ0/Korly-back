@@ -1271,6 +1271,72 @@ ediciones rápidas en línea (aportar/retirar en metas, editar monto de
 un gasto/ingreso) validan en silencio sin mensaje visible — patrón
 consistente en todo el proyecto, no un descuido puntual.
 
+## Importación
+
+Extensión sobre `docs/openapi.yaml` (documento-maestro-v2.md §12,
+"importación/exportación" — complemento de "Exportación", arriba).
+
+**Alcance deliberadamente acotado, decidido con el usuario:** una fila
+del CSV cuya fecha no cae dentro del periodo activo actual se rechaza
+y se reporta como error, sin tocar ningún periodo cerrado. La
+alternativa (generarla como ajuste contra el periodo activo, igual que
+editar/eliminar un gasto de un periodo cerrado) habría mezclado en el
+periodo activo gastos que en realidad no le pertenecen — se descartó a
+propósito. Esto evita cualquier tensión con la invariante 10 (un gasto
+solo se registra contra un periodo `'activo'`): importar es, para el
+dominio, exactamente lo mismo que capturar esas filas a mano una por
+una, nunca un camino especial.
+
+**`POST /periodos/{periodoId}/gastos/importar`** y su espejo para
+ingresos: reciben el CSV como `text/csv` en el body (no
+`multipart/form-data` — el frontend ya lo lee con `FileReader` antes de
+mandarlo, así que es texto plano de principio a fin; requirió registrar
+un `addContentTypeParser` en `app.ts`, ya que Fastify solo trae
+`application/json` de fábrica). Columnas por nombre, no por posición
+(`fecha` y `monto` obligatorias; `moneda` opcional con default `MXN`;
+`categoria` opcional, buscada por nombre sin distinguir mayúsculas
+contra las categorías del tenant — si no coincide ninguna, la fila se
+importa sin categoría, no es un error; `nota` opcional).
+
+**Validación por fila, no todo-o-nada:** cada fila se valida (fecha
+real con formato `YYYY-MM-DD` y dentro del rango del periodo activo,
+monto positivo) antes de insertar nada; las filas válidas se registran
+y las inválidas se reportan con su número de línea y el motivo —
+`{ creados, errores: [{ fila, mensaje }] }`. Un typo en una fila no
+bloquea las demás.
+
+**Parser de CSV escrito a mano** (`shared/csv.ts`, `parsearFilasCsv`) —
+sin dependencia nueva, deliberado: es la operación inversa de
+`escaparCsv`/`filaCsv` que ya existían para exportar, mismo nivel de
+rigor. Máquina de estados carácter por carácter (RFC 4180): respeta
+comillas, comas y saltos de línea reales dentro de un campo
+entrecomillado, `""` como comilla literal, quita un BOM inicial (común
+en CSVs de Excel), y acepta tanto `\r\n` como `\n`. Un `split(',')`
+ingenuo habría partido en silencio una fila con un campo como
+`"Cena, con amigos"`, produciendo columnas corridas en vez de fallar
+claramente.
+
+`parsearMontoDecimalCsv` (mismo archivo) y `esFechaIsoValida`
+(`shared/fechas.ts`) completan la validación: el primero acepta
+`"150"`/`"150.5"`/`"150.50"` sin pasar por `Number` (mismo motivo que
+`centavosADecimalCsv`); el segundo rechaza fechas con la forma correcta
+pero que no existen en el calendario (`2026-02-30`), algo que una
+regex de formato por sí sola no detecta porque `Date.UTC` las
+normaliza en silencio en vez de fallar.
+
+Validado contra Postgres real (`test/integracion/importar.test.ts` +
+`test/unidad/csv.test.ts` + `test/unidad/fechas.test.ts`): columnas
+obligatorias faltantes, filas válidas e inválidas mezcladas en el mismo
+archivo, fecha fuera de rango, monto inválido, fecha con formato
+inválido, coincidencia de categoría sin distinguir mayúsculas, una
+categoría que no coincide con ninguna (no es error), un campo de nota
+entrecomillado con una coma adentro, un periodo cerrado o de otro
+tenant, y el parser de CSV en aislamiento (comillas, `""`, saltos de
+línea reales, CRLF, BOM, líneas en blanco). Probado en vivo contra el
+servidor y la cuenta de prueba reales, incluida una fila con un monto
+como `"1,234.00"` (coma real dentro del campo entrecomillado) para
+confirmar que el parser no la parte en dos columnas.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable
