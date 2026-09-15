@@ -24,6 +24,12 @@ export function FilaMeta({ meta }: FilaMetaProps) {
   const [modo, setModo] = useState<Modo>(null);
   const [monto, setMonto] = useState('');
   const [motivo, setMotivo] = useState('');
+  // Hallazgo del pase de QA/UX: un monto/motivo inválido no debe fallar
+  // en silencio (el botón simplemente sin hacer nada, sin explicar por
+  // qué) — a diferencia de FormularioGasto/FormularioMeta (RHF + Zod,
+  // con su propio manejo de errores), este formulario inline usa
+  // useState simple, así que el mensaje se arma a mano aquí.
+  const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
   const aportarMeta = useAportarMeta();
   const retirarMeta = useRetirarMeta();
 
@@ -31,25 +37,33 @@ export function FilaMeta({ meta }: FilaMetaProps) {
     setModo(null);
     setMonto('');
     setMotivo('');
+    setErrorValidacion(null);
     aportarMeta.reset();
     retirarMeta.reset();
   }
 
   function confirmar() {
     const valor = Number(monto);
-    if (!Number.isFinite(valor) || valor <= 0) return;
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setErrorValidacion('El monto debe ser mayor a cero');
+      return;
+    }
+    if (modo === 'retirar' && motivo.trim().length === 0) {
+      setErrorValidacion('Indica un motivo para el retiro');
+      return;
+    }
+    setErrorValidacion(null);
     const montoDto = { valorMinimo: Math.round(valor * 100), moneda: meta.montoObjetivo.moneda };
 
     if (modo === 'aportar') {
       aportarMeta.mutate({ metaId: meta.id, monto: montoDto }, { onSuccess: cerrar });
     } else if (modo === 'retirar') {
-      if (motivo.trim().length === 0) return;
       retirarMeta.mutate({ metaId: meta.id, monto: montoDto, motivo }, { onSuccess: cerrar });
     }
   }
 
   const pendiente = aportarMeta.isPending || retirarMeta.isPending;
-  const error = aportarMeta.error ?? retirarMeta.error;
+  const mensajeError = errorValidacion ?? (aportarMeta.error ?? retirarMeta.error)?.message;
 
   return (
     <li className="flex flex-col gap-2 border-b py-3">
@@ -76,7 +90,10 @@ export function FilaMeta({ meta }: FilaMetaProps) {
         <div className="flex flex-wrap items-center gap-2">
           <Input
             value={monto}
-            onChange={(evento) => setMonto(evento.target.value)}
+            onChange={(evento) => {
+              setMonto(evento.target.value);
+              setErrorValidacion(null);
+            }}
             type="number"
             step="0.01"
             min="0"
@@ -85,7 +102,15 @@ export function FilaMeta({ meta }: FilaMetaProps) {
             className="w-28"
           />
           {modo === 'retirar' && (
-            <Input value={motivo} onChange={(evento) => setMotivo(evento.target.value)} placeholder="Motivo" className="w-40" />
+            <Input
+              value={motivo}
+              onChange={(evento) => {
+                setMotivo(evento.target.value);
+                setErrorValidacion(null);
+              }}
+              placeholder="Motivo"
+              className="w-40"
+            />
           )}
           <Button size="sm" onClick={confirmar} disabled={pendiente}>
             {pendiente ? 'Guardando…' : modo === 'aportar' ? 'Aportar' : 'Retirar'}
@@ -95,7 +120,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
           </Button>
         </div>
       )}
-      {error && <p className="text-sm text-destructive">{error.message}</p>}
+      {mensajeError && <p className="text-sm text-destructive">{mensajeError}</p>}
     </li>
   );
 }

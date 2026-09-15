@@ -8,6 +8,8 @@ export interface Periodo {
   estado: 'borrador' | 'activo' | 'cerrado' | 'archivado';
   fechaInicio: string;
   fechaFin: string;
+  /** Extensión sobre openapi.yaml — distingue dos periodos con el mismo rango de fechas (ver Historial.tsx). */
+  creadoEn: string;
 }
 
 /** Sin reintentos por el mismo motivo que use-disponible.ts: un 404 aquí es un estado esperado. */

@@ -15,12 +15,19 @@ interface FilaIngresoProps {
 export function FilaIngreso({ ingreso }: FilaIngresoProps) {
   const [editando, setEditando] = useState(false);
   const [monto, setMonto] = useState(() => (ingreso.monto.valorMinimo / 100).toString());
+  // Hallazgo del pase de QA/UX: un monto inválido no debe fallar en
+  // silencio — mismo criterio que FilaGasto.tsx.
+  const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
   const editarIngreso = useEditarIngreso();
   const eliminarIngreso = useEliminarIngreso();
 
   function guardar() {
     const valor = Number(monto);
-    if (!Number.isFinite(valor) || valor <= 0) return;
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setErrorValidacion('El monto debe ser mayor a cero');
+      return;
+    }
+    setErrorValidacion(null);
     editarIngreso.mutate(
       { ingresoId: ingreso.id, monto: { valorMinimo: Math.round(valor * 100), moneda: ingreso.monto.moneda } },
       { onSuccess: () => setEditando(false) }
@@ -53,7 +60,10 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
       <li className="flex flex-wrap items-center gap-2 border-b py-3">
         <Input
           value={monto}
-          onChange={(evento) => setMonto(evento.target.value)}
+          onChange={(evento) => {
+            setMonto(evento.target.value);
+            setErrorValidacion(null);
+          }}
           type="number"
           step="0.01"
           min="0"
@@ -68,12 +78,15 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
           variant="ghost"
           onClick={() => {
             editarIngreso.reset();
+            setErrorValidacion(null);
             setEditando(false);
           }}
         >
           Cancelar
         </Button>
-        {editarIngreso.isError && <p className="w-full text-sm text-destructive">{editarIngreso.error.message}</p>}
+        {(errorValidacion ?? editarIngreso.error?.message) && (
+          <p className="w-full text-sm text-destructive">{errorValidacion ?? editarIngreso.error?.message}</p>
+        )}
       </li>
     );
   }

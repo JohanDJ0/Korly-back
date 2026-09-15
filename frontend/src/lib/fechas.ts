@@ -11,3 +11,15 @@ export function formatearRangoFechas(fechaInicio: string, fechaFin: string): str
   const fin = new Date(`${fechaFin}T00:00:00Z`);
   return `${formato.format(inicio)} – ${formato.format(fin)}`;
 }
+
+/**
+ * A diferencia de `formatearRangoFechas`, `creadoEn` sí es un instante
+ * real (con hora), no una fecha de calendario pura — aquí sí tiene
+ * sentido mostrarlo en la zona local del navegador, sin forzar UTC.
+ * Usado solo para distinguir dos periodos que comparten el mismo rango
+ * de fechas (ver Historial.tsx) — nunca se muestra si no hace falta.
+ */
+export function formatearFechaHora(fechaIso: string): string {
+  const formato = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
+  return formato.format(new Date(fechaIso));
+}

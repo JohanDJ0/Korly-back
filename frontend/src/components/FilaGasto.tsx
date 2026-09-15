@@ -29,6 +29,10 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
   // accidente con solo abrir y guardar sin tocarla (sigue siendo
   // posible quitarla a propósito, eligiendo "Sin categoría").
   const [categoriaId, setCategoriaId] = useState(() => gasto.categoriaId ?? '');
+  // Hallazgo del pase de QA/UX: un monto inválido no debe fallar en
+  // silencio — este formulario inline usa useState simple, no RHF+Zod
+  // como FormularioGasto, así que el mensaje se arma a mano aquí.
+  const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
   const { data: categorias } = useCategorias();
   const editarGasto = useEditarGasto();
   const eliminarGasto = useEliminarGasto();
@@ -37,7 +41,11 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
 
   function guardar() {
     const valor = Number(monto);
-    if (!Number.isFinite(valor) || valor <= 0) return;
+    if (!Number.isFinite(valor) || valor <= 0) {
+      setErrorValidacion('El monto debe ser mayor a cero');
+      return;
+    }
+    setErrorValidacion(null);
     editarGasto.mutate(
       { gastoId: gasto.id, monto: { valorMinimo: Math.round(valor * 100), moneda: gasto.monto.moneda }, categoriaId: categoriaId || undefined },
       { onSuccess: () => setEditando(false) }
@@ -76,7 +84,10 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
       <li className="flex flex-wrap items-center gap-2 border-b py-3">
         <Input
           value={monto}
-          onChange={(evento) => setMonto(evento.target.value)}
+          onChange={(evento) => {
+            setMonto(evento.target.value);
+            setErrorValidacion(null);
+          }}
           type="number"
           step="0.01"
           min="0"
@@ -94,12 +105,15 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
           variant="ghost"
           onClick={() => {
             editarGasto.reset();
+            setErrorValidacion(null);
             setEditando(false);
           }}
         >
           Cancelar
         </Button>
-        {editarGasto.isError && <p className="w-full text-sm text-destructive">{editarGasto.error.message}</p>}
+        {(errorValidacion ?? editarGasto.error?.message) && (
+          <p className="w-full text-sm text-destructive">{errorValidacion ?? editarGasto.error?.message}</p>
+        )}
       </li>
     );
   }

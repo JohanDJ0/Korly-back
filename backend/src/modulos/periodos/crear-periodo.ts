@@ -16,6 +16,20 @@ export interface Periodo {
   estado: EstadoPeriodo;
   fechaInicio: string;
   fechaFin: string;
+  /**
+   * Extensión sobre `docs/openapi.yaml` — hallazgo del pase de QA/UX:
+   * dos periodos `'cerrado'` pueden compartir exactamente el mismo
+   * `fechaInicio`/`fechaFin` (cerrar manualmente antes de tiempo y
+   * crear otro dentro de la misma quincena calendario), y sin esto no
+   * había ningún campo que los distinguiera en un listado. Ver
+   * `listarPeriodos` (mismo archivo) y `Historial.tsx` en el frontend.
+   * Serializado a ISO string por el `JSON.stringify` default de
+   * Fastify al mandarlo por HTTP — igual que `fechaRegistro` en
+   * `GastoDetallado` (registrar-gasto.ts), aquí no hay un DTO manual
+   * que lo haga explícito porque `periodos/rutas.ts` manda el objeto
+   * de dominio tal cual.
+   */
+  creadoEn: Date;
 }
 
 const COLUMNAS_PERIODO = {
@@ -24,6 +38,7 @@ const COLUMNAS_PERIODO = {
   estado: periodos.estado,
   fechaInicio: periodos.fechaInicio,
   fechaFin: periodos.fechaFin,
+  creadoEn: periodos.creadoEn,
 } as const;
 
 /**

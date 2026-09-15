@@ -10,7 +10,7 @@ import { useIngresos } from '@/hooks/use-ingresos';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { usePeriodos } from '@/hooks/use-periodos';
 import { ApiError } from '@/lib/api';
-import { formatearRangoFechas } from '@/lib/fechas';
+import { formatearFechaHora, formatearRangoFechas } from '@/lib/fechas';
 
 /**
  * Sin `:periodoId` en la URL, muestra el periodo activo (comportamiento
@@ -45,6 +45,23 @@ export function Historial() {
 
   const periodosAnteriores = (periodos ?? []).filter(
     (p) => (p.estado === 'cerrado' || p.estado === 'archivado') && p.id !== periodoId
+  );
+  // Hallazgo del pase de QA/UX: cerrar un periodo manualmente antes de
+  // tiempo y crear otro puede dejar dos periodos 'cerrado' con el mismo
+  // fechaInicio/fechaFin (la quincena calendario no cambió) — sin nada
+  // que los distinga, el usuario no puede saber cuál es cuál. Solo se
+  // muestra `creadoEn` cuando de verdad hace falta, no para el caso
+  // normal (un único periodo por rango).
+  const rangosRepetidos = new Set(
+    Object.entries(
+      periodosAnteriores.reduce<Record<string, number>>((conteo, p) => {
+        const clave = `${p.fechaInicio}|${p.fechaFin}`;
+        conteo[clave] = (conteo[clave] ?? 0) + 1;
+        return conteo;
+      }, {})
+    )
+      .filter(([, total]) => total > 1)
+      .map(([clave]) => clave)
   );
 
   const exportar = useExportar();
@@ -136,6 +153,9 @@ export function Historial() {
               <li key={p.id} className="flex items-center justify-between gap-2 border-b py-3">
                 <Link to={`/historial/${p.id}`} className="underline-offset-4 hover:underline">
                   {formatearRangoFechas(p.fechaInicio, p.fechaFin)}
+                  {rangosRepetidos.has(`${p.fechaInicio}|${p.fechaFin}`) && (
+                    <span className="text-muted-foreground"> — creado {formatearFechaHora(p.creadoEn)}</span>
+                  )}
                 </Link>
                 <Button asChild variant="outline" size="sm">
                   <Link to={`/resumen/${p.id}`}>Ver resumen</Link>

@@ -1262,14 +1262,28 @@ volver. Corregido con `routes/NoEncontrado.tsx` + `<Route path="*">` al
 final de `App.tsx`, fuera de `ProtectedRoute` para que cubra cualquier
 ruta no declarada sin importar si hay sesión.
 
-**Quedó documentado pero sin corregir** (menor prioridad, no se pidió
-en esta pasada): cuando hay varios periodos cerrados con el mismo rango
-de fechas (cerrar manualmente antes de tiempo y crear otro dentro de la
-misma quincena calendario — reproducible, no solo teórico), "Periodos
-anteriores" los lista con la etiqueta idéntica repetida; y las
-ediciones rápidas en línea (aportar/retirar en metas, editar monto de
-un gasto/ingreso) validan en silencio sin mensaje visible — patrón
-consistente en todo el proyecto, no un descuido puntual.
+Dos hallazgos menores, corregidos en una segunda pasada a pedido del
+usuario:
+
+**Periodos duplicados sin distinguir.** Cuando hay varios periodos
+`'cerrado'` con el mismo rango de fechas (cerrar manualmente antes de
+tiempo y crear otro dentro de la misma quincena calendario —
+reproducible, no solo teórico), "Periodos anteriores" los listaba con
+la etiqueta idéntica repetida, sin forma de saber cuál es cuál.
+Corregido exponiendo `creadoEn` en `Periodo` (extensión sobre
+`docs/openapi.yaml` — serializado a ISO string por el `JSON.stringify`
+default de Fastify, igual que `fechaRegistro` en `GastoDetallado`);
+`Historial.tsx` solo lo muestra cuando de verdad hace falta (dos o más
+periodos comparten el mismo `fechaInicio`/`fechaFin`), nunca para el
+caso normal de un único periodo por rango.
+
+**Ediciones rápidas en línea validaban en silencio.** Aportar/retirar
+en metas y editar el monto de un gasto/ingreso (`FilaMeta.tsx`,
+`FilaGasto.tsx`, `FilaIngreso.tsx`) usan `useState` simple, no RHF+Zod
+como los formularios principales — un valor inválido hacía que el
+botón no hiciera nada, sin explicar por qué. Corregido agregando un
+mensaje de validación armado a mano en cada uno, limpiado en cuanto el
+usuario vuelve a escribir.
 
 ## Importación
 
