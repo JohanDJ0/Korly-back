@@ -3,6 +3,7 @@ import { periodos } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
+import { esUuidValido } from '../../shared/validacion.js';
 import { resolverDecisionesVencidasTx } from './decidir-sobrante.js';
 import { generarResumenTx, obtenerResumenTx, type ResumenGenerado } from './generar-resumen.js';
 import { drenarACuentaPuenteTx, reclamarArrastresTx } from './materializar-arrastre.js';
@@ -30,6 +31,10 @@ export async function cerrarPeriodoManualmente(
   periodoId: string,
   fechaReferencia: Date = new Date()
 ): Promise<ResumenGenerado> {
+  if (!esUuidValido(periodoId)) {
+    throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
+  }
+
   return conTenant(tenantId, async (tx) => {
     const [periodo] = await tx
       .select()

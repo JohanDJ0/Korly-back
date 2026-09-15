@@ -7,6 +7,7 @@ import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
+import { esUuidValido } from '../../shared/validacion.js';
 
 /**
  * `undefined` = no se especificó (queda sin categoría); `null` =
@@ -110,6 +111,10 @@ async function cargarGastoParaCorreccionTx(
   tenantId: string,
   gastoId: string
 ): Promise<{ movimientoId: string; periodoId: string }> {
+  if (!esUuidValido(gastoId)) {
+    throw new ErrorDominio('GASTO_NO_ENCONTRADO', 'El gasto especificado no existe');
+  }
+
   const [gasto] = await tx
     .select({ movimientoId: gastos.movimientoId, periodoId: gastos.periodoId })
     .from(gastos)

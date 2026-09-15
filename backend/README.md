@@ -1219,6 +1219,58 @@ tenants, y el formateo de centavos a decimal (incluido negativo y
 cero). Probado en vivo contra el servidor y la cuenta de prueba reales:
 ambos botones descargan un CSV con los datos correctos.
 
+## Pase de QA/UX
+
+Revisión manual de todo el frontend contra el servidor y la cuenta de
+prueba reales (escritorio y móvil) — no atada a ningún feature puntual.
+Tres hallazgos corregidos:
+
+**IDs malformados devolvían 500 en vez de un 404/400 limpio.** Cualquier
+lookup que compara una columna `uuid` contra un valor externo (de la
+URL o del body) sin pasar por una validación de formato antes: si el
+valor no tiene forma de UUID, Postgres rechaza la consulta entera con
+`invalid input syntax for type uuid` — un error que no es
+`ErrorDominio`, así que caía al manejador genérico de 500. Confirmado
+en `GET /periodos/:id`, `PATCH /gastos-recurrentes/:id` y
+`POST /metas/:id/aportes`; el resto de rutas con id comparten el mismo
+punto de lookup, así que estaban igual de expuestas. Corregido con
+`shared/validacion.ts` (`esUuidValido`), agregado como guarda al
+principio de cada función central de lookup por id
+(`obtenerPeriodoPorIdTx`, `cargarGastoParaCorreccionTx`,
+`cargarIngresoParaCorreccionTx`, `obtenerMetaPorIdTx`,
+`obtenerGastoRecurrentePorIdTx`, `obtenerCategoriaPorIdTx`,
+`obtenerResumenTx`, `obtenerMetaParaReclamoTx`, y el chequeo inicial de
+`cerrarPeriodoManualmente`) — mismo criterio que ya aplica el resto del
+sistema para BOLA: "malformado" y "no existe" deben verse exactamente
+igual desde afuera, nunca un 500. Validado con
+`test/unidad/validacion.test.ts` y
+`test/integracion/ids-malformados.test.ts` (un id malformado en cada
+uno de esos puntos de entrada, confirmando el código de error correcto
+en vez de un error crudo de Postgres).
+
+**Historial no mostraba ningún estado de error para Ingresos/Gastos.**
+Si la consulta fallaba (el bug de arriba, o cualquier error real), la
+pantalla se quedaba en "Cargando…" y después en blanco, sin mensaje —
+inconsistente con el resto de la app. Corregido exponiendo el `error`
+de `useIngresos`/`useGastos` en `Historial.tsx`, mismo patrón que ya
+usan Home/Metas/Recurrentes/Resumen.
+
+**No había página 404.** Una URL no reconocida (typo, marcador viejo,
+enlace roto) no coincidía con ninguna `<Route>`, y `<Routes>` no
+renderiza nada en ese caso — pantalla en blanco sin mensaje ni forma de
+volver. Corregido con `routes/NoEncontrado.tsx` + `<Route path="*">` al
+final de `App.tsx`, fuera de `ProtectedRoute` para que cubra cualquier
+ruta no declarada sin importar si hay sesión.
+
+**Quedó documentado pero sin corregir** (menor prioridad, no se pidió
+en esta pasada): cuando hay varios periodos cerrados con el mismo rango
+de fechas (cerrar manualmente antes de tiempo y crear otro dentro de la
+misma quincena calendario — reproducible, no solo teórico), "Periodos
+anteriores" los lista con la etiqueta idéntica repetida; y las
+ediciones rápidas en línea (aportar/retirar en metas, editar monto de
+un gasto/ingreso) validan en silencio sin mensaje visible — patrón
+consistente en todo el proyecto, no un descuido puntual.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

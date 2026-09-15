@@ -3,6 +3,7 @@ import { resumenes } from '../../db/schema/cierre.js';
 import { metas } from '../../db/schema/metas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
+import { esUuidValido } from '../../shared/validacion.js';
 import { obtenerResumenTx } from './generar-resumen.js';
 import { reclamarArrastreComoAporteMetaTx } from './materializar-arrastre.js';
 
@@ -93,6 +94,8 @@ export async function decidirSobrante(
  * en profundidad que el resto (RLS es la autoridad real).
  */
 async function obtenerMetaParaReclamoTx(tx: Ejecutor, tenantId: string, metaId: string): Promise<{ id: string; cuentaId: string } | null> {
+  if (!esUuidValido(metaId)) return null;
+
   const [fila] = await tx
     .select({ id: metas.id, cuentaId: metas.cuentaId })
     .from(metas)

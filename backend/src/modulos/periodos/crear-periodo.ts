@@ -7,6 +7,7 @@ import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
+import { esUuidValido } from '../../shared/validacion.js';
 import { calcularQuincenaDeCalendario } from './calcular-quincena.js';
 
 export interface Periodo {
@@ -197,6 +198,8 @@ export async function obtenerPeriodoPorId(tenantId: string, periodoId: string, f
  * en la realidad ya terminó.
  */
 export async function obtenerPeriodoPorIdTx(tx: Ejecutor, tenantId: string, periodoId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
+  if (!esUuidValido(periodoId)) return null;
+
   await resolverPendientesTx(tx, tenantId, fechaReferencia);
 
   const [fila] = await tx

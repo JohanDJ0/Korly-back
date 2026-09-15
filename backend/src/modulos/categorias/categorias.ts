@@ -2,6 +2,7 @@ import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import { categorias } from '../../db/schema/categorias.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
+import { esUuidValido } from '../../shared/validacion.js';
 
 export interface Categoria {
   id: string;
@@ -79,6 +80,8 @@ export async function crearCategoriaPersonalizada(tenantId: string, nombre: stri
  * `categorias` es la defensa real.
  */
 export async function obtenerCategoriaPorIdTx(tx: Ejecutor, tenantId: string, categoriaId: string): Promise<Categoria | null> {
+  if (!esUuidValido(categoriaId)) return null;
+
   const [fila] = await tx
     .select(COLUMNAS_CATEGORIA)
     .from(categorias)

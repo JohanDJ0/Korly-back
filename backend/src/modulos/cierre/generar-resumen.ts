@@ -3,6 +3,7 @@ import { type TipoMovimiento } from '../../db/schema/ledger.js';
 import { resumenes, type EstadoDecisionSobrante } from '../../db/schema/cierre.js';
 import { obtenerNetoPorTipoEfectivoTx } from '../ledger/registrar-movimiento.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
+import { esUuidValido } from '../../shared/validacion.js';
 
 export interface ResumenGenerado {
   id: string;
@@ -76,6 +77,8 @@ export async function obtenerResumen(tenantId: string, periodoId: string): Promi
 }
 
 export async function obtenerResumenTx(tx: Ejecutor, tenantId: string, periodoId: string): Promise<ResumenGenerado | null> {
+  if (!esUuidValido(periodoId)) return null;
+
   const [fila] = await tx
     .select()
     .from(resumenes)

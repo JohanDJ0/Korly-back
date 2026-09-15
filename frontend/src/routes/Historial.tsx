@@ -32,10 +32,11 @@ export function Historial() {
   const periodoId = periodoIdDeUrl ?? (!errorPeriodoActivo ? periodoActivo?.id : undefined);
   const periodoViendose = periodoIdDeUrl ? periodos?.find((p) => p.id === periodoIdDeUrl) : periodoActivo;
 
-  const { data: ingresos, isLoading: cargandoIngresos } = useIngresos(periodoId);
+  const { data: ingresos, isLoading: cargandoIngresos, error: errorIngresos } = useIngresos(periodoId);
   const {
     data: gastos,
     isLoading: cargandoGastos,
+    error: errorGastos,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
@@ -93,6 +94,7 @@ export function Historial() {
           <section>
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">Ingresos</h2>
             {cargandoIngresos && <p className="text-sm text-muted-foreground">Cargando…</p>}
+            {errorIngresos && <p className="text-sm text-destructive">{errorIngresos.message}</p>}
             {ingresos?.length === 0 && <p className="text-sm text-muted-foreground">Sin ingresos todavía.</p>}
             <ul>{ingresos?.map((ingreso) => <FilaIngreso key={ingreso.id} ingreso={ingreso} />)}</ul>
           </section>
@@ -100,6 +102,7 @@ export function Historial() {
           <section>
             <h2 className="mb-2 text-sm font-medium text-muted-foreground">Gastos</h2>
             {cargandoGastos && <p className="text-sm text-muted-foreground">Cargando…</p>}
+            {errorGastos && <p className="text-sm text-destructive">{errorGastos.message}</p>}
             {gastos?.pages[0]?.datos.length === 0 && <p className="text-sm text-muted-foreground">Sin gastos todavía.</p>}
             <ul>
               {gastos?.pages.flatMap((pagina) => pagina.datos).map((gasto) => <FilaGasto key={gasto.id} gasto={gasto} />)}

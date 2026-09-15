@@ -6,6 +6,7 @@ import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
+import { esUuidValido } from '../../shared/validacion.js';
 
 export interface Meta {
   id: string;
@@ -100,6 +101,8 @@ export async function listarMetas(tenantId: string): Promise<MetaConProgreso[]> 
  * (mismo criterio que `obtenerPeriodoPorIdTx`).
  */
 export async function obtenerMetaPorIdTx(tx: Ejecutor, tenantId: string, metaId: string): Promise<Meta | null> {
+  if (!esUuidValido(metaId)) return null;
+
   const [fila] = await tx
     .select()
     .from(metas)

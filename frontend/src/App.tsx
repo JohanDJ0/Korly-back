@@ -6,6 +6,7 @@ import { Historial } from '@/routes/Historial';
 import { Home } from '@/routes/Home';
 import { Login } from '@/routes/Login';
 import { Metas } from '@/routes/Metas';
+import { NoEncontrado } from '@/routes/NoEncontrado';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { Recurrentes } from '@/routes/Recurrentes';
 import { Registro } from '@/routes/Registro';
@@ -26,6 +27,7 @@ export function App() {
             <Route path="/metas" element={<Metas />} />
             <Route path="/recurrentes" element={<Recurrentes />} />
           </Route>
+          <Route path="*" element={<NoEncontrado />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

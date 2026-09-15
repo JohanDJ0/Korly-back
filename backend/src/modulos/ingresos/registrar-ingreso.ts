@@ -6,6 +6,7 @@ import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
+import { esUuidValido } from '../../shared/validacion.js';
 
 export interface RegistrarIngresoEntrada {
   tenantId: string;
@@ -106,6 +107,10 @@ async function cargarIngresoParaCorreccionTx(
   tenantId: string,
   ingresoId: string
 ): Promise<{ movimientoId: string; periodoId: string }> {
+  if (!esUuidValido(ingresoId)) {
+    throw new ErrorDominio('INGRESO_NO_ENCONTRADO', 'El ingreso especificado no existe');
+  }
+
   const [ingreso] = await tx
     .select({ movimientoId: ingresos.movimientoId, periodoId: ingresos.periodoId })
     .from(ingresos)

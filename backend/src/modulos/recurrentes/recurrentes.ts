@@ -3,6 +3,7 @@ import { FRECUENCIAS_RECURRENTE, gastosRecurrentes, type FrecuenciaRecurrente } 
 import { obtenerCategoriaPorIdTx } from '../categorias/categorias.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
+import { esUuidValido } from '../../shared/validacion.js';
 
 export interface GastoRecurrente {
   id: string;
@@ -116,6 +117,8 @@ export async function listarGastosRecurrentes(tenantId: string): Promise<GastoRe
 }
 
 async function obtenerGastoRecurrentePorIdTx(tx: Ejecutor, tenantId: string, id: string): Promise<GastoRecurrente | null> {
+  if (!esUuidValido(id)) return null;
+
   const [fila] = await tx
     .select(COLUMNAS_RECURRENTE)
     .from(gastosRecurrentes)
