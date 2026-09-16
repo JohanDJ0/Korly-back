@@ -9,7 +9,7 @@ import { crearPeriodo, obtenerPeriodoActivo } from '../../src/modulos/periodos/c
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { obtenerResumen } from '../../src/modulos/cierre/generar-resumen.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
-import { crearTarjeta, listarTarjetas } from '../../src/modulos/tarjetas/tarjetas.js';
+import { crearTarjeta, eliminarTarjeta, listarTarjetas } from '../../src/modulos/tarjetas/tarjetas.js';
 import { listarCargosTarjeta, listarPagosTarjetaDePeriodo, registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
 import { conTenant } from '../../src/shared/db.js';
 
@@ -58,6 +58,39 @@ describe('tarjetas de crédito y MSI', () => {
       expect(tarjetas).toHaveLength(1);
       expect(tarjetas[0]?.saldoValorMinimo).toBe(0n);
       expect(tarjetas[0]?.creditoDisponibleValorMinimo).toBe(1000000n);
+    });
+  });
+
+  describe('eliminarTarjeta', () => {
+    it('rechaza una tarjeta que no existe (BOLA)', async () => {
+      const tenantId = await tenantNuevo();
+      await expect(eliminarTarjeta(tenantId, randomUUID())).rejects.toMatchObject({ codigo: 'TARJETA_NO_ENCONTRADA' });
+    });
+
+    it('rechaza una tarjeta de otro tenant (BOLA)', async () => {
+      const tenantId = await tenantNuevo();
+      const otroTenantId = await tenantNuevo();
+      const tarjetaAjena = await tarjetaDePrueba(otroTenantId);
+
+      await expect(eliminarTarjeta(tenantId, tarjetaAjena.id)).rejects.toMatchObject({ codigo: 'TARJETA_NO_ENCONTRADA' });
+    });
+
+    it('elimina una tarjeta sin cargos de verdad — ya no aparece en el listado', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+
+      await eliminarTarjeta(tenantId, tarjeta.id);
+
+      expect(await listarTarjetas(tenantId)).toHaveLength(0);
+    });
+
+    it('rechaza eliminar una tarjeta que ya tiene un cargo registrado', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      await registrarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, descripcion: 'Laptop', montoTotalValorMinimo: 100000n, moneda: 'MXN', numeroPlazos: 1 });
+
+      await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({ codigo: 'TARJETA_CON_HISTORIAL' });
+      expect(await listarTarjetas(tenantId)).toHaveLength(1);
     });
   });
 

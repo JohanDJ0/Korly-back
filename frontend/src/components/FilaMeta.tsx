@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAportarMeta } from '@/hooks/use-aportar-meta';
+import { useEliminarMeta } from '@/hooks/use-eliminar-meta';
 import type { Meta } from '@/hooks/use-metas';
 import { useRetirarMeta } from '@/hooks/use-retirar-meta';
 import { formatearMonto } from '@/lib/dinero';
@@ -32,6 +33,12 @@ export function FilaMeta({ meta }: FilaMetaProps) {
   const [errorValidacion, setErrorValidacion] = useState<string | null>(null);
   const aportarMeta = useAportarMeta();
   const retirarMeta = useRetirarMeta();
+  const eliminarMeta = useEliminarMeta();
+
+  function eliminar() {
+    if (!window.confirm(`¿Eliminar la meta "${meta.nombre}"?`)) return;
+    eliminarMeta.mutate(meta.id);
+  }
 
   function cerrar() {
     setModo(null);
@@ -63,7 +70,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
   }
 
   const pendiente = aportarMeta.isPending || retirarMeta.isPending;
-  const mensajeError = errorValidacion ?? (aportarMeta.error ?? retirarMeta.error)?.message;
+  const mensajeError = errorValidacion ?? (aportarMeta.error ?? retirarMeta.error ?? eliminarMeta.error)?.message;
 
   return (
     <li className="flex flex-col gap-2 border-b py-3">
@@ -81,6 +88,9 @@ export function FilaMeta({ meta }: FilaMetaProps) {
             </Button>
             <Button size="sm" variant="outline" onClick={() => setModo('retirar')}>
               Retirar
+            </Button>
+            <Button size="sm" variant="ghost" className="text-destructive" onClick={eliminar} disabled={eliminarMeta.isPending}>
+              Eliminar
             </Button>
           </div>
         )}

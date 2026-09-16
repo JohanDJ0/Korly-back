@@ -1,5 +1,6 @@
 import { and, eq, sql } from 'drizzle-orm';
-import { asientos } from '../../db/schema/ledger.js';
+import { cargosTarjeta } from '../../db/schema/cargos-tarjeta.js';
+import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { tarjetas } from '../../db/schema/tarjetas.js';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
@@ -107,4 +108,35 @@ export async function obtenerTarjetaPorIdTx(tx: Ejecutor, tenantId: string, tarj
 
 export async function obtenerSaldoTarjetaTx(tx: Ejecutor, cuentaId: string): Promise<bigint> {
   return saldoCuentaTx(tx, cuentaId);
+}
+
+/**
+ * Solo permitido si la tarjeta nunca tuvo ningún cargo — el mismo
+ * momento en que "me equivoqué al crearla" es seguro de deshacer del
+ * todo. Un cargo ya registrado generó un movimiento `'cargo_tarjeta'`
+ * real (inmutable, ADR-001); borrar la tarjeta en ese caso dejaría ese
+ * movimiento apuntando a una cuenta sin dueño. Sin cargos, en cambio,
+ * la cuenta de la tarjeta nunca recibió ni un solo asiento — no hay
+ * nada del ledger que preservar, así que sí se borra de verdad (fila
+ * de `tarjetas` + su `cuenta`), a diferencia de gastos/ingresos, que
+ * nunca se borran de verdad por la misma inmutabilidad.
+ */
+export async function eliminarTarjeta(tenantId: string, tarjetaId: string): Promise<void> {
+  return conTenant(tenantId, async (tx) => {
+    const tarjeta = await obtenerTarjetaPorIdTx(tx, tenantId, tarjetaId);
+    if (!tarjeta) {
+      throw new ErrorDominio('TARJETA_NO_ENCONTRADA', 'La tarjeta especificada no existe');
+    }
+
+    const [fila] = await tx
+      .select({ total: sql<number>`count(*)::int` })
+      .from(cargosTarjeta)
+      .where(and(eq(cargosTarjeta.tenantId, tenantId), eq(cargosTarjeta.tarjetaId, tarjetaId)));
+    if ((fila?.total ?? 0) > 0) {
+      throw new ErrorDominio('TARJETA_CON_HISTORIAL', 'No se puede eliminar una tarjeta que ya tiene cargos registrados');
+    }
+
+    await tx.delete(tarjetas).where(and(eq(tarjetas.tenantId, tenantId), eq(tarjetas.id, tarjetaId)));
+    await tx.delete(cuentas).where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.id, tarjeta.cuentaId)));
+  });
 }

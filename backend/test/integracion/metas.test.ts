@@ -6,7 +6,7 @@ import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
-import { aportarAMeta, crearMeta, listarMetas, retirarDeMeta } from '../../src/modulos/metas/metas.js';
+import { aportarAMeta, crearMeta, eliminarMeta, listarMetas, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 
 describe('metas de ahorro', () => {
   async function tenantConPeriodoActivo() {
@@ -35,6 +35,50 @@ describe('metas de ahorro', () => {
     it('rechaza un nombre vacío', async () => {
       const { tenantId } = await tenantConPeriodoActivo();
       await expect(crearMeta(tenantId, '   ', 1000n, 'MXN')).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+  });
+
+  describe('eliminarMeta', () => {
+    it('rechaza una meta que no existe (BOLA)', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      await expect(eliminarMeta(tenantId, randomUUID())).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+    });
+
+    it('rechaza una meta de otro tenant (BOLA)', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const { tenantId: otroTenantId } = await tenantConPeriodoActivo();
+      const metaAjena = await crearMeta(otroTenantId, 'Vacaciones', 1000n, 'MXN');
+
+      await expect(eliminarMeta(tenantId, metaAjena.id)).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+    });
+
+    it('elimina una meta sin aportes ni retiros de verdad — ya no aparece en el listado', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+
+      await eliminarMeta(tenantId, meta.id);
+
+      expect(await listarMetas(tenantId)).toHaveLength(0);
+    });
+
+    it('rechaza eliminar una meta que ya tiene un aporte registrado', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', fechaReferencia: HOY });
+
+      await expect(eliminarMeta(tenantId, meta.id)).rejects.toMatchObject({ codigo: 'META_CON_HISTORIAL' });
+    });
+
+    it('rechaza eliminar una meta incluso si un aporte y un retiro idénticos la dejaron de vuelta en saldo 0', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', fechaReferencia: HOY });
+      await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'Ya no la necesito', fechaReferencia: HOY });
+
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(0n);
+      await expect(eliminarMeta(tenantId, meta.id)).rejects.toMatchObject({ codigo: 'META_CON_HISTORIAL' });
     });
   });
 

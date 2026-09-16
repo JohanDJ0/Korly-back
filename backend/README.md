@@ -100,7 +100,14 @@ aplicarían y nadie lo notaría hasta un incidente. `app_backend` es un
 rol sin privilegios especiales, así que Postgres sí evalúa las
 políticas para él. Ver [ADR-005](../docs/adr/005-tenant-id-rls.md).
 
-Con la contraseña elegida, completar `APP_DATABASE_URL` en `.env`.
+Con la contraseña elegida, completar `APP_DATABASE_URL` en `.env` —
+usando el **connection pooler** de Supabase, no la conexión directa
+`db.TU-PROYECTO.supabase.co` (ver el comentario en `.env.example`):
+hallazgo real, la conexión directa tuvo fallas intermitentes de DNS en
+desarrollo mientras el dominio principal de Supabase seguía
+resolviendo bien — el pooler es infraestructura separada y no las
+compartió. `DATABASE_URL` (solo migraciones, uso ocasional) se deja
+como conexión directa.
 
 ## 5. Generar y aplicar las migraciones
 
@@ -1580,6 +1587,56 @@ periodo que recibe la mensualidad la ve en la consulta, el periodo
 donde solo se hizo la compra (antes de que venza nada) no ve nada.
 Verificación en vivo contra la cuenta real todavía pendiente (la
 cuenta de prueba real no tiene ninguna tarjeta dada de alta todavía).
+
+## Eliminar tarjetas/categorías/metas
+
+Hallazgo real del usuario: creaba una tarjeta por error (o quería una
+categoría/meta que ya no le servía) y no había ninguna forma de
+quitarla — los tres módulos solo tenían crear + listar. No es un
+`DELETE` genérico: cada uno se bloquea distinto según qué tan "en uso"
+está.
+
+- **Tarjetas** (`eliminarTarjeta`, `tarjetas.ts`): solo si nunca tuvo
+  ningún cargo. Un cargo ya generó un movimiento `'cargo_tarjeta'` real
+  (inmutable, ADR-001) contra la cuenta de la tarjeta; sin cargos, esa
+  cuenta nunca recibió ni un solo asiento, así que sí se borra de
+  verdad (fila de `tarjetas` + su `cuenta`) — a diferencia de
+  gastos/ingresos, que nunca se borran de verdad. `TARJETA_CON_HISTORIAL`
+  (409) si ya tiene cargos.
+- **Categorías** (`eliminarCategoria`, `categorias.ts`): las
+  predeterminadas nunca se pueden eliminar (`CATEGORIA_PREDETERMINADA`,
+  409) — las siembra `resolverOcrearIdentidad` para todo tenant nuevo,
+  no son un dato del usuario. Una personalizada solo se borra si nadie
+  la usó todavía: `categoriaId` es nullable en tres tablas distintas
+  (`gastos`, `gastos_recurrentes`, `cargos_tarjeta`), así que Postgres
+  no lo bloquearía con una FK — se comprueban las tres a mano
+  (`CATEGORIA_EN_USO`, 409) para no dejar un gasto ya registrado
+  apuntando a una categoría que ya no existe.
+- **Metas** (`eliminarMeta`, `metas.ts`): solo si su cuenta nunca
+  recibió ningún asiento — no "saldo en cero", que un aporte seguido de
+  un retiro idéntico también deja en cero pero con historial real
+  detrás (`aportarAMeta`, `retirarDeMeta`, y `decidirSobrante` cuando
+  el usuario elige "ahorrar" también escriben contra esta cuenta).
+  `META_CON_HISTORIAL` (409) si ya tiene algo.
+
+Extensión sobre `docs/openapi.yaml` (que no define `DELETE` para
+ninguno de los tres todavía), mismo criterio que el resto de
+extensiones documentadas en este README.
+
+Frontend: botón "Eliminar" en la fila de cada tarjeta/meta (siempre
+visible — el backend decide si aplica, el frontend no adivina
+consultando cargos/aportes por adelantado solo para eso). Categorías no
+tenía ninguna pantalla propia (solo el selector inline al capturar un
+gasto, con "+ Nueva categoría…") — se agregó `routes/Categorias.tsx`
+(mismo patrón que Tarjetas.tsx/Metas.tsx) con el listado completo y
+"Eliminar" únicamente en las personalizadas.
+
+16 tests nuevos entre los tres módulos (BOLA, predeterminada, en uso
+por cada una de las tres tablas para categorías, aporte+retiro
+idénticos para metas), contra Postgres real. Verificado en vivo contra
+la cuenta real: bloqueo real de una tarjeta con cargos y de una
+categoría en uso, y borrado real de una tarjeta/categoría/meta de
+prueba sin historial.
 
 ## CORS
 

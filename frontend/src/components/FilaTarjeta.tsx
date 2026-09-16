@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { FormularioCargo } from '@/components/FormularioCargo';
 import { useCargosTarjeta } from '@/hooks/use-cargos-tarjeta';
+import { useEliminarTarjeta } from '@/hooks/use-eliminar-tarjeta';
 import type { Tarjeta } from '@/hooks/use-tarjetas';
 import { formatearMonto } from '@/lib/dinero';
 
@@ -16,11 +17,24 @@ interface FilaTarjetaProps {
  * (`useCargosTarjeta` con `enabled` condicionado) — la mayoría de las
  * veces el usuario solo quiere ver deuda/disponible de un vistazo, sin
  * pagar el costo de traer cada mensualidad de cada compra.
+ *
+ * "Eliminar" siempre se muestra (sin pedir los cargos por adelantado
+ * solo para decidir si mostrarlo o no — eso repetiría el costo que
+ * "Ver compras" ya evita a propósito): el backend rechaza con
+ * `TARJETA_CON_HISTORIAL` si ya tiene cargos, y ese mensaje se muestra
+ * tal cual, mismo criterio que `LIMITE_CREDITO_EXCEDIDO` en
+ * FormularioCargo (el backend decide, el frontend no adivina).
  */
 export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
   const [mostrarFormularioCargo, setMostrarFormularioCargo] = useState(false);
   const [mostrarCargos, setMostrarCargos] = useState(false);
   const { data: cargos, isLoading: cargandoCargos } = useCargosTarjeta(mostrarCargos ? tarjeta.id : undefined);
+  const eliminarTarjeta = useEliminarTarjeta();
+
+  function eliminar() {
+    if (!window.confirm(`¿Eliminar la tarjeta "${tarjeta.nombre}"?`)) return;
+    eliminarTarjeta.mutate(tarjeta.id);
+  }
 
   return (
     <li className="flex flex-col gap-3 border-b py-4">
@@ -34,6 +48,7 @@ export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
           <p className="text-sm text-muted-foreground">
             Corte día {tarjeta.diaCorte} · {tarjeta.diasParaPago} días para pagar
           </p>
+          {eliminarTarjeta.isError && <p className="text-sm text-destructive">{eliminarTarjeta.error.message}</p>}
         </div>
         <div className="flex shrink-0 flex-col gap-2">
           <Button size="sm" variant="outline" onClick={() => setMostrarFormularioCargo((v) => !v)}>
@@ -41,6 +56,9 @@ export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setMostrarCargos((v) => !v)}>
             {mostrarCargos ? 'Ocultar compras' : 'Ver compras'}
+          </Button>
+          <Button size="sm" variant="ghost" className="text-destructive" onClick={eliminar} disabled={eliminarTarjeta.isPending}>
+            Eliminar
           </Button>
         </div>
       </div>

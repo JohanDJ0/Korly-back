@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
-import { crearCategoriaPersonalizada, listarCategorias } from '../../src/modulos/categorias/categorias.js';
+import { crearCategoriaPersonalizada, eliminarCategoria, listarCategorias } from '../../src/modulos/categorias/categorias.js';
+import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
+import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
+import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.js';
+import { crearTarjeta } from '../../src/modulos/tarjetas/tarjetas.js';
+import { registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
 
 describe('categorías', () => {
   async function tenantDePrueba() {
@@ -79,6 +84,79 @@ describe('categorías', () => {
       await expect(crearCategoriaPersonalizada(tenantId, 'Una de más')).rejects.toMatchObject({
         codigo: 'LIMITE_CATEGORIAS_ALCANZADO',
       });
+    });
+  });
+
+  describe('eliminarCategoria', () => {
+    it('rechaza una categoría que no existe (BOLA)', async () => {
+      const tenantId = await tenantDePrueba();
+      await expect(eliminarCategoria(tenantId, randomUUID())).rejects.toMatchObject({ codigo: 'CATEGORIA_NO_ENCONTRADA' });
+    });
+
+    it('rechaza una categoría de otro tenant (BOLA)', async () => {
+      const tenantId = await tenantDePrueba();
+      const otroTenantId = await tenantDePrueba();
+      const ajena = await crearCategoriaPersonalizada(otroTenantId, 'Mascota');
+
+      await expect(eliminarCategoria(tenantId, ajena.id)).rejects.toMatchObject({ codigo: 'CATEGORIA_NO_ENCONTRADA' });
+    });
+
+    it('rechaza eliminar una categoría predeterminada', async () => {
+      const tenantId = await tenantDePrueba();
+      const [comida] = await listarCategorias(tenantId);
+
+      await expect(eliminarCategoria(tenantId, comida!.id)).rejects.toMatchObject({ codigo: 'CATEGORIA_PREDETERMINADA' });
+    });
+
+    it('elimina una categoría personalizada sin usar de verdad — ya no aparece en el listado', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+
+      await eliminarCategoria(tenantId, categoria.id);
+
+      expect(await listarCategorias(tenantId)).not.toContainEqual(expect.objectContaining({ id: categoria.id }));
+    });
+
+    it('rechaza eliminar una categoría ya usada por un gasto', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+      const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+      await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 100n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-01',
+        categoriaId: categoria.id,
+        fechaReferencia: new Date('2026-08-01T00:00:00Z'),
+      });
+
+      await expect(eliminarCategoria(tenantId, categoria.id)).rejects.toMatchObject({ codigo: 'CATEGORIA_EN_USO' });
+    });
+
+    it('rechaza eliminar una categoría ya usada por un gasto recurrente', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+      await crearGastoRecurrente({ tenantId, descripcion: 'Comida del perro', montoValorMinimo: 300n, moneda: 'MXN', frecuencia: 'quincenal', categoriaId: categoria.id });
+
+      await expect(eliminarCategoria(tenantId, categoria.id)).rejects.toMatchObject({ codigo: 'CATEGORIA_EN_USO' });
+    });
+
+    it('rechaza eliminar una categoría ya usada por un cargo de tarjeta', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+      const tarjeta = await crearTarjeta(tenantId, 'BBVA', 1000000n, 'MXN', 15, 20);
+      await registrarCargoTarjeta({
+        tenantId,
+        tarjetaId: tarjeta.id,
+        descripcion: 'Veterinario',
+        montoTotalValorMinimo: 50000n,
+        moneda: 'MXN',
+        numeroPlazos: 1,
+        categoriaId: categoria.id,
+      });
+
+      await expect(eliminarCategoria(tenantId, categoria.id)).rejects.toMatchObject({ codigo: 'CATEGORIA_EN_USO' });
     });
   });
 });

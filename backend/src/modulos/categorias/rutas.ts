@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { crearCategoriaPersonalizada, listarCategorias, type Categoria } from './categorias.js';
+import { crearCategoriaPersonalizada, eliminarCategoria, listarCategorias, type Categoria } from './categorias.js';
 import { ErrorDominio } from '../../shared/errores.js';
 
 function categoriaADto(categoria: Categoria) {
@@ -24,5 +24,10 @@ export async function rutasCategorias(app: FastifyInstance): Promise<void> {
 
     const categoria = await crearCategoriaPersonalizada(request.identidad.tenantId, body.nombre);
     reply.code(201).send(categoriaADto(categoria));
+  });
+
+  app.delete<{ Params: { categoriaId: string } }>('/categorias/:categoriaId', async (request, reply) => {
+    await eliminarCategoria(request.identidad.tenantId, request.params.categoriaId);
+    reply.code(204).send();
   });
 }

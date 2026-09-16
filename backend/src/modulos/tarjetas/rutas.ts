@@ -6,7 +6,7 @@ import {
   type PagoTarjetaAplicado,
   registrarCargoTarjeta,
 } from './registrar-cargo.js';
-import { crearTarjeta, listarTarjetas, type TarjetaConSaldo } from './tarjetas.js';
+import { crearTarjeta, eliminarTarjeta, listarTarjetas, type TarjetaConSaldo } from './tarjetas.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { montoADto, montoDesdeDto, type MontoDto } from '../../shared/http.js';
 
@@ -102,6 +102,11 @@ export async function rutasTarjetas(app: FastifyInstance): Promise<void> {
         creditoDisponibleValorMinimo: tarjeta.limiteCreditoValorMinimo,
       })
     );
+  });
+
+  app.delete<{ Params: { tarjetaId: string } }>('/tarjetas/:tarjetaId', async (request, reply) => {
+    await eliminarTarjeta(request.identidad.tenantId, request.params.tarjetaId);
+    reply.code(204).send();
   });
 
   app.get<{ Params: { tarjetaId: string } }>('/tarjetas/:tarjetaId/cargos', async (request, reply) => {

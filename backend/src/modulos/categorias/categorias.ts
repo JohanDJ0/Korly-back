@@ -1,5 +1,8 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { cargosTarjeta } from '../../db/schema/cargos-tarjeta.js';
 import { categorias } from '../../db/schema/categorias.js';
+import { gastos } from '../../db/schema/gastos.js';
+import { gastosRecurrentes } from '../../db/schema/gastos-recurrentes.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
 import { esUuidValido } from '../../shared/validacion.js';
@@ -88,4 +91,40 @@ export async function obtenerCategoriaPorIdTx(tx: Ejecutor, tenantId: string, ca
     .where(and(eq(categorias.tenantId, tenantId), eq(categorias.id, categoriaId)))
     .limit(1);
   return fila ?? null;
+}
+
+/**
+ * Solo las personalizadas se pueden eliminar — las predeterminadas
+ * las siembra `resolverOcrearIdentidad` para todos los tenants, no
+ * son un dato del usuario que le pertenezca borrar. Y solo si nunca
+ * se usó: a diferencia de `tarjetas`/`metas` (una sola cuenta del
+ * ledger que revisar), una categoría puede estar referenciada desde
+ * tres tablas distintas (`gastos`, `gastos_recurrentes`,
+ * `cargos_tarjeta`) — `categoriaId` es nullable en las tres, así que
+ * Postgres no lo impediría con una FK, pero dejar gastos ya
+ * registrados apuntando a una categoría borrada rompería el reporte
+ * de "gastado por categoría" (generar-resumen.ts) en silencio.
+ */
+export async function eliminarCategoria(tenantId: string, categoriaId: string): Promise<void> {
+  return conTenant(tenantId, async (tx) => {
+    const categoria = await obtenerCategoriaPorIdTx(tx, tenantId, categoriaId);
+    if (!categoria) {
+      throw new ErrorDominio('CATEGORIA_NO_ENCONTRADA', 'La categoría especificada no existe');
+    }
+    if (categoria.esPredeterminada) {
+      throw new ErrorDominio('CATEGORIA_PREDETERMINADA', 'No se puede eliminar una categoría predeterminada');
+    }
+
+    const [gastosFila] = await tx.select({ total: sql<number>`count(*)::int` }).from(gastos).where(eq(gastos.categoriaId, categoriaId));
+    const [recurrentesFila] = await tx
+      .select({ total: sql<number>`count(*)::int` })
+      .from(gastosRecurrentes)
+      .where(eq(gastosRecurrentes.categoriaId, categoriaId));
+    const [cargosFila] = await tx.select({ total: sql<number>`count(*)::int` }).from(cargosTarjeta).where(eq(cargosTarjeta.categoriaId, categoriaId));
+    if ((gastosFila?.total ?? 0) > 0 || (recurrentesFila?.total ?? 0) > 0 || (cargosFila?.total ?? 0) > 0) {
+      throw new ErrorDominio('CATEGORIA_EN_USO', 'No se puede eliminar una categoría que ya está en uso');
+    }
+
+    await tx.delete(categorias).where(and(eq(categorias.tenantId, tenantId), eq(categorias.id, categoriaId)));
+  });
 }

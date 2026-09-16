@@ -1,5 +1,5 @@
 import { and, desc, eq, sql } from 'drizzle-orm';
-import { asientos } from '../../db/schema/ledger.js';
+import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { metas } from '../../db/schema/metas.js';
 import { crearCuentaTx, registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
@@ -111,6 +111,33 @@ export async function obtenerMetaPorIdTx(tx: Ejecutor, tenantId: string, metaId:
   if (!fila) return null;
 
   return { id: fila.id, cuentaId: fila.cuentaId, nombre: fila.nombre, montoObjetivoValorMinimo: fila.montoObjetivoValorMinimo, moneda: fila.moneda };
+}
+
+/**
+ * Solo si la cuenta de la meta nunca recibió ningún asiento — no solo
+ * "saldo en cero", que un aporte seguido de un retiro idéntico también
+ * deja en cero pero sí con historial real detrás (aportarAMeta,
+ * retirarDeMeta, y decidirSobrante cuando el usuario elige "ahorrar",
+ * ver cierre/decidir-sobrante.ts, todos escriben contra esta misma
+ * cuenta). Sin aportes ni retiros de por medio, no hay nada del ledger
+ * que preservar, así que sí se borra de verdad (fila de `metas` + su
+ * `cuenta`) — mismo criterio que `eliminarTarjeta`.
+ */
+export async function eliminarMeta(tenantId: string, metaId: string): Promise<void> {
+  return conTenant(tenantId, async (tx) => {
+    const meta = await obtenerMetaPorIdTx(tx, tenantId, metaId);
+    if (!meta) {
+      throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    }
+
+    const [fila] = await tx.select({ total: sql<number>`count(*)::int` }).from(asientos).where(eq(asientos.cuentaId, meta.cuentaId));
+    if ((fila?.total ?? 0) > 0) {
+      throw new ErrorDominio('META_CON_HISTORIAL', 'No se puede eliminar una meta que ya tiene aportes o retiros registrados');
+    }
+
+    await tx.delete(metas).where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId)));
+    await tx.delete(cuentas).where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.id, meta.cuentaId)));
+  });
 }
 
 /** Mismo criterio que `periodoActivoObligatorioTx` en registrar-gasto.ts/registrar-ingreso.ts. */

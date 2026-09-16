@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { aportarAMeta, crearMeta, listarMetas, retirarDeMeta, type MetaConProgreso } from './metas.js';
+import { aportarAMeta, crearMeta, eliminarMeta, listarMetas, retirarDeMeta, type MetaConProgreso } from './metas.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { montoADto, montoDesdeDto, type MontoDto } from '../../shared/http.js';
 
@@ -55,6 +55,11 @@ export async function rutasMetas(app: FastifyInstance): Promise<void> {
   app.get('/metas', async (request, reply) => {
     const metas = await listarMetas(request.identidad.tenantId);
     reply.send(metas.map(metaADto));
+  });
+
+  app.delete<{ Params: { metaId: string } }>('/metas/:metaId', async (request, reply) => {
+    await eliminarMeta(request.identidad.tenantId, request.params.metaId);
+    reply.code(204).send();
   });
 
   app.post<{ Params: { metaId: string } }>('/metas/:metaId/aportes', async (request, reply) => {

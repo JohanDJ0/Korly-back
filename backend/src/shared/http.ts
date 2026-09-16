@@ -37,6 +37,15 @@ const CODIGO_A_STATUS: Record<string, number> = {
   // de una tarjeta es un tope físico real — ver backend/README.md,
   // "Tarjetas de crédito y MSI".
   LIMITE_CREDITO_EXCEDIDO: 403,
+  // Eliminar tarjetas/categorías/metas es una extensión sobre
+  // openapi.yaml (que no define DELETE para ninguno de los tres
+  // todavía) — 409 porque el bloqueo depende del estado actual del
+  // recurso (¿ya tiene historial?), no de que el request esté mal
+  // formado. Ver backend/README.md, "Eliminar tarjetas/categorías/metas".
+  TARJETA_CON_HISTORIAL: 409,
+  CATEGORIA_PREDETERMINADA: 409,
+  CATEGORIA_EN_USO: 409,
+  META_CON_HISTORIAL: 409,
 };
 
 /**
