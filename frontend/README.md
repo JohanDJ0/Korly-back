@@ -520,10 +520,11 @@ redirect (siempre es la raíz `/`, dentro de la zona protegida).
 `supabase.auth.updateUser({ password })` no pide la contraseña
 anterior porque la sesión de recuperación ya autentica al usuario.
 
-Verificado en vivo: `/olvide-password` renderiza y valida
-correctamente. El intercepto de `ProtectedRoute` con un link de
-recuperación real (correo → clic → `RestablecerPassword`) todavía no
-se ha probado de punta a punta contra la cuenta real.
+Verificado en vivo de punta a punta contra la cuenta real:
+`/olvide-password` con el correo real → el correo llegó con el link
+apuntando al frontend correcto (ya no al 404 del puerto del backend) →
+al abrirlo, `ProtectedRoute` interceptó la sesión de recuperación y
+mostró `RestablecerPassword` en vez de dejar pasar directo a Home.
 
 ## Qué falta
 
