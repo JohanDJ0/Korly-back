@@ -1585,8 +1585,21 @@ normales.
 Validado con una extensión de `test/integracion/tarjetas.test.ts`: el
 periodo que recibe la mensualidad la ve en la consulta, el periodo
 donde solo se hizo la compra (antes de que venza nada) no ve nada.
-Verificación en vivo contra la cuenta real todavía pendiente (la
-cuenta de prueba real no tiene ninguna tarjeta dada de alta todavía).
+**Intento de verificación en vivo contra la cuenta real, con la
+tarjeta BBVA que ya existe ahí:** no se pudo completar — la
+materialización de `pago_tarjeta` solo ocurre en el momento en que un
+periodo se activa (limitación conocida, ver el comentario en
+`materializar-pagos-tarjeta.ts`), y el periodo activo actual (16-30 de
+septiembre) ya estaba activo desde antes de que existiera cualquier
+cargo de prueba — no hay forma de retriggerar esa activación sin
+cerrar el periodo real antes de tiempo, algo que no vale la pena hacer
+solo para ver un aviso en pantalla. La primera mensualidad real de BBVA
+vence el 10 de octubre, dentro del periodo del 1-15 de octubre — se
+verá en vivo cuando ese periodo se active de forma natural. Mientras
+tanto, el mecanismo completo (materialización al activarse un periodo +
+el endpoint `GET /periodos/:id/pagos-tarjeta`) sigue cubierto por
+`test/integracion/tarjetas.test.ts` contra Postgres real, incluyendo el
+caso exacto de "una mensualidad que vence dentro del periodo activo".
 
 ## Eliminar tarjetas/categorías/metas
 
