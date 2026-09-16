@@ -57,7 +57,7 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * menos) y `díasRestantes` bajó uno - ahí es donde ocurre la
  * redistribución, nunca a mitad del mismo día.
  *
- * **Por qué el corte se restringe a `['gasto', 'aporte_meta', 'pago_tarjeta']` y no al
+ * **Por qué el corte se restringe a `['gasto', 'aporte_meta']` y no al
  * neto de "todo lo de hoy":** se probó primero con el neto de TODOS los
  * asientos de hoy, y falla justo en el caso más común - el día 1, con
  * el ingreso y el primer gasto fechados el mismo día. Un ingreso de
@@ -84,6 +84,25 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * corregir un ingreso se veía en la app como si se hubiera gastado ese
  * dinero hoy mismo.
  *
+ * **`'pago_tarjeta'` nunca entra a este corte, y un `'gasto'` con
+ * `origenRecurrenteId` (materializado por un recurrente) se excluye a
+ * propósito vía `excluirGastosRecurrentes` — bug real, reportado por
+ * el usuario contra su cuenta real: creó un recurrente mensual el
+ * mismo día en que ya estaba activo el periodo al que le tocaba, y la
+ * materialización inmediata (ver crearGastoRecurrente,
+ * modulos/recurrentes/recurrentes.ts) generó el gasto fechado hoy —
+ * "puedes gastar hoy" pasó de $486 a "te excediste hoy por $1,513",
+ * como si el usuario hubiera elegido gastarse la renta completa en un
+ * día. Ambos casos (un recurrente y una mensualidad de tarjeta) son
+ * compromisos automáticos que el usuario no decidió pagar HOY — solo
+ * coinciden con hoy porque hoy es cuando el periodo se activó o se creó
+ * el recurrente. Deben bajar `disponible` de inmediato (y lo hacen: el
+ * corte de arriba es tipo-agnóstico), pero no deben consumir el
+ * objetivo discrecional del día ni disparar "te excediste hoy" — esa
+ * señal es para lo que el usuario decide gastar, no para lo que ya
+ * estaba comprometido de antemano. Un gasto MANUAL (sin
+ * `origenRecurrenteId`) sigue contando igual que siempre.
+ *
  * Deliberadamente NO corre dentro de una única transacción: es una
  * composición de lecturas (periodo activo, ¿hay ingreso?, saldo, corte
  * de hoy), y a diferencia de un registro de escritura como
@@ -105,16 +124,9 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
   const disponibleValorMinimo = await obtenerSaldoCuenta(tenantId, periodo.cuentaId);
   const diasRestantes = calcularDiasRestantes(periodo.fechaFin, fechaReferencia);
 
-  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), [
-    'gasto',
-    'aporte_meta',
-    // Mismo criterio que 'aporte_meta': modelo-dominio.md §6 ya
-    // establece que un aporte "se trata como un gasto más" para este
-    // corte — una mensualidad de tarjeta materializada hoy (el periodo
-    // se activó hoy mismo) debe contar igual, o "gastadoHoy" mostraría
-    // $0 aunque un pago real ya haya bajado el disponible.
-    'pago_tarjeta',
-  ]);
+  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), ['gasto', 'aporte_meta'], {
+    excluirGastosRecurrentes: true,
+  });
   const gastadoHoyValorMinimo = netoGastosHoy < 0n ? -netoGastosHoy : 0n;
   const disponibleBaseHoy = disponibleValorMinimo + gastadoHoyValorMinimo;
   const objetivoHoy = pisoDivisionBigInt(disponibleBaseHoy, BigInt(diasRestantes));

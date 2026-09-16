@@ -1,6 +1,7 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import { asientos, cuentas, movimientos, type TipoCuenta, type TipoMovimiento } from '../../db/schema/ledger.js';
+import { gastos } from '../../db/schema/gastos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 
 const movimientoRevertido = alias(movimientos, 'movimiento_revertido');
@@ -190,18 +191,33 @@ export async function obtenerSaldoCuenta(tenantId: string, cuentaId: string): Pr
  * compara contra `tipos` es el del original si existe (una reversión
  * de un gasto sigue contando como gasto; una reversión de un ingreso
  * ya no), o el propio tipo del movimiento si no es una reversión.
+ *
+ * `excluirGastosRecurrentes` — mismo tipo de resolución que la de
+ * arriba (via el movimiento "efectivo", el original si esto es una
+ * reversión), pero contra `gastos.origenRecurrenteId` en vez de contra
+ * el tipo: ver el comentario grande en consultar-disponible.ts sobre
+ * por qué un gasto materializado automáticamente por un recurrente
+ * (o revertirlo) no debe contar en el corte de "hoy" aunque su tipo
+ * efectivo sea `'gasto'`. El `LEFT JOIN` a `gastos` no cambia el
+ * resultado cuando la opción es `false`/`undefined`: solo se usa para
+ * filtrar, nunca se selecciona ninguna columna suya.
  */
 export async function obtenerNetoCuentaEnFecha(
   tenantId: string,
   cuentaId: string,
   fechaEfectiva: string,
-  tipos?: TipoMovimiento[]
+  tipos?: TipoMovimiento[],
+  opciones?: { excluirGastosRecurrentes?: boolean }
 ): Promise<bigint> {
   return conTenant(tenantId, async (tx) => {
     const tipoEfectivo = sql`coalesce(${movimientoRevertido.tipo}, ${movimientos.tipo})`;
+    const movimientoEfectivoId = sql`coalesce(${movimientoRevertido.id}, ${movimientos.id})`;
     const condiciones = [eq(asientos.cuentaId, cuentaId), eq(movimientos.fechaEfectiva, fechaEfectiva)];
     if (tipos && tipos.length > 0) {
       condiciones.push(inArray(tipoEfectivo, tipos));
+    }
+    if (opciones?.excluirGastosRecurrentes) {
+      condiciones.push(isNull(gastos.origenRecurrenteId));
     }
 
     const [fila] = await tx
@@ -209,6 +225,7 @@ export async function obtenerNetoCuentaEnFecha(
       .from(asientos)
       .innerJoin(movimientos, eq(movimientos.id, asientos.movimientoId))
       .leftJoin(movimientoRevertido, eq(movimientoRevertido.id, movimientos.movimientoRevertidoId))
+      .leftJoin(gastos, eq(gastos.movimientoId, movimientoEfectivoId))
       .where(and(...condiciones));
 
     return BigInt(fila?.neto ?? '0');

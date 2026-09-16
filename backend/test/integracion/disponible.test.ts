@@ -1,11 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
+import { periodos } from '../../src/db/schema/periodos.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { editarIngreso, eliminarIngreso, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
-import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
+import { crearCuentaTx } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { crearPeriodo, obtenerPeriodoActivo } from '../../src/modulos/periodos/crear-periodo.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
 import { aportarAMeta, crearMeta } from '../../src/modulos/metas/metas.js';
+import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.js';
+import { crearTarjeta } from '../../src/modulos/tarjetas/tarjetas.js';
+import { registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
+import { conTenant } from '../../src/shared/db.js';
 
 describe('consultarDisponible (motor de flujo de caja)', () => {
   async function tenantNuevo() {
@@ -366,5 +372,96 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     expect(resultado.disponibleValorMinimo).toBe(4700n); // 5000 - 300
     expect(resultado.gastadoHoyValorMinimo).toBe(300n);
     expect(resultado.cifraDiariaValorMinimo).toBe(33n); // objetivoHoy = piso(5000/15) = 333; 333 - 300 = 33
+  });
+
+  // --- 6. Bug real (cuenta de producción): un compromiso automático
+  // materializado hoy no debe leerse como "el usuario se gastó esto hoy" ---
+
+  it('un gasto recurrente materializado el mismo día en que se crea (periodo ya activo) baja el disponible pero NO cuenta como gastado hoy', async () => {
+    const tenantId = await tenantNuevo();
+    const hoy = new Date('2026-08-16T00:00:00Z'); // quincena 16-31 de agosto, 16 días restantes
+    const periodo = await crearPeriodo(tenantId, 'quincenal', hoy);
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 7300n, moneda: 'MXN', fechaEfectiva: '2026-08-16', fechaReferencia: hoy });
+
+    // Mismo caso exacto reportado por el usuario: recurrente mensual día
+    // 17, creado hoy (día 16) con el periodo ya activo — se materializa
+    // de inmediato (ver crearGastoRecurrente, recurrentes.ts).
+    await crearGastoRecurrente({
+      tenantId,
+      descripcion: 'Renta',
+      montoValorMinimo: 2000n,
+      moneda: 'MXN',
+      frecuencia: 'mensual',
+      diaMes: 17,
+      fechaReferencia: hoy,
+    });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(5300n); // 7300 - 2000, ya descontado
+    // Antes del fix: gastadoHoy incluía la renta -> "te excediste hoy por
+    // $1,513" el mismo día en que se creó el recurrente, como si el
+    // usuario hubiera elegido gastarse la renta completa en un día.
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n);
+    expect(resultado.cifraDiariaValorMinimo).toBe(331n); // piso(5300/16), sin restarle la renta encima
+  });
+
+  it('un gasto manual el mismo día que un recurrente materializado sí cuenta como gastado hoy (el recurrente no tapa un gasto real)', async () => {
+    const tenantId = await tenantNuevo();
+    const hoy = new Date('2026-08-16T00:00:00Z');
+    const periodo = await crearPeriodo(tenantId, 'quincenal', hoy);
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 7300n, moneda: 'MXN', fechaEfectiva: '2026-08-16', fechaReferencia: hoy });
+    await crearGastoRecurrente({
+      tenantId,
+      descripcion: 'Renta',
+      montoValorMinimo: 2000n,
+      moneda: 'MXN',
+      frecuencia: 'mensual',
+      diaMes: 17,
+      fechaReferencia: hoy,
+    });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 300n, moneda: 'MXN', fechaEfectiva: '2026-08-16', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(5000n); // 7300 - 2000 - 300
+    expect(resultado.gastadoHoyValorMinimo).toBe(300n); // solo el gasto manual, no la renta
+  });
+
+  it('una mensualidad de tarjeta (pago_tarjeta) materializada el mismo día en que se activa el periodo tampoco cuenta como gastado hoy', async () => {
+    const tenantId = await tenantNuevo();
+    const tarjeta = await crearTarjeta(tenantId, 'BBVA Oro', 1000000n, 'MXN', 15, 20);
+    // Corte día 15, 20 días para pagar; compra 20-jul -> vence 4-sep, dentro de la quincena 1-15 de septiembre.
+    await registrarCargoTarjeta({
+      tenantId,
+      tarjetaId: tarjeta.id,
+      descripcion: 'Refrigerador',
+      montoTotalValorMinimo: 900000n,
+      moneda: 'MXN',
+      numeroPlazos: 3,
+      fechaCompra: '2026-07-20',
+    });
+
+    const periodoSeptiembre = await conTenant(tenantId, async (tx) => {
+      const cuenta = await crearCuentaTx(tx, tenantId, 'periodo');
+      const [fila] = await tx
+        .insert(periodos)
+        .values({ tenantId, cuentaId: cuenta.id, tipo: 'quincenal', estado: 'borrador', fechaInicio: '2026-09-01', fechaFin: '2026-09-15' })
+        .returning();
+      if (!fila) throw new Error('setup falló');
+      return fila;
+    });
+    const hoy = new Date('2026-09-05T00:00:00Z');
+    const activo = await obtenerPeriodoActivo(tenantId, hoy); // promueve el borrador y materializa el pago_tarjeta
+    expect(activo?.id).toBe(periodoSeptiembre.id);
+    await registrarIngreso({ tenantId, periodoId: periodoSeptiembre.id, monto: 500000n, moneda: 'MXN', fechaEfectiva: '2026-09-01', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(200000n); // 500000 - 300000 (mensualidad ya aplicada)
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n); // pago_tarjeta nunca es un gasto discrecional "de hoy"
   });
 });
