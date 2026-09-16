@@ -1,8 +1,12 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gte } from 'drizzle-orm';
+import { gastos } from '../../db/schema/gastos.js';
 import { FRECUENCIAS_RECURRENTE, gastosRecurrentes, type FrecuenciaRecurrente } from '../../db/schema/gastos-recurrentes.js';
+import { periodos } from '../../db/schema/periodos.js';
 import { obtenerCategoriaPorIdTx } from '../categorias/categorias.js';
+import { registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
+import { fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 
 export interface GastoRecurrente {
@@ -64,6 +68,62 @@ function validarFrecuenciaYDia(frecuencia: string, diaMes: number | null | undef
   return { frecuencia: frecuencia as FrecuenciaRecurrente, diaMes: null };
 }
 
+/**
+ * `diaMes<=15` cae siempre en la primera mitad del mes (1-15) y
+ * `diaMes>=16` en la segunda (16-fin) — ADR-004 ancla los periodos al
+ * calendario, así que un cargo mensual con día fijo siempre aterriza en
+ * la misma mitad, nunca en las dos. Comparar contra el día de
+ * `fechaInicio` (que solo puede ser `1` o `16`, ver
+ * modulos/periodos/calcular-quincena.ts) evita el caso especial de "el
+ * día 31 no existe en abril": ese cargo simplemente se materializa en
+ * la segunda mitad de abril, igual que lo haría cualquier cobro real
+ * de fin de mes. Vive aquí (no en materializar-recurrentes.ts) para
+ * que `crearGastoRecurrente`, abajo, pueda reusarla sin crear un ciclo
+ * de imports (materializar-recurrentes.ts ya importa de este archivo,
+ * nunca al revés).
+ */
+export function debeMaterializarEnEstePeriodo(recurrente: GastoRecurrente, fechaInicioPeriodo: string): boolean {
+  if (recurrente.frecuencia === 'quincenal') return true;
+  const diaInicioPeriodo = Number(fechaInicioPeriodo.slice(-2));
+  return recurrente.diaMes! <= 15 ? diaInicioPeriodo === 1 : diaInicioPeriodo === 16;
+}
+
+/**
+ * Genera el gasto real (mismas partidas que `registrarGasto`) para un
+ * recurrente en un periodo, si de verdad le toca — usada tanto por
+ * `materializarRecurrentesTx` (al activarse un periodo) como por
+ * `crearGastoRecurrente` (ver comentario ahí sobre el hallazgo real que
+ * motivó esto).
+ */
+export async function materializarUnRecurrenteTx(
+  tx: Ejecutor,
+  tenantId: string,
+  periodo: { id: string; cuentaId: string; fechaInicio: string },
+  recurrente: GastoRecurrente
+): Promise<void> {
+  if (!debeMaterializarEnEstePeriodo(recurrente, periodo.fechaInicio)) return;
+
+  const { movimientoId } = await registrarMovimientoTx(tx, {
+    tenantId,
+    tipo: 'gasto',
+    moneda: recurrente.moneda,
+    fechaEfectiva: periodo.fechaInicio,
+    nota: recurrente.descripcion,
+    partidas: [
+      { cuentaId: periodo.cuentaId, montoValorMinimo: -recurrente.montoValorMinimo },
+      { cuentaId: null, montoValorMinimo: recurrente.montoValorMinimo },
+    ],
+  });
+
+  await tx.insert(gastos).values({
+    tenantId,
+    periodoId: periodo.id,
+    movimientoId,
+    categoriaId: recurrente.categoriaId,
+    origenRecurrenteId: recurrente.id,
+  });
+}
+
 export interface CrearGastoRecurrenteEntrada {
   tenantId: string;
   descripcion: string;
@@ -72,8 +132,23 @@ export interface CrearGastoRecurrenteEntrada {
   categoriaId?: string | null;
   frecuencia: string;
   diaMes?: number | null;
+  fechaReferencia?: Date;
 }
 
+/**
+ * **Hallazgo real:** `materializarRecurrentesTx` solo corre en los dos
+ * momentos en que un periodo se vuelve activo — un recurrente creado
+ * DESPUÉS, mientras ese periodo ya está activo, nunca tenía otra
+ * oportunidad de materializarse en él, aunque su fecha le tocara
+ * exactamente a ese periodo (p. ej. crear hoy, día 16, un recurrente
+ * mensual con `diaMes: 17`, para el periodo 16-fin que ya está activo
+ * desde antes). Corregido comprobando, aquí mismo, si hay un periodo
+ * activo al que le toque de inmediato — mismo criterio de "una sola
+ * vez, nunca doble materialización" que ya vale para el camino
+ * original: un periodo que ya está activo no vuelve a pasar por
+ * `crearPeriodo`/la promoción de borrador, así que no hay forma de que
+ * esto y la materialización original choquen para el mismo periodo.
+ */
 export async function crearGastoRecurrente(entrada: CrearGastoRecurrenteEntrada): Promise<GastoRecurrente> {
   const descripcionLimpia = entrada.descripcion.trim();
   if (descripcionLimpia.length === 0) {
@@ -83,6 +158,7 @@ export async function crearGastoRecurrente(entrada: CrearGastoRecurrenteEntrada)
     throw new ErrorDominio('VALIDACION', 'El monto de un gasto recurrente debe ser positivo');
   }
   const { frecuencia, diaMes } = validarFrecuenciaYDia(entrada.frecuencia, entrada.diaMes);
+  const fechaReferencia = entrada.fechaReferencia ?? new Date();
 
   return conTenant(entrada.tenantId, async (tx) => {
     const categoriaId = await resolverCategoriaIdTx(tx, entrada.tenantId, entrada.categoriaId);
@@ -100,6 +176,21 @@ export async function crearGastoRecurrente(entrada: CrearGastoRecurrenteEntrada)
       })
       .returning(COLUMNAS_RECURRENTE);
     if (!recurrente) throw new Error('No se pudo crear el gasto recurrente');
+
+    // `fechaFin >= hoy` además de `estado = 'activo'`: sin resolver el
+    // cierre perezoso aquí (importar eso crearía un ciclo con
+    // cierre/cerrar-periodo.ts, que ya importa este módulo), esto evita
+    // el caso raro de materializar contra un periodo vencido que
+    // todavía no se cerró porque nadie lo ha vuelto a consultar.
+    const [periodoActivo] = await tx
+      .select({ id: periodos.id, cuentaId: periodos.cuentaId, fechaInicio: periodos.fechaInicio })
+      .from(periodos)
+      .where(and(eq(periodos.tenantId, entrada.tenantId), eq(periodos.estado, 'activo'), gte(periodos.fechaFin, fechaISO(fechaReferencia))))
+      .limit(1);
+    if (periodoActivo) {
+      await materializarUnRecurrenteTx(tx, entrada.tenantId, periodoActivo, recurrente as GastoRecurrente);
+    }
+
     return recurrente as GastoRecurrente;
   });
 }

@@ -217,10 +217,89 @@ describe('gastos recurrentes', () => {
       expect(datos).toHaveLength(0);
     });
 
-    it('un recurrente creado DESPUÉS de que un periodo ya está activo no se materializa retroactivamente en él', async () => {
+    it('un recurrente "quincenal" creado mientras el periodo activo ya existe se materializa de inmediato en él (hallazgo real del usuario)', async () => {
       const tenantId = await tenantNuevo();
       const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
-      await crearGastoRecurrente({ tenantId, descripcion: 'Gimnasio', montoValorMinimo: 30000n, moneda: 'MXN', frecuencia: 'quincenal' });
+      await crearGastoRecurrente({
+        tenantId,
+        descripcion: 'Gimnasio',
+        montoValorMinimo: 30000n,
+        moneda: 'MXN',
+        frecuencia: 'quincenal',
+        fechaReferencia: new Date('2026-08-05T00:00:00Z'),
+      });
+
+      const { datos } = await listarGastos(tenantId, periodo.id);
+      expect(datos).toHaveLength(1);
+      expect(datos[0]?.esRecurrente).toBe(true);
+    });
+
+    it('un recurrente "mensual" creado mientras el periodo activo SÍ le toca se materializa de inmediato (caso exacto reportado: periodo del 16, recurrente diaMes 17)', async () => {
+      const tenantId = await tenantNuevo();
+      // Periodo 16-30 de agosto, activo.
+      const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+
+      await crearGastoRecurrente({
+        tenantId,
+        descripcion: 'Renta',
+        montoValorMinimo: 500000n,
+        moneda: 'MXN',
+        frecuencia: 'mensual',
+        diaMes: 17,
+        fechaReferencia: new Date('2026-08-16T00:00:00Z'),
+      });
+
+      const { datos } = await listarGastos(tenantId, periodo.id);
+      expect(datos).toHaveLength(1);
+      expect(datos[0]?.montoValorMinimo).toBe(500000n);
+    });
+
+    it('un recurrente "mensual" creado mientras el periodo activo NO le toca (mitad equivocada del mes) no se materializa todavía', async () => {
+      const tenantId = await tenantNuevo();
+      // Periodo 1-15 de agosto, activo — diaMes 17 le toca a la SEGUNDA mitad, no a esta.
+      const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-05T00:00:00Z'));
+
+      await crearGastoRecurrente({
+        tenantId,
+        descripcion: 'Renta',
+        montoValorMinimo: 500000n,
+        moneda: 'MXN',
+        frecuencia: 'mensual',
+        diaMes: 17,
+        fechaReferencia: new Date('2026-08-05T00:00:00Z'),
+      });
+
+      const { datos } = await listarGastos(tenantId, periodo.id);
+      expect(datos).toHaveLength(0);
+    });
+
+    it('un recurrente creado sin ningún periodo activo no falla, simplemente no materializa nada todavía', async () => {
+      const tenantId = await tenantNuevo();
+      const recurrente = await crearGastoRecurrente({
+        tenantId,
+        descripcion: 'Gimnasio',
+        montoValorMinimo: 30000n,
+        moneda: 'MXN',
+        frecuencia: 'quincenal',
+      });
+      expect(recurrente.id).toBeDefined();
+    });
+
+    it('un recurrente creado cuando el único periodo "activo" en la fila ya venció (aún no lo cierra nadie) no se materializa en él', async () => {
+      const tenantId = await tenantNuevo();
+      const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+
+      // "Hoy" para crearGastoRecurrente es muy posterior al fin real del
+      // periodo (2026-08-15) — aunque la fila siga diciendo 'activo'
+      // porque nadie disparó el cierre perezoso, no debe materializarse ahí.
+      await crearGastoRecurrente({
+        tenantId,
+        descripcion: 'Gimnasio',
+        montoValorMinimo: 30000n,
+        moneda: 'MXN',
+        frecuencia: 'quincenal',
+        fechaReferencia: new Date('2026-09-01T00:00:00Z'),
+      });
 
       const { datos } = await listarGastos(tenantId, periodo.id);
       expect(datos).toHaveLength(0);
