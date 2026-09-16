@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import { crearApp } from './app.js';
+import { inicializarObservabilidad } from './shared/observabilidad.js';
+
+inicializarObservabilidad();
 
 const puerto = Number(process.env.PORT ?? 3000);
 const app = crearApp();

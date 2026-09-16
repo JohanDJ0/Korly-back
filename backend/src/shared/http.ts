@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { ErrorDominio } from './errores.js';
+import { reportarErrorInesperado } from './observabilidad.js';
 
 /**
  * Mapeo de `ErrorDominio.codigo` a status HTTP. `NO_SOPORTADO` → 501,
@@ -64,6 +65,7 @@ export function registrarManejadorErroresDominio(app: FastifyInstance): void {
     }
 
     app.log.error(error);
+    reportarErrorInesperado(error);
     reply.code(500).send({ codigo: 'ERROR_INTERNO', mensaje: 'Ocurrió un error inesperado' });
   });
 }

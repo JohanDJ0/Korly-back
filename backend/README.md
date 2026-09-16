@@ -193,6 +193,12 @@ contra un Postgres efímero levantado como servicio de GitHub Actions
 Docker), pero equivalente en espíritu: tampoco depende de pasos
 manuales ni de credenciales de Supabase.
 
+El frontend tiene su propio workflow
+([`.github/workflows/frontend-ci.yml`](../.github/workflows/frontend-ci.yml),
+agregado junto con la observabilidad — ver esa sección en este README):
+lint + typecheck + build en cada push/PR que toque `frontend/`. No
+corría en CI hasta ahora — un hueco real, no una omisión deliberada.
+
 El primer test del archivo (`corre con el rol sin privilegios`) falla
 a propósito si la conexión de los tests apunta al rol `postgres` en
 vez de a `app_backend` — así el resto de las aserciones no puede pasar
@@ -1350,6 +1356,43 @@ línea reales, CRLF, BOM, líneas en blanco). Probado en vivo contra el
 servidor y la cuenta de prueba reales, incluida una fila con un monto
 como `"1,234.00"` (coma real dentro del campo entrecomillado) para
 confirmar que el parser no la parte en dos columnas.
+
+## Observabilidad
+
+documento-maestro-v2.md, F0 "Fundaciones" y §15.1 (Must: "métricas
+instrumentadas") — pendiente desde el inicio del proyecto, cerrado
+junto con el hueco de CI del frontend (ver "Cómo correr los tests
+localmente", arriba) al analizar qué era lo más viable después de
+agotar el backlog de features rápidas.
+
+**Backend** (`shared/observabilidad.ts`, `@sentry/node`):
+`inicializarObservabilidad()` se llama una sola vez en `server.ts` —
+nunca dentro de `crearApp()`, para que `test:local`/CI (que importan
+`crearApp` directo) no dependan de esto. Sin `SENTRY_DSN` en el
+entorno, `Sentry.init` nunca se ejecuta y cualquier
+`Sentry.captureException` posterior es un no-op seguro (comportamiento
+documentado del SDK) — nada se rompe en desarrollo ni en CI, donde la
+variable nunca está definida. `reportarErrorInesperado` se llama en un
+único punto: el 500 genuino de `registrarManejadorErroresDominio`
+(`shared/http.ts`), nunca para un `ErrorDominio` (respuestas de
+negocio esperadas, no bugs) ni para los 4xx que ya reenvía Fastify.
+
+**Frontend** (`lib/observabilidad.ts`, `@sentry/react`): mismo
+criterio con `VITE_SENTRY_DSN` opcional. Viene acompañado de un
+`<Sentry.ErrorBoundary>` envolviendo `<App />` en `main.tsx` —
+hallazgo relacionado con el pase de QA/UX (mismo espíritu que
+`routes/NoEncontrado.tsx` para una URL no reconocida): sin esto, un
+error de render en cualquier componente dejaba a React desmontar el
+árbol entero y el usuario se quedaba viendo una pantalla en blanco,
+sin mensaje ni forma de recuperarse. Verificado en vivo forzando un
+throw real durante el render (no dentro de un `onClick` — React no
+captura errores de manejadores de evento con un ErrorBoundary, solo
+los de render/lifecycle) y confirmando que aparece el fallback
+("Algo salió mal" + botón "Reintentar") en vez de la pantalla en
+blanco.
+
+Ninguna de las dos integraciones manda nada a ningún lado hasta que se
+agregue un DSN real a `.env` — ver `.env.example` en ambos proyectos.
 
 ## CORS
 
