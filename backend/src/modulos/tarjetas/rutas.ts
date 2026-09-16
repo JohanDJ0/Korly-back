@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify';
-import { type CargoDetallado, listarCargosTarjeta, registrarCargoTarjeta } from './registrar-cargo.js';
+import {
+  type CargoDetallado,
+  listarCargosTarjeta,
+  listarPagosTarjetaDePeriodo,
+  type PagoTarjetaAplicado,
+  registrarCargoTarjeta,
+} from './registrar-cargo.js';
 import { crearTarjeta, listarTarjetas, type TarjetaConSaldo } from './tarjetas.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { montoADto, montoDesdeDto, type MontoDto } from '../../shared/http.js';
@@ -33,6 +39,16 @@ function cargoADto(cargo: CargoDetallado) {
       fechaVencimiento: m.fechaVencimiento,
       pagado: m.pagado,
     })),
+  };
+}
+
+function pagoAplicadoADto(pago: PagoTarjetaAplicado) {
+  return {
+    tarjetaNombre: pago.tarjetaNombre,
+    cargoDescripcion: pago.cargoDescripcion,
+    numeroPago: pago.numeroPago,
+    numeroPlazos: pago.numeroPlazos,
+    monto: montoADto(pago.montoValorMinimo, pago.moneda),
   };
 }
 
@@ -122,5 +138,19 @@ export async function rutasTarjetas(app: FastifyInstance): Promise<void> {
         fechaVencimiento: m.fechaVencimiento,
       })),
     });
+  });
+
+  /**
+   * Hallazgo real (ver registrar-cargo.ts, `listarPagosTarjetaDePeriodo`):
+   * un `pago_tarjeta` nunca aparece en `GET /periodos/:id/gastos` (es un
+   * tipo de movimiento distinto), así que sin esto no había ninguna
+   * forma de saber, para un periodo dado, qué mensualidades de tarjeta
+   * ya se le aplicaron. Usado tanto por el aviso proactivo en Home
+   * (periodo activo) como por Historial (cualquier periodo, pasado o
+   * presente).
+   */
+  app.get<{ Params: { periodoId: string } }>('/periodos/:periodoId/pagos-tarjeta', async (request, reply) => {
+    const pagos = await listarPagosTarjetaDePeriodo(request.identidad.tenantId, request.params.periodoId);
+    reply.send(pagos.map(pagoAplicadoADto));
   });
 }

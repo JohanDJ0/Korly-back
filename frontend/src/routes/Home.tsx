@@ -10,6 +10,7 @@ import { RecordatorioContextual } from '@/components/RecordatorioContextual';
 import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
+import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
@@ -39,6 +40,7 @@ export function Home() {
   // requisito real es tener un periodo activo, que es justo cuando `data`
   // existe sin error.
   const periodoId = !error ? data?.periodoId : undefined;
+  const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
@@ -70,6 +72,31 @@ export function Home() {
             <Button asChild size="sm" variant="outline" className="w-full">
               <Link to={`/resumen/${resumenPendiente.periodoId}`}>Decidir ahora</Link>
             </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {
+        // Hallazgo real (el usuario preguntó si el pago de tarjeta se
+        // descuenta solo o hay que agregarlo a mano): sí es automático,
+        // pero antes no había ningún aviso — un 'pago_tarjeta' nunca
+        // aparece en el listado de gastos (es un tipo de movimiento
+        // distinto), así que el disponible bajaba sin ninguna
+        // explicación visible. Este aviso es la corrección.
+      }
+      {pagosTarjeta && pagosTarjeta.length > 0 && (
+        <Card className="w-full max-w-sm border-primary/40 bg-primary/5 dark:bg-primary/10">
+          <CardContent className="flex flex-col gap-2 pt-6">
+            <p className="text-sm font-medium">
+              Esta quincena ya se aplicaron {pagosTarjeta.length} pago{pagosTarjeta.length === 1 ? '' : 's'} de tarjeta a tu disponible:
+            </p>
+            <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
+              {pagosTarjeta.map((pago, indice) => (
+                <li key={indice}>
+                  {pago.tarjetaNombre} — {pago.cargoDescripcion} ({pago.numeroPago}/{pago.numeroPlazos}): {formatearMonto(pago.monto)}
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}

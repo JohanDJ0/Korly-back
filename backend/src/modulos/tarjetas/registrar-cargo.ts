@@ -1,7 +1,9 @@
 import { and, asc, eq } from 'drizzle-orm';
 import { cargosTarjeta, pagosTarjeta } from '../../db/schema/cargos-tarjeta.js';
+import { tarjetas } from '../../db/schema/tarjetas.js';
 import { obtenerCategoriaPorIdTx } from '../categorias/categorias.js';
 import { registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
+import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { obtenerSaldoTarjetaTx, obtenerTarjetaPorIdTx } from './tarjetas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
@@ -204,5 +206,50 @@ export async function listarCargosTarjeta(tenantId: string, tarjetaId: string): 
       });
     }
     return resultado;
+  });
+}
+
+export interface PagoTarjetaAplicado {
+  tarjetaNombre: string;
+  cargoDescripcion: string;
+  numeroPago: number;
+  numeroPlazos: number;
+  montoValorMinimo: bigint;
+  moneda: string;
+}
+
+/**
+ * Hallazgo real (el usuario preguntó "¿se descuenta automático o hay
+ * que agregarlo a mano?"): el pago de una mensualidad SÍ se descuenta
+ * solo (materializar-pagos-tarjeta.ts), pero antes no había ninguna
+ * forma de enterarse de que pasó — 'pago_tarjeta' nunca aparece en
+ * `listarGastos` (es un tipo de movimiento distinto, no una fila de
+ * `gastos`), así que la única pista era notar, a mano, que una
+ * mensualidad cambió a "Pagado" en Tarjetas → Ver compras. Esta
+ * consulta es lo que permite avisar proactivamente en Home/Historial
+ * (ver rutas.ts) qué pagos de tarjeta ya se aplicaron a un periodo
+ * dado.
+ */
+export async function listarPagosTarjetaDePeriodo(tenantId: string, periodoId: string): Promise<PagoTarjetaAplicado[]> {
+  return conTenant(tenantId, async (tx) => {
+    const periodo = await obtenerPeriodoPorIdTx(tx, tenantId, periodoId);
+    if (!periodo) {
+      throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
+    }
+
+    return tx
+      .select({
+        tarjetaNombre: tarjetas.nombre,
+        cargoDescripcion: cargosTarjeta.descripcion,
+        numeroPago: pagosTarjeta.numeroPago,
+        numeroPlazos: cargosTarjeta.numeroPlazos,
+        montoValorMinimo: pagosTarjeta.montoValorMinimo,
+        moneda: cargosTarjeta.moneda,
+      })
+      .from(pagosTarjeta)
+      .innerJoin(cargosTarjeta, eq(cargosTarjeta.id, pagosTarjeta.cargoTarjetaId))
+      .innerJoin(tarjetas, eq(tarjetas.id, cargosTarjeta.tarjetaId))
+      .where(and(eq(pagosTarjeta.tenantId, tenantId), eq(pagosTarjeta.periodoId, periodoId)))
+      .orderBy(asc(tarjetas.nombre), asc(pagosTarjeta.numeroPago));
   });
 }

@@ -10,7 +10,7 @@ import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.j
 import { obtenerResumen } from '../../src/modulos/cierre/generar-resumen.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { crearTarjeta, listarTarjetas } from '../../src/modulos/tarjetas/tarjetas.js';
-import { listarCargosTarjeta, registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
+import { listarCargosTarjeta, listarPagosTarjetaDePeriodo, registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
 import { conTenant } from '../../src/shared/db.js';
 
 // Toda la quincena de prueba vive en esta ventana.
@@ -206,6 +206,16 @@ describe('tarjetas de crédito y MSI', () => {
       expect(mensualidades[0]?.pagado).toBe(true);
       expect(mensualidades[1]?.pagado).toBe(false);
       expect(mensualidades[2]?.pagado).toBe(false);
+
+      // El aviso: el periodo que recibió el pago debe poder consultarlo.
+      const pagosAplicados = await listarPagosTarjetaDePeriodo(tenantId, periodoSeptiembre.id);
+      expect(pagosAplicados).toEqual([
+        { tarjetaNombre: 'BBVA Oro', cargoDescripcion: 'Refrigerador', numeroPago: 1, numeroPlazos: 3, montoValorMinimo: 300000n, moneda: 'MXN' },
+      ]);
+
+      // El periodo de julio (donde se compró, pero no venció nada) no debe mostrar nada.
+      const pagosEnJulio = await listarPagosTarjetaDePeriodo(tenantId, periodoJulio.id);
+      expect(pagosEnJulio).toEqual([]);
     });
 
     it('un periodo en borrador (ya hay uno activo) no materializa todavía', async () => {

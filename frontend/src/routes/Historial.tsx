@@ -7,9 +7,11 @@ import { FormularioImportar } from '@/components/FormularioImportar';
 import { useExportar } from '@/hooks/use-exportar';
 import { useGastos } from '@/hooks/use-gastos';
 import { useIngresos } from '@/hooks/use-ingresos';
+import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { usePeriodos } from '@/hooks/use-periodos';
 import { ApiError } from '@/lib/api';
+import { formatearMonto } from '@/lib/dinero';
 import { formatearFechaHora, formatearRangoFechas } from '@/lib/fechas';
 
 /**
@@ -42,6 +44,7 @@ export function Historial() {
     hasNextPage,
     isFetchingNextPage,
   } = useGastos(periodoId);
+  const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
 
   const periodosAnteriores = (periodos ?? []).filter(
     (p) => (p.estado === 'cerrado' || p.estado === 'archivado') && p.id !== periodoId
@@ -142,6 +145,32 @@ export function Historial() {
               </Button>
             )}
           </section>
+
+          {
+            // Hallazgo real: un pago de tarjeta nunca aparece arriba, en
+            // "Gastos" — es un tipo de movimiento distinto (ver
+            // backend/README.md, "Tarjetas de crédito y MSI"). Sin esta
+            // sección, no había ninguna forma de ver, desde el
+            // historial, qué mensualidades ya se aplicaron a este
+            // periodo. Solo se muestra si hay algo que mostrar.
+          }
+          {pagosTarjeta && pagosTarjeta.length > 0 && (
+            <section>
+              <h2 className="mb-2 text-sm font-medium text-muted-foreground">Pagos de tarjeta</h2>
+              <ul>
+                {pagosTarjeta.map((pago, indice) => (
+                  <li key={indice} className="flex items-center justify-between gap-2 border-b py-3">
+                    <div>
+                      <p className="font-medium">{formatearMonto(pago.monto)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {pago.tarjetaNombre} — {pago.cargoDescripcion} ({pago.numeroPago}/{pago.numeroPlazos})
+                      </p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
 
