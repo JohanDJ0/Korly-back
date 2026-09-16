@@ -33,6 +33,15 @@ export const TIPOS_MOVIMIENTO = [
   'aporte_meta',
   'retiro_meta',
   'reversion',
+  // Tarjetas de crédito y MSI (ver modulos/tarjetas/) — dos movimientos
+  // separados a propósito, nunca uno solo: 'cargo_tarjeta' es la compra
+  // (tarjeta -> externo, sube la deuda, no toca ningún periodo todavía);
+  // 'pago_tarjeta' es cada mensualidad al vencer (periodo -> tarjeta,
+  // transferencia interna, mismo patrón que 'arrastre_sobrante' entre
+  // periodo y periodo). Separarlos es lo que permite que una compra a
+  // 12 MSI no golpee el disponible de la quincena de un jalón.
+  'cargo_tarjeta',
+  'pago_tarjeta',
 ] as const;
 export type TipoMovimiento = (typeof TIPOS_MOVIMIENTO)[number];
 
@@ -96,7 +105,7 @@ export const movimientos = pgTable(
   (t) => [
     check(
       'movimientos_tipo_valido',
-      sql`${t.tipo} in ('ingreso','gasto','arrastre_sobrante','aporte_meta','retiro_meta','reversion')`
+      sql`${t.tipo} in ('ingreso','gasto','arrastre_sobrante','aporte_meta','retiro_meta','reversion','cargo_tarjeta','pago_tarjeta')`
     ),
     pgPolicy('movimientos_aislamiento_tenant', {
       for: 'all',

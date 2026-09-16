@@ -8,6 +8,7 @@ import { resolverDecisionesVencidasTx } from './decidir-sobrante.js';
 import { generarResumenTx, obtenerResumenTx, type ResumenGenerado } from './generar-resumen.js';
 import { drenarACuentaPuenteTx, reclamarArrastresTx } from './materializar-arrastre.js';
 import { materializarRecurrentesTx } from '../recurrentes/materializar-recurrentes.js';
+import { materializarPagosTarjetaTx } from '../tarjetas/materializar-pagos-tarjeta.js';
 
 /**
  * Default del barrido de sobrante pendiente (modelo-dominio.md §3).
@@ -137,6 +138,7 @@ async function promoverBorradorSiExisteTx(tx: Ejecutor, tenantId: string, fechaR
   await tx.update(periodos).set({ estado: 'activo' }).where(eq(periodos.id, borrador.id));
   await reclamarArrastresTx(tx, tenantId, borrador.id, borrador.cuentaId, fechaReferencia);
   await materializarRecurrentesTx(tx, tenantId, borrador);
+  await materializarPagosTarjetaTx(tx, tenantId, borrador);
 }
 
 /**

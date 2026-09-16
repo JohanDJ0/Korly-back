@@ -12,6 +12,7 @@ import { rutasCategorias } from './modulos/categorias/rutas.js';
 import { rutasRecurrentes } from './modulos/recurrentes/rutas.js';
 import { rutasExportar } from './modulos/exportar/rutas.js';
 import { rutasImportar } from './modulos/importar/rutas.js';
+import { rutasTarjetas } from './modulos/tarjetas/rutas.js';
 
 export function crearApp() {
   const app = Fastify({ logger: true });
@@ -77,6 +78,7 @@ export function crearApp() {
       v1.register(rutasRecurrentes);
       v1.register(rutasExportar);
       v1.register(rutasImportar);
+      v1.register(rutasTarjetas);
     },
     { prefix: '/v1' }
   );

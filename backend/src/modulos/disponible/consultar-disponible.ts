@@ -57,7 +57,7 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * menos) y `díasRestantes` bajó uno - ahí es donde ocurre la
  * redistribución, nunca a mitad del mismo día.
  *
- * **Por qué el corte se restringe a `['gasto', 'aporte_meta']` y no al
+ * **Por qué el corte se restringe a `['gasto', 'aporte_meta', 'pago_tarjeta']` y no al
  * neto de "todo lo de hoy":** se probó primero con el neto de TODOS los
  * asientos de hoy, y falla justo en el caso más común - el día 1, con
  * el ingreso y el primer gasto fechados el mismo día. Un ingreso de
@@ -105,7 +105,16 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
   const disponibleValorMinimo = await obtenerSaldoCuenta(tenantId, periodo.cuentaId);
   const diasRestantes = calcularDiasRestantes(periodo.fechaFin, fechaReferencia);
 
-  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), ['gasto', 'aporte_meta']);
+  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), [
+    'gasto',
+    'aporte_meta',
+    // Mismo criterio que 'aporte_meta': modelo-dominio.md §6 ya
+    // establece que un aporte "se trata como un gasto más" para este
+    // corte — una mensualidad de tarjeta materializada hoy (el periodo
+    // se activó hoy mismo) debe contar igual, o "gastadoHoy" mostraría
+    // $0 aunque un pago real ya haya bajado el disponible.
+    'pago_tarjeta',
+  ]);
   const gastadoHoyValorMinimo = netoGastosHoy < 0n ? -netoGastosHoy : 0n;
   const disponibleBaseHoy = disponibleValorMinimo + gastadoHoyValorMinimo;
   const objetivoHoy = pisoDivisionBigInt(disponibleBaseHoy, BigInt(diasRestantes));

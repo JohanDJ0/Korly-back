@@ -1394,6 +1394,85 @@ blanco.
 Ninguna de las dos integraciones manda nada a ningún lado hasta que se
 agregue un DSN real a `.env` — ver `.env.example` en ambos proyectos.
 
+## Tarjetas de crédito y MSI
+
+documento-maestro-v2.md, diferenciador #3: "tarjetas de crédito y MSI
+modelados nativamente". **Deliberadamente sin conexión bancaria** —
+mismo criterio que el resto del producto (tesis de valor, §1.3: "sin
+conexión bancaria, resuelve el ciclo quincenal mexicano"; §20 explica
+por qué: la CNBV nunca emitió las reglas secundarias de Open Finance
+transaccional en México). El usuario captura cada compra a mano, igual
+que un gasto en efectivo — la diferencia está en el modelo de datos.
+
+**`'tarjeta'` ya existía en `TIPOS_CUENTA` desde el primer commit**,
+reservado sin usarse. Tabla `tarjetas` (mismo patrón que `metas`):
+`cuentaId`, `limiteCreditoValorMinimo`, `diaCorte`, `diasParaPago` (el
+plazo de pago mexicano real es "N días después del corte", no un día
+fijo del mes). Una tarjeta es un pasivo: saldo negativo = deuda, un
+cargo la vuelve más negativa, un pago la acerca a cero.
+
+**Dos movimientos nuevos en el ledger, nunca uno solo** — esto es lo
+que permite que una compra a 12 MSI no golpee el disponible de la
+quincena de un jalón:
+
+- **`cargo_tarjeta`** (la compra): `tarjeta -> externo`. Sube la deuda
+  de inmediato, no toca ningún periodo. En la misma transacción se
+  calculan y guardan las `numeroPlazos` mensualidades futuras
+  (`pagos_tarjeta`), con sus fechas de vencimiento reales
+  (`calcular-ciclo.ts`: antes del corte → ese ciclo, después → el
+  siguiente; cada mensualidad subsecuente, un corte más adelante).
+  `repartirEnMensualidades` (registrar-cargo.ts) carga el residuo del
+  redondeo a la última mensualidad, para que la suma cierre exacto en
+  centavos.
+- **`pago_tarjeta`** (cada mensualidad al vencer): `periodo -> tarjeta`,
+  transferencia interna — mismo patrón que `arrastre_sobrante` entre
+  periodo y periodo. Baja el disponible de esa quincena y la deuda de
+  la tarjeta en la misma operación.
+
+**Materialización:** `materializarPagosTarjetaTx` se llama en los
+mismos dos puntos exactos que `materializarRecurrentesTx`
+(`crearPeriodo` y la promoción de borrador) — al activarse un periodo,
+cualquier mensualidad pendiente que venza en su ventana se materializa
+sola. El usuario solo interactúa una vez, al registrar la compra;
+todas las quincenas futuras ya "saben" lo que les toca. Misma
+limitación conocida que recurrentes: si el periodo al que le tocaba
+una mensualidad nunca se activa, queda pendiente hasta que sí se
+active uno cuya ventana la cubra.
+
+**Encaje con el resto del sistema, todo verificado, no supuesto:**
+`obtenerSaldoCuenta` ya suma TODOS los asientos de una cuenta sin
+importar el tipo, así que `disponible` refleja un `pago_tarjeta`
+automáticamente, sin tocar `consultar-disponible.ts` para el cálculo
+principal — solo el corte de `gastadoHoy` (restringido a tipos
+específicos) necesitó agregar `'pago_tarjeta'` junto a `'gasto'`/
+`'aporte_meta'`. La clasificación exhaustiva de `generar-resumen.ts`
+(que revienta a propósito ante un tipo no clasificado — el mismo
+mecanismo que ya atrapó el bug de "arrastre heredado") obligó a sumar
+`'pago_tarjeta'` a `TIPOS_GASTO`; `'cargo_tarjeta'` no necesita
+clasificarse ahí porque nunca postea contra `periodo.cuentaId`.
+
+**Dos decisiones de producto, tomadas explícitamente con el usuario al
+diseñar esto** (a diferencia del resto del sistema, donde "presupuesto
+excedido" nunca bloquea): un cargo que excede el crédito disponible
+**se bloquea** (`LIMITE_CREDITO_EXCEDIDO`, 403) — un límite de tarjeta
+es un tope físico real, no una guía. Y el alcance de esta primera
+versión es **solo mensualidades automáticas**: no hay abonos extra ni
+adelantados todavía (quedaría como extensión futura, igual que aportar
+a una meta) — el modelo asume que se paga exactamente lo calculado al
+momento de la compra.
+
+Validado contra Postgres real (`test/integracion/tarjetas.test.ts` +
+`test/unidad/tarjetas.test.ts`): validaciones de entrada, BOLA en
+tarjeta y categoría, bloqueo del límite de crédito (incluido el caso
+límite exacto), reparto de mensualidades con residuo, matemática de
+fechas de corte/vencimiento (antes/después/exacto del corte, cruce de
+año, día de corte que no existe en el mes), materialización correcta
+al activar un periodo, un periodo en borrador que no materializa
+todavía, clasificación correcta en el resumen de cierre, y aislamiento
+entre tenants. Probado en vivo contra el servidor y la cuenta de
+prueba reales: alta de tarjeta, cargo a 12 MSI con las mensualidades
+correctas, y el bloqueo real del límite de crédito.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

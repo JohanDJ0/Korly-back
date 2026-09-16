@@ -140,7 +140,14 @@ interface TotalesPeriodo {
  * trata como un gasto más"; el retiro es su simétrico.
  */
 const TIPOS_INGRESO: ReadonlySet<TipoMovimiento> = new Set(['ingreso', 'retiro_meta', 'arrastre_sobrante']);
-const TIPOS_GASTO: ReadonlySet<TipoMovimiento> = new Set(['gasto', 'aporte_meta']);
+// 'pago_tarjeta' (modulos/tarjetas/materializar-pagos-tarjeta.ts) baja
+// el disponible de la quincena exactamente igual que un gasto — el
+// chequeo exhaustivo de abajo (throw en cualquier tipo no clasificado)
+// es lo que obligó a no olvidar este caso al agregar tarjetas.
+// 'cargo_tarjeta' NO aparece aquí a propósito: nunca postea un asiento
+// contra `periodo.cuentaId` (solo contra la cuenta de la tarjeta), así
+// que el resumen de un periodo nunca se entera de que existió.
+const TIPOS_GASTO: ReadonlySet<TipoMovimiento> = new Set(['gasto', 'aporte_meta', 'pago_tarjeta']);
 
 /**
  * **Bug real, encontrado antes de construir Metas — no hipotético.**

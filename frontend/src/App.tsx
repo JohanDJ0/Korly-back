@@ -11,6 +11,7 @@ import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { Recurrentes } from '@/routes/Recurrentes';
 import { Registro } from '@/routes/Registro';
 import { Resumen } from '@/routes/Resumen';
+import { Tarjetas } from '@/routes/Tarjetas';
 
 export function App() {
   return (
@@ -26,6 +27,7 @@ export function App() {
             <Route path="/resumen/:periodoId" element={<Resumen />} />
             <Route path="/metas" element={<Metas />} />
             <Route path="/recurrentes" element={<Recurrentes />} />
+            <Route path="/tarjetas" element={<Tarjetas />} />
           </Route>
           <Route path="*" element={<NoEncontrado />} />
         </Routes>

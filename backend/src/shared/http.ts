@@ -31,6 +31,12 @@ const CODIGO_A_STATUS: Record<string, number> = {
   CATEGORIA_NO_ENCONTRADA: 404,
   LIMITE_CATEGORIAS_ALCANZADO: 403,
   RECURRENTE_NO_ENCONTRADO: 404,
+  TARJETA_NO_ENCONTRADA: 404,
+  // Mismo criterio que LIMITE_CATEGORIAS_ALCANZADO (403): a diferencia
+  // de "presupuesto excedido" (nunca se bloquea), el límite de crédito
+  // de una tarjeta es un tope físico real — ver backend/README.md,
+  // "Tarjetas de crédito y MSI".
+  LIMITE_CREDITO_EXCEDIDO: 403,
 };
 
 /**
