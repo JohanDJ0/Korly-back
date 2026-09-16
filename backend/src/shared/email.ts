@@ -25,13 +25,27 @@ export interface CorreoEntrada {
  * también sirve de `text` para Resend, que ya genera un `html` mínimo
  * a partir de texto si no se le da uno explícito.
  */
+/**
+ * **Hallazgo real, al probar contra la cuenta real:** el SDK de Resend
+ * no lanza en un error de la API (límite del modo de prueba, dominio
+ * sin verificar, etc.) — devuelve `{ data, error }`, y solo lo *loguea*
+ * a consola por su cuenta. Sin este chequeo, `procesarRecordatorioDiarioDeTenant`
+ * marcaba `enviado: true` (y `recordatorios_enviados` ya había
+ * reclamado el día) aunque el correo nunca hubiera salido — el conteo
+ * del job (`enviados`/`fallidos`) mentía. Lanzar aquí hace que el
+ * `catch` por tenant en `scripts/enviar-recordatorios.ts` lo cuente
+ * como lo que es: un fallo, no un envío.
+ */
 export async function enviarCorreo(entrada: CorreoEntrada): Promise<void> {
   if (!resend) return;
 
-  await resend.emails.send({
+  const { error } = await resend.emails.send({
     from: remitente,
     to: entrada.para,
     subject: entrada.asunto,
     text: entrada.textoPlano,
   });
+  if (error) {
+    throw new Error(`Resend rechazó el envío: ${error.message}`);
+  }
 }

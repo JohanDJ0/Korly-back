@@ -106,8 +106,17 @@ usando el **connection pooler** de Supabase, no la conexión directa
 hallazgo real, la conexión directa tuvo fallas intermitentes de DNS en
 desarrollo mientras el dominio principal de Supabase seguía
 resolviendo bien — el pooler es infraestructura separada y no las
-compartió. `DATABASE_URL` (solo migraciones, uso ocasional) se deja
-como conexión directa.
+compartió.
+
+**`DATABASE_URL` también, en modo *session* (mismo host, puerto 5432,
+no 6543) — ya no es "solo migraciones, uso ocasional".** Desde que
+`shared/db-admin.ts` (modulos/notificaciones/) lo usa en cada corrida
+del job de recordatorios, no solo drizzle-kit, la misma falla
+intermitente de la conexión directa volvió a aparecer ahí — verificado
+en vivo el mismo día que se corrigió `APP_DATABASE_URL`. Modo *session*
+(no *transaction*) porque drizzle-kit sí necesita semántica de sesión
+completa para las migraciones; el rol sigue siendo `postgres`, solo
+cambia el host/puerto: `postgres.TU-PROYECTO@aws-0-TU-REGION.pooler.supabase.com:5432`.
 
 ## 5. Generar y aplicar las migraciones
 
@@ -1736,13 +1745,35 @@ periodo activo, sin ingreso, ya hubo actividad hoy, ya se mandó hoy,
 backoff activo, backoff termina tras los días de espera, backoff se
 resetea con actividad real, sin correo resuelto, preferencias) contra
 Postgres real — el envío en sí queda mockeado vía `resolverCorreo`,
-nunca una llamada real. **Verificado en vivo contra la cuenta real:**
-el ajuste de "Recibir recordatorios por correo" (`routes/Ajustes.tsx`,
-pantalla nueva) se apagó y se volvió a prender, confirmando que
-persiste contra la base real. **Pendiente:** el envío real de un
-correo — todavía no hay una cuenta de Resend con dominio verificado;
-correr el script contra la cuenta real antes de eso solo consumiría el
-cupo de "hoy" sin mandar nada (`RESEND_API_KEY` vacío = no-op).
+nunca una llamada real.
+
+**Verificado en vivo contra la cuenta real, de punta a punta:** el
+ajuste de "Recibir recordatorios por correo" se apagó y se volvió a
+prender (persiste contra la base real), y se corrió
+`scripts/enviar-recordatorios.ts` de verdad contra las 115 filas reales
+de `tenants` — 2 calificaron ese día, el correo a la cuenta real llegó
+(a spam, ver abajo), y el índice único de `recordatorios_enviados`
+protegió correctamente una segunda corrida el mismo día (`enviados: 0`
+la segunda vez).
+
+**Dos hallazgos reales de esa corrida:**
+
+1. **El SDK de Resend no lanza en un error de la API** (límite del
+   modo de prueba: solo entrega al correo dueño de la cuenta) — devuelve
+   `{ data, error }` y solo lo loguea a consola por su cuenta.
+   `enviarCorreo` no revisaba ese campo, así que un correo que Resend
+   rechazó de verdad se contaba como `enviado: true` en el resumen del
+   job. Corregido: ahora lanza si `error` viene presente, y el `catch`
+   por tenant en el script lo cuenta como `fallido`, no como enviado.
+2. **Llega a spam en modo de prueba** — esperado, no un bug: el
+   remitente (`onboarding@resend.dev`) es un dominio compartido por
+   miles de cuentas de Resend, sin reputación propia, y "Korly" como
+   nombre con un dominio ajeno es justo el patrón que los filtros
+   asocian con suplantación. El mecanismo completo (disparo, contenido,
+   entrega) ya quedó probado; falta el dominio propio verificado
+   (SPF/DKIM, idealmente DMARC) para que llegue a la bandeja principal
+   — el paso de comprar/verificar un dominio sigue pendiente de que el
+   usuario lo decida.
 
 ## CORS
 
