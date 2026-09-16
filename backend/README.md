@@ -742,6 +742,41 @@ corrección: editar un ingreso el mismo día dejaba `gastadoHoy` en
 mismo día que una edición de ingreso sigue contando solo por el gasto
 real, sin que la corrección del ingreso lo tape ni lo infle.
 
+### Tercer hallazgo real: un pago automático materializado hoy se contaba como gasto discrecional de hoy
+
+**Reportado por el usuario contra su cuenta real**, justo al verificar
+en vivo el fix de "Gastos recurrentes" de arriba: creó un recurrente
+mensual (`diaMes: 17`) mientras el periodo 16-fin ya estaba activo, la
+materialización inmediata generó el gasto de $2,000 fechado hoy, y la
+pantalla pasó de "puedes gastar hoy $486.66" a "te excediste hoy por
+$1,513.34" — como si el usuario hubiera elegido gastarse la renta
+completa en un solo día. El disponible total bajó correctamente; lo
+que estaba mal era tratar ese gasto como si fuera una decisión
+discrecional de hoy.
+
+**Causa:** el corte de `gastadoHoy` (`tipos: ['gasto', 'aporte_meta',
+'pago_tarjeta']`) no distinguía un gasto manual de uno materializado
+automáticamente — un recurrente o una mensualidad de tarjeta que
+vencen a materializarse el mismo día en que el periodo se activa caen
+en el corte igual que si el usuario los hubiera registrado a mano.
+
+**Corregido:** `'pago_tarjeta'` sale por completo del corte (en V1 solo
+existe la vía automática — nunca hay un pago de tarjeta manual, ver
+`## Tarjetas de crédito y MSI`). Para `'gasto'`, que sí comparten tipo
+un gasto manual y uno de un recurrente, `obtenerNetoCuentaEnFecha`
+gana una opción `excluirGastosRecurrentes` que hace `LEFT JOIN` contra
+`gastos` (resolviendo primero, igual que con las reversiones, al
+movimiento "efectivo") y descarta las filas con `origenRecurrenteId`
+no nulo. Un gasto manual, con o sin una reversión de por medio, sigue
+contando exactamente igual que antes.
+
+Tres tests nuevos en `test/integracion/disponible.test.ts`: el caso
+exacto reportado (recurrente materializado el mismo día no cuenta como
+gastado hoy pero sí baja el disponible), un gasto manual el mismo día
+que el recurrente sigue contando (el recurrente no lo tapa), y el caso
+equivalente con una mensualidad de tarjeta materializada al activarse
+el periodo.
+
 ## Cierre
 
 ```
@@ -1178,10 +1213,57 @@ Validado contra Postgres real (`test/integracion/recurrentes.test.ts`):
 validaciones de entrada, BOLA en categoría y en el propio recurrente,
 pausar sin borrar, cambiar de frecuencia sin arrastrar un `diaMes` que
 ya no aplica, las tres reglas de materialización (quincenal, mensual
-primera/segunda mitad, el caso de día 31), que un recurrente pausado o
-creado después no se materialice, que un periodo en `'borrador'` no
-materialice todavía, aislamiento entre tenants, propagación de
-categoría, y el índice único parcial.
+primera/segunda mitad, el caso de día 31), que un recurrente pausado
+no se materialice, que un periodo en `'borrador'` no materialice
+todavía, aislamiento entre tenants, propagación de categoría, y el
+índice único parcial.
+
+### Bug real: un recurrente creado con el periodo ya activo no se materializaba hasta el periodo siguiente
+
+Reportado por el usuario con el caso exacto: creó un periodo nuevo el
+día 16, y un recurrente `'mensual'` con `diaMes: 17` — que por regla
+(`diaMes>=16` → segunda mitad) le tocaba exactamente a ese periodo,
+pero no aparecía. Causa: `materializarRecurrentesTx` solo corre en los
+dos momentos en que un periodo se vuelve `'activo'` (`crearPeriodo` y
+la promoción de borrador) — un recurrente creado **después**, mientras
+ese periodo ya está activo, nunca tenía otra oportunidad de
+materializarse en él, aunque su fecha le tocara exactamente a ese
+periodo. El caso "un recurrente creado después de que un periodo ya
+está activo no se materializa retroactivamente" incluso estaba probado
+así deliberadamente — era el comportamiento documentado, solo que
+resultó ser el comportamiento equivocado para este caso concreto.
+
+**Corregido** extrayendo la lógica de "¿le toca este recurrente a este
+periodo?" + la escritura del ledger a una función compartida
+(`materializarUnRecurrenteTx`, en `recurrentes.ts` — vive ahí, no en
+`materializar-recurrentes.ts`, para que `crearGastoRecurrente` pueda
+reusarla sin crear un ciclo de imports, ya que
+`materializar-recurrentes.ts` importa de `recurrentes.ts`, nunca al
+revés). Ahora `crearGastoRecurrente` comprueba, en la misma
+transacción, si hay un periodo activo al que le toque de inmediato
+(`estado = 'activo' AND fechaFin >= hoy` — el filtro de fecha evita
+materializar contra un periodo vencido que técnicamente sigue
+marcado `'activo'` porque nadie disparó el cierre perezoso) y lo
+materializa ahí mismo si corresponde. Sin riesgo de doble
+materialización: un periodo que ya está activo nunca vuelve a pasar
+por `crearPeriodo`/la promoción de borrador, así que este camino nuevo
+y el original nunca compiten por el mismo periodo.
+
+Validado con 4 tests nuevos: el caso exacto reportado (periodo del 16,
+recurrente `diaMes: 17`), un recurrente `'mensual'` creado cuando el
+periodo activo NO le toca (no debe materializarse), sin ningún periodo
+activo (no debe fallar), y contra un periodo cuya fila sigue diciendo
+`'activo'` pero ya venció en la realidad (no debe materializarse ahí).
+
+Verificado en vivo contra la cuenta real, una vez resuelto el problema
+de DNS de la máquina de desarrollo: el recurrente original de la
+cuenta del usuario era anterior a este fix, así que quedó "huérfano" —
+nunca iba a materializarse retroactivamente. Se corrigió pausándolo y
+recreándolo idéntico, lo que sí disparó la materialización inmediata
+del código nuevo. Esa misma verificación destapó un segundo bug real,
+ver "Bug real: un pago automático materializado hoy se contaba como
+gasto discrecional de hoy" en `## Disponible (el motor de flujo de
+caja)`.
 
 ## Exportación
 
@@ -1472,6 +1554,32 @@ todavía, clasificación correcta en el resumen de cierre, y aislamiento
 entre tenants. Probado en vivo contra el servidor y la cuenta de
 prueba reales: alta de tarjeta, cargo a 12 MSI con las mensualidades
 correctas, y el bloqueo real del límite de crédito.
+
+### Aviso de pagos de tarjeta aplicados
+
+Hallazgo real (el usuario preguntó explícitamente: "¿se descuenta
+automático o hay que agregarlo a mano?"): el pago de una mensualidad sí
+se descuenta solo del disponible, pero un `'pago_tarjeta'` nunca
+aparece en `GET /periodos/:id/gastos` (es un tipo de movimiento
+distinto, no una fila de `gastos`) — así que no había ninguna forma de
+enterarse de que había pasado, más allá de notar a mano que una
+mensualidad cambió a "Pagado" en Tarjetas → Ver compras.
+
+**`listarPagosTarjetaDePeriodo`** (`registrar-cargo.ts`) + **`GET
+/periodos/{periodoId}/pagos-tarjeta`**: para cualquier periodo, lista
+qué mensualidades ya se le aplicaron (tarjeta, descripción del cargo,
+número de pago/plazos, monto). Frontend: una tarjeta de aviso en Home
+cuando el periodo activo tiene pagos aplicados (mismo estilo que el
+aviso de sobrante pendiente), y una sección "Pagos de tarjeta" en
+Historial para cualquier periodo — llenando el hueco de visibilidad
+que dejaba que `pago_tarjeta` nunca apareciera junto a los gastos
+normales.
+
+Validado con una extensión de `test/integracion/tarjetas.test.ts`: el
+periodo que recibe la mensualidad la ve en la consulta, el periodo
+donde solo se hizo la compra (antes de que venza nada) no ve nada.
+Verificación en vivo contra la cuenta real todavía pendiente (la
+cuenta de prueba real no tiene ninguna tarjeta dada de alta todavía).
 
 ## CORS
 

@@ -492,6 +492,39 @@ entorno.
   teal) — verificado visualmente contra el servidor real en las
   pantallas principales, sin regresiones de contraste ni legibilidad.
 
+## Recuperación de contraseña
+
+Hallazgo real: la configuración por defecto de Supabase ("Site URL")
+mandaba el link de "olvidé mi contraseña" al puerto del **backend**
+(3000, sin páginas) en vez del frontend (5173) — un 404, sin ninguna
+pantalla que además supiera qué hacer con el token de recuperación
+aunque hubiera llegado al lugar correcto.
+
+**`routes/OlvidePassword.tsx`**: pide el correo y llama a
+`supabase.auth.resetPasswordForEmail(email, { redirectTo:
+window.location.origin })` — el `redirectTo` explícito es la
+corrección robusta: apunta siempre a donde de verdad corre el
+frontend (5173 en desarrollo, el dominio real una vez desplegado), sin
+depender de que la configuración del dashboard de Supabase esté bien
+puesta. Esa URL igual necesita estar en la lista de "Redirect URLs"
+del proyecto de Supabase, o Supabase la rechaza.
+
+**`routes/RestablecerPassword.tsx`** + `stores/auth-store.ts`
+(`esRecuperacion`): el SDK de Supabase detecta el token del link en el
+hash de la URL solo (`detectSessionInUrl`, default de la librería) y
+dispara el evento `PASSWORD_RECOVERY` — sin nada más, esa sesión
+temporal habría dejado pasar directo a Home. `ProtectedRoute` intercepta
+ese caso (`esRecuperacion === true`) y muestra el formulario de
+contraseña nueva en su lugar, sin importar en qué ruta haya caído el
+redirect (siempre es la raíz `/`, dentro de la zona protegida).
+`supabase.auth.updateUser({ password })` no pide la contraseña
+anterior porque la sesión de recuperación ya autentica al usuario.
+
+Verificado en vivo: `/olvide-password` renderiza y valida
+correctamente. El intercepto de `ProtectedRoute` con un link de
+recuperación real (correo → clic → `RestablecerPassword`) todavía no
+se ha probado de punta a punta contra la cuenta real.
+
 ## Qué falta
 
 - Recordatorios contextuales por email/web push (documento-maestro-v2.md
