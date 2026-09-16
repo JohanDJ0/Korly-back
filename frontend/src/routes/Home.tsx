@@ -172,6 +172,9 @@ export function Home() {
       <Button asChild variant="link" size="sm">
         <Link to="/categorias">Categorías</Link>
       </Button>
+      <Button asChild variant="link" size="sm">
+        <Link to="/ajustes">Ajustes</Link>
+      </Button>
 
       {periodoId && (
         <Button

@@ -92,10 +92,23 @@ async function main(): Promise<void> {
       env: {
         ...process.env,
         APP_DATABASE_URL: urlApp,
+        // shared/db-admin.ts (modulos/notificaciones/) lee DATABASE_URL
+        // en tiempo de ejecución, no solo drizzle-kit — sin este override,
+        // un backend/.env real en este mismo directorio haría que
+        // dotenv/config (que sí corre dentro del proceso de vitest)
+        // cargara el DATABASE_URL de producción encima del efímero.
+        // Mismo motivo que el override de APP_DATABASE_URL de arriba.
+        DATABASE_URL: urlAdmin,
         // Los tests nunca llaman a Supabase de verdad (no pasan por
         // auth.ts), pero shared/supabase-admin.ts exige que existan.
         SUPABASE_URL: 'https://test-local-placeholder.supabase.co',
         SUPABASE_SERVICE_ROLE_KEY: 'test-local-placeholder',
+        // Los tests nunca mandan correos de verdad (ver el parámetro
+        // resolverCorreo/enviarCorreo inyectable en
+        // modulos/notificaciones/enviar-recordatorios.ts) — vacío
+        // aquí por la misma razón que DATABASE_URL arriba: que un
+        // backend/.env real no filtre una API key real hacia los tests.
+        RESEND_API_KEY: '',
       },
     });
     codigoSalida = resultado.status ?? 1;

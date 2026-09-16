@@ -2,6 +2,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Route, Routes } from 'react-router-dom';
 
 import { queryClient } from '@/lib/query-client';
+import { Ajustes } from '@/routes/Ajustes';
 import { Categorias } from '@/routes/Categorias';
 import { Historial } from '@/routes/Historial';
 import { Home } from '@/routes/Home';
@@ -32,6 +33,7 @@ export function App() {
             <Route path="/recurrentes" element={<Recurrentes />} />
             <Route path="/tarjetas" element={<Tarjetas />} />
             <Route path="/categorias" element={<Categorias />} />
+            <Route path="/ajustes" element={<Ajustes />} />
           </Route>
           <Route path="*" element={<NoEncontrado />} />
         </Routes>

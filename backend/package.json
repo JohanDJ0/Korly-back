@@ -12,7 +12,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio",
     "test": "vitest run",
-    "test:local": "tsx scripts/test-local.ts"
+    "test:local": "tsx scripts/test-local.ts",
+    "recordatorios": "tsx scripts/enviar-recordatorios.ts"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
@@ -22,7 +23,8 @@
     "drizzle-orm": "^0.45.2",
     "fastify": "^5.12.4",
     "fastify-plugin": "^5.0.1",
-    "postgres": "^3.4.5"
+    "postgres": "^3.4.5",
+    "resend": "^6.28.1"
   },
   "devDependencies": {
     "@types/node": "^22.16.0",

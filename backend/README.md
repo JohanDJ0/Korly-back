@@ -1651,6 +1651,99 @@ la cuenta real: bloqueo real de una tarjeta con cargos y de una
 categoría en uso, y borrado real de una tarjeta/categoría/meta de
 prueba sin historial.
 
+## Recordatorios por correo
+
+Primer canal real de los recordatorios contextuales
+(documento-maestro-v2.md §13.4, "núcleo, no accesorio"): hasta ahora
+`RecordatorioContextual.tsx` solo avisaba dentro de la app — inútil si
+el usuario ya dejó de abrirla, que es justo el riesgo #1 que el
+documento cita (las apps de finanzas retienen ~4% de usuarios a 30
+días). Esta primera iteración cubre el **recordatorio diario**
+(reglas 1, 2, 3 y 5 de §13.4); la **alerta de ritmo** (regla 4,
+"vas gastando más rápido de lo sostenible") queda para después — es un
+disparador distinto (comportamiento, no inactividad), no vale la pena
+mezclar los dos de una vez.
+
+**Proveedor: Resend**, no el buzón de correo del hosting — un buzón
+normal (`hola@dominio`) está pensado para que una persona reciba/mande
+correo a mano, con límites de envío bajos y reputación de IP
+compartida; nada de eso sirve para que una aplicación le mande un
+correo automático a cada usuario. `shared/email.ts` es un wrapper
+delgado, mismo criterio que `observabilidad.ts` con Sentry: sin
+`RESEND_API_KEY` no manda nada y no truena (desarrollo/CI seguros).
+
+**Despliegue: Cron Job de Railway**, no un endpoint HTTP — un segundo
+servicio en el mismo proyecto, `scripts/enviar-recordatorios.ts`
+(`npm run recordatorios`), corriendo `0 2 * * *` UTC (8pm hora de
+México, fija sin DST). Nunca vive dentro del servidor Fastify — sigue
+siendo "puro request/response".
+
+**Una excepción de arquitectura, documentada en `shared/db-admin.ts`:**
+el script necesita enumerar TODOS los tenants antes de saber a cuáles
+procesar — algo que ningún otro módulo hace (todo lo demás vive dentro
+de una request ya scoped a un tenant). Para eso usa una conexión
+aparte con el rol `postgres` (el mismo de las migraciones,
+`BYPASSRLS`), **solo** para `listarTenantIdsConRecordatoriosActivos` —
+el resto del trabajo, tenant por tenant, sigue pasando por
+`conTenant`/`app_backend`/RLS de siempre (`consultarDisponible`, etc.).
+No es el mismo riesgo que "el servidor sirviendo requests con ese rol"
+(la razón de ser de `app_backend`): un script de cron sin superficie
+HTTP no es alcanzable por un tenant atacante.
+
+**Cómo decide si le toca hoy a un tenant** (`enviar-recordatorios.ts`,
+en orden): periodo activo + ingreso registrado (regla 5, nunca con
+datos incompletos) → `gastadoHoy === 0` (regla 2, se silencia sola si
+ya hubo actividad) → no se le mandó ya hoy (`recordatorios_enviados`,
+índice único — protege contra que el cron corra dos veces, CLAUDE.md)
+→ **frecuencia decreciente** (regla 3): si en las 24h después de cada
+uno de sus últimos 3 recordatorios no hubo ningún gasto/ingreso, entra
+en "backoff" — cadencia baja a cada 3 días hasta que uno sí tenga
+actividad después, ahí vuelve a diario solo, sin bandera que resetear
+a mano (se recalcula desde cero en cada corrida). Si pasa los filtros,
+calcula la cifra con la misma `consultarDisponible` que usa la app y
+manda: *"Te quedan N días con $X disponible — hoy puedes gastar hasta
+$Y."* — mismo texto que la tarjeta dentro de la app.
+
+**El correo del usuario no vive en la base propia** (ADR-003: el
+proveedor de auth es desacoplado) — se resuelve preguntándole a
+Supabase Auth (`supabaseAdmin.auth.admin.getUserById`) por el usuario
+detrás de la identidad `'supabase'` del tenant.
+
+**Por qué `resolverCorreo` es un parámetro inyectable, no una llamada
+directa:** es la única función de todo este módulo que hace una
+llamada de red real a un proveedor externo, y `scripts/test-local.ts`
+documenta como invariante que "los tests nunca llaman a Supabase de
+verdad" (no pasan por `auth.ts`). El valor por defecto
+(`resolverCorreoViaSupabase`) es lo único que usa el script en
+producción; los tests pasan un stub. Por el mismo motivo,
+`scripts/test-local.ts` ahora también fuerza `DATABASE_URL` al
+Postgres efímero y `RESEND_API_KEY` vacío en el proceso de la suite —
+sin esto, un `backend/.env` real en la máquina de desarrollo (que sí
+tiene `DATABASE_URL`/`RESEND_API_KEY` reales) se habría filtrado hacia
+los tests vía `dotenv/config`, apuntando `dbAdmin` a producción o
+mandando correos reales durante `npm run test:local`.
+
+**Preferencia de opt-out:** `tenants.recibir_recordatorios` (booleano,
+default `true`) — vive en `tenants`, no en una tabla de preferencias
+aparte, porque hoy es la única que existe y un tenant es de un solo
+miembro. `GET`/`PATCH /preferencias`. Necesitó una política RLS de
+`update` que `tenants` nunca había tenido (solo `select`/`insert`) —
+sin ella el `PATCH` habría fallado en silencio (RLS bloquea el UPDATE,
+cero filas afectadas, mismo hallazgo ya documentado para otras tablas).
+
+13 tests nuevos en `test/integracion/notificaciones.test.ts` (sin
+periodo activo, sin ingreso, ya hubo actividad hoy, ya se mandó hoy,
+backoff activo, backoff termina tras los días de espera, backoff se
+resetea con actividad real, sin correo resuelto, preferencias) contra
+Postgres real — el envío en sí queda mockeado vía `resolverCorreo`,
+nunca una llamada real. **Verificado en vivo contra la cuenta real:**
+el ajuste de "Recibir recordatorios por correo" (`routes/Ajustes.tsx`,
+pantalla nueva) se apagó y se volvió a prender, confirmando que
+persiste contra la base real. **Pendiente:** el envío real de un
+correo — todavía no hay una cuenta de Resend con dominio verificado;
+correr el script contra la cuenta real antes de eso solo consumiría el
+cupo de "hoy" sin mandar nada (`RESEND_API_KEY` vacío = no-op).
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

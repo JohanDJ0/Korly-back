@@ -12,3 +12,4 @@ export * from './arrastres.js';
 export * from './gastos-recurrentes.js';
 export * from './tarjetas.js';
 export * from './cargos-tarjeta.js';
+export * from './recordatorios.js';

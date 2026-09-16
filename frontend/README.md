@@ -528,11 +528,20 @@ mostró `RestablecerPassword` → contraseña nueva guardada
 (`updateUser`) → login exitoso con la contraseña nueva. El flujo
 completo, no solo cada paso por separado.
 
+## Ajustes
+
+`routes/Ajustes.tsx` — la primera pantalla de preferencias de cuenta,
+hoy con un solo ajuste: apagar los recordatorios por correo (ver
+backend/README.md, "Recordatorios por correo"). `GET`/`PATCH
+/preferencias`. Verificado en vivo contra la cuenta real: apagar y
+volver a prender persiste contra la base real, no solo en el estado
+local del checkbox.
+
 ## Qué falta
 
-- Recordatorios contextuales por email/web push (documento-maestro-v2.md
-  §13.4) — el aviso in-app ya está resuelto (punto 13); el envío real
-  requiere un proveedor de email y VAPID/service worker para push, que
-  todavía no existen. Con eso, también entrarían las reglas de cadencia
-  que no aplican a un aviso in-app (frecuencia decreciente, ventana
-  adaptada al patrón del usuario).
+- Recordatorios contextuales por **web push** y la **alerta de ritmo**
+  (documento-maestro-v2.md §13.4, regla 4: "vas gastando más rápido de
+  lo sostenible") — el aviso in-app (punto 13) y el recordatorio diario
+  por **email** ya están resueltos (ver backend/README.md). Falta VAPID
+  + service worker para push, y la lógica de la alerta de ritmo (un
+  disparador distinto: comportamiento, no inactividad).
