@@ -60,6 +60,9 @@ export function Login() {
               <Label htmlFor="password">Contraseña</Label>
               <Input id="password" type="password" autoComplete="current-password" {...register('password')} />
               {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
+              <Link to="/olvide-password" className="self-end text-xs text-muted-foreground underline-offset-4 hover:underline">
+                ¿Olvidaste tu contraseña?
+              </Link>
             </div>
             {errorGeneral && <p className="text-sm text-destructive">{errorGeneral}</p>}
             <Button type="submit" disabled={isSubmitting}>

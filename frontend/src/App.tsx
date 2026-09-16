@@ -7,6 +7,7 @@ import { Home } from '@/routes/Home';
 import { Login } from '@/routes/Login';
 import { Metas } from '@/routes/Metas';
 import { NoEncontrado } from '@/routes/NoEncontrado';
+import { OlvidePassword } from '@/routes/OlvidePassword';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { Recurrentes } from '@/routes/Recurrentes';
 import { Registro } from '@/routes/Registro';
@@ -20,6 +21,7 @@ export function App() {
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route path="/registro" element={<Registro />} />
+          <Route path="/olvide-password" element={<OlvidePassword />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
             <Route path="/historial" element={<Historial />} />
