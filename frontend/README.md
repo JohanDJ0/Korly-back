@@ -524,7 +524,9 @@ Verificado en vivo de punta a punta contra la cuenta real:
 `/olvide-password` con el correo real → el correo llegó con el link
 apuntando al frontend correcto (ya no al 404 del puerto del backend) →
 al abrirlo, `ProtectedRoute` interceptó la sesión de recuperación y
-mostró `RestablecerPassword` en vez de dejar pasar directo a Home.
+mostró `RestablecerPassword` → contraseña nueva guardada
+(`updateUser`) → login exitoso con la contraseña nueva. El flujo
+completo, no solo cada paso por separado.
 
 ## Qué falta
 
