@@ -1770,10 +1770,25 @@ la segunda vez).
    miles de cuentas de Resend, sin reputación propia, y "Korly" como
    nombre con un dominio ajeno es justo el patrón que los filtros
    asocian con suplantación. El mecanismo completo (disparo, contenido,
-   entrega) ya quedó probado; falta el dominio propio verificado
-   (SPF/DKIM, idealmente DMARC) para que llegue a la bandeja principal
-   — el paso de comprar/verificar un dominio sigue pendiente de que el
-   usuario lo decida.
+   entrega) ya quedó probado; solo faltaba el dominio propio.
+
+**Dominio propio: resuelto.** `korly.com.mx` comprado en Cloudflare
+Registrar (precio al costo, $16.75/año, sin margen de reventa —
+verificado contra GoDaddy, que cobra $36.99/año real detrás de un
+"$0.01" del primer año, y Namecheap, que ni siquiera vende `.com.mx`)
+y verificado en Resend vía los registros DNS que Resend pide (DKIM TXT
++ dos CNAME de SPF + TXT de DMARC opcional), todos con proxy de
+Cloudflare **apagado** — un CNAME/TXT de verificación de correo tiene
+que resolver al valor real, no a la IP del proxy de Cloudflare.
+`RESEND_REMITENTE` ya apunta a `hola@korly.com.mx`. Probado con un
+envío real directo contra la API de Resend (sin pasar por la app,
+para aislar la variable): llegó a la bandeja principal, no a spam —
+confirma que SPF/DKIM/DMARC quedaron bien configurados.
+
+**Nota del registro `.com.mx`:** no admite privacidad de WHOIS por
+política del registro (no es específico de Cloudflare) — los datos de
+contacto del registrante quedan públicamente visibles en cualquier
+búsqueda de WHOIS, sin opción de ocultarlos en ningún registrador.
 
 ## CORS
 
