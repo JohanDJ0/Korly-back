@@ -27,6 +27,13 @@ interface FormularioGastoProps {
   periodoId: string;
   /** Se llama tras registrar con éxito — Home.tsx lo usa para volver a colapsar el formulario. */
   onRegistrado?: () => void;
+  /**
+   * Hallazgo real de QA: sin esto, una vez abierto el formulario no
+   * había forma de cerrarlo sin registrar un gasto de verdad — ni
+   * siquiera recargando se evitaba, porque el estado vivía en el padre.
+   * Mismo criterio que "Cancelar" en el modo de edición de FilaGasto.tsx.
+   */
+  onCancelar?: () => void;
 }
 
 /**
@@ -35,7 +42,7 @@ interface FormularioGastoProps {
  * de mayor frecuencia del sistema (modelo-dominio.md §4), cualquier
  * fricción aquí se paga muchas veces al día.
  */
-export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProps) {
+export function FormularioGasto({ periodoId, onRegistrado, onCancelar }: FormularioGastoProps) {
   const registrarGasto = useRegistrarGasto();
   const [categoriaId, setCategoriaId] = useState('');
 
@@ -84,9 +91,16 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
         <SelectorCategoria id="categoria-gasto" value={categoriaId} onChange={setCategoriaId} />
       </div>
       {registrarGasto.isError && <p className="text-sm text-destructive">{registrarGasto.error.message}</p>}
-      <Button type="submit" disabled={registrarGasto.isPending}>
-        {registrarGasto.isPending ? 'Guardando…' : 'Registrar gasto'}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={registrarGasto.isPending}>
+          {registrarGasto.isPending ? 'Guardando…' : 'Registrar gasto'}
+        </Button>
+        {onCancelar && (
+          <Button type="button" variant="ghost" onClick={onCancelar}>
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

@@ -148,7 +148,11 @@ export function Home() {
             <CardTitle>Nuevo gasto</CardTitle>
           </CardHeader>
           <CardContent>
-            <FormularioGasto periodoId={periodoId} onRegistrado={() => setMostrarFormularioGasto(false)} />
+            <FormularioGasto
+              periodoId={periodoId}
+              onRegistrado={() => setMostrarFormularioGasto(false)}
+              onCancelar={() => setMostrarFormularioGasto(false)}
+            />
           </CardContent>
         </Card>
       )}

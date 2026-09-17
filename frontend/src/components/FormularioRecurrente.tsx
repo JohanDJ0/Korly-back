@@ -26,9 +26,11 @@ type RecurrenteFormSalida = z.output<typeof esquemaRecurrente>;
 
 interface FormularioRecurrenteProps {
   onCreado?: () => void;
+  /** Ver el comentario en FormularioGasto.tsx — mismo hallazgo real, mismo criterio. */
+  onCancelar?: () => void;
 }
 
-export function FormularioRecurrente({ onCreado }: FormularioRecurrenteProps) {
+export function FormularioRecurrente({ onCreado, onCancelar }: FormularioRecurrenteProps) {
   const crearRecurrente = useCrearRecurrente();
   const [categoriaId, setCategoriaIdState] = useState('');
 
@@ -104,9 +106,16 @@ export function FormularioRecurrente({ onCreado }: FormularioRecurrenteProps) {
       </div>
 
       {crearRecurrente.isError && <p className="text-sm text-destructive">{crearRecurrente.error.message}</p>}
-      <Button type="submit" disabled={crearRecurrente.isPending}>
-        {crearRecurrente.isPending ? 'Guardando…' : 'Guardar'}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={crearRecurrente.isPending}>
+          {crearRecurrente.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+        {onCancelar && (
+          <Button type="button" variant="ghost" onClick={onCancelar}>
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

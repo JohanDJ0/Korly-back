@@ -559,6 +559,27 @@ navegador, así que no puede fallar de esa forma. Layout de la
 confirmación inline todavía básico (se ve apretado en pantallas
 angostas) — pendiente del pase de diseño.
 
+## Cancelar un formulario de "nuevo X"
+
+**Hallazgo real del pase de QA/UX:** los 4 formularios que se abren
+como una tarjeta dentro de la misma pantalla (`FormularioGasto` en
+Home, `FormularioMeta`, `FormularioTarjeta`, `FormularioRecurrente`)
+no tenían ninguna forma de cerrarse sin enviar de verdad — ni siquiera
+recargando la página se evitaba, porque el estado de "mostrar
+formulario" vive en el componente padre (`useState`), no en la URL.
+Una vez abierto, la única salida era registrar el gasto/meta/tarjeta/
+recurrente de verdad.
+
+Los 4 formularios ganaron un `onCancelar?: () => void` opcional —
+cuando el padre lo pasa, aparece un botón "Cancelar" junto al de
+enviar (mismo criterio que el modo de edición de `FilaGasto.tsx`, que
+sí lo tenía desde el principio). Las 4 pantallas (`Home.tsx`,
+`Metas.tsx`, `Tarjetas.tsx`, `Recurrentes.tsx`) ya lo pasan, apuntando
+al mismo `setMostrarFormulario(false)` que ya usaban para el caso de
+éxito. Verificado en vivo contra la cuenta real: abrir y cancelar
+"Registrar gasto" y "Nueva meta" cierra el formulario sin registrar
+nada.
+
 ## Qué falta
 
 - Recordatorios contextuales por **web push** y la **alerta de ritmo**

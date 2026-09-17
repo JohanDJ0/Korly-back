@@ -48,7 +48,7 @@ export function Recurrentes() {
             <CardTitle>Nuevo gasto recurrente</CardTitle>
           </CardHeader>
           <CardContent>
-            <FormularioRecurrente onCreado={() => setMostrarFormulario(false)} />
+            <FormularioRecurrente onCreado={() => setMostrarFormulario(false)} onCancelar={() => setMostrarFormulario(false)} />
           </CardContent>
         </Card>
       )}

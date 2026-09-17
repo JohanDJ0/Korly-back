@@ -40,7 +40,7 @@ export function Metas() {
             <CardTitle>Nueva meta</CardTitle>
           </CardHeader>
           <CardContent>
-            <FormularioMeta onCreada={() => setMostrarFormulario(false)} />
+            <FormularioMeta onCreada={() => setMostrarFormulario(false)} onCancelar={() => setMostrarFormulario(false)} />
           </CardContent>
         </Card>
       )}

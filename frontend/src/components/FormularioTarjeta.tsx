@@ -21,9 +21,11 @@ type TarjetaFormSalida = z.output<typeof esquemaTarjeta>;
 
 interface FormularioTarjetaProps {
   onCreada?: () => void;
+  /** Ver el comentario en FormularioGasto.tsx — mismo hallazgo real, mismo criterio. */
+  onCancelar?: () => void;
 }
 
-export function FormularioTarjeta({ onCreada }: FormularioTarjetaProps) {
+export function FormularioTarjeta({ onCreada, onCancelar }: FormularioTarjetaProps) {
   const crearTarjeta = useCrearTarjeta();
 
   const {
@@ -80,9 +82,16 @@ export function FormularioTarjeta({ onCreada }: FormularioTarjetaProps) {
       </div>
 
       {crearTarjeta.isError && <p className="text-sm text-destructive">{crearTarjeta.error.message}</p>}
-      <Button type="submit" disabled={crearTarjeta.isPending}>
-        {crearTarjeta.isPending ? 'Guardando…' : 'Guardar'}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={crearTarjeta.isPending}>
+          {crearTarjeta.isPending ? 'Guardando…' : 'Guardar'}
+        </Button>
+        {onCancelar && (
+          <Button type="button" variant="ghost" onClick={onCancelar}>
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }

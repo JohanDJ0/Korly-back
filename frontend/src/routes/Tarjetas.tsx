@@ -40,7 +40,7 @@ export function Tarjetas() {
             <CardTitle>Nueva tarjeta</CardTitle>
           </CardHeader>
           <CardContent>
-            <FormularioTarjeta onCreada={() => setMostrarFormulario(false)} />
+            <FormularioTarjeta onCreada={() => setMostrarFormulario(false)} onCancelar={() => setMostrarFormulario(false)} />
           </CardContent>
         </Card>
       )}

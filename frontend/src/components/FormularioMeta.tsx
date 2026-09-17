@@ -19,9 +19,11 @@ type MetaFormSalida = z.output<typeof esquemaMeta>;
 
 interface FormularioMetaProps {
   onCreada?: () => void;
+  /** Ver el comentario en FormularioGasto.tsx — mismo hallazgo real, mismo criterio. */
+  onCancelar?: () => void;
 }
 
-export function FormularioMeta({ onCreada }: FormularioMetaProps) {
+export function FormularioMeta({ onCreada, onCancelar }: FormularioMetaProps) {
   const crearMeta = useCrearMeta();
 
   const {
@@ -56,9 +58,16 @@ export function FormularioMeta({ onCreada }: FormularioMetaProps) {
         {errors.montoObjetivo && <p className="text-sm text-destructive">{errors.montoObjetivo.message}</p>}
       </div>
       {crearMeta.isError && <p className="text-sm text-destructive">{crearMeta.error.message}</p>}
-      <Button type="submit" disabled={crearMeta.isPending}>
-        {crearMeta.isPending ? 'Creando…' : 'Crear meta'}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={crearMeta.isPending}>
+          {crearMeta.isPending ? 'Creando…' : 'Crear meta'}
+        </Button>
+        {onCancelar && (
+          <Button type="button" variant="ghost" onClick={onCancelar}>
+            Cancelar
+          </Button>
+        )}
+      </div>
     </form>
   );
 }
