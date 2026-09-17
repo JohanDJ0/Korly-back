@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { useEditarIngreso } from '@/hooks/use-editar-ingreso';
 import { useEliminarIngreso } from '@/hooks/use-eliminar-ingreso';
 import type { Ingreso } from '@/hooks/use-ingresos';
@@ -32,12 +33,6 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
       { ingresoId: ingreso.id, monto: { valorMinimo: Math.round(valor * 100), moneda: ingreso.monto.moneda } },
       { onSuccess: () => setEditando(false) }
     );
-  }
-
-  function eliminar() {
-    if (!window.confirm('¿Eliminar este ingreso?')) return;
-    editarIngreso.reset();
-    eliminarIngreso.mutate(ingreso.id);
   }
 
   if (ingreso.revertido) {
@@ -112,9 +107,18 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
         >
           Editar
         </Button>
-        <Button size="sm" variant="outline" onClick={eliminar} disabled={eliminarIngreso.isPending}>
+        <BotonConfirmar
+          variant="outline"
+          size="sm"
+          pregunta="¿Eliminar este ingreso?"
+          onConfirmar={() => {
+            editarIngreso.reset();
+            eliminarIngreso.mutate(ingreso.id);
+          }}
+          disabled={eliminarIngreso.isPending}
+        >
           Eliminar
-        </Button>
+        </BotonConfirmar>
       </div>
     </li>
   );

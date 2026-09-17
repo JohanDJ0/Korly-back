@@ -537,6 +537,28 @@ backend/README.md, "Recordatorios por correo"). `GET`/`PATCH
 volver a prender persiste contra la base real, no solo en el estado
 local del checkbox.
 
+## Confirmaciones (`BotonConfirmar.tsx`)
+
+**Hallazgo real del usuario:** el botón "Eliminar" de una meta "no
+hacía nada". El código estaba bien — el problema era `window.confirm`,
+el diálogo nativo del navegador que las 6 confirmaciones destructivas
+usaban (5 "Eliminar" + "Cerrar periodo" en `Home.tsx`). Algunas
+extensiones/entornos suprimen ese diálogo sin avisar, y
+`if (!window.confirm(...)) return` trata ese silencio exactamente
+igual que un "Cancelar" real — no hay forma de distinguir "el usuario
+canceló a propósito" de "el diálogo nunca llegó a mostrarse". Al
+reproducirlo en vivo contra la cuenta real (bypasseando `confirm` a
+mano), el borrado sí funcionaba — confirmando que el bug estaba en el
+diálogo, no en la lógica.
+
+`BotonConfirmar` reemplaza las 6 llamadas a `window.confirm` con una
+confirmación inline en la propia UI (clic → aparece "¿Seguro? Sí,
+confirmar / Cancelar" en el lugar del botón → confirmar dispara la
+acción) — al ser puro estado de React, no depende de ninguna API del
+navegador, así que no puede fallar de esa forma. Layout de la
+confirmación inline todavía básico (se ve apretado en pantallas
+angostas) — pendiente del pase de diseño.
+
 ## Qué falta
 
 - Recordatorios contextuales por **web push** y la **alerta de ritmo**

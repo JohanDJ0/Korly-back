@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { SelectorCategoria } from '@/components/SelectorCategoria';
 import { useCategorias } from '@/hooks/use-categorias';
 import { useEditarGasto } from '@/hooks/use-editar-gasto';
@@ -50,12 +51,6 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
       { gastoId: gasto.id, monto: { valorMinimo: Math.round(valor * 100), moneda: gasto.monto.moneda }, categoriaId: categoriaId || undefined },
       { onSuccess: () => setEditando(false) }
     );
-  }
-
-  function eliminar() {
-    if (!window.confirm('¿Eliminar este gasto?')) return;
-    editarGasto.reset();
-    eliminarGasto.mutate(gasto.id);
   }
 
   // Ya se editó o eliminó antes (backend/README.md, "Listar gastos") —
@@ -145,9 +140,18 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
         >
           Editar
         </Button>
-        <Button size="sm" variant="outline" onClick={eliminar} disabled={eliminarGasto.isPending}>
+        <BotonConfirmar
+          variant="outline"
+          size="sm"
+          pregunta="¿Eliminar este gasto?"
+          onConfirmar={() => {
+            editarGasto.reset();
+            eliminarGasto.mutate(gasto.id);
+          }}
+          disabled={eliminarGasto.isPending}
+        >
           Eliminar
-        </Button>
+        </BotonConfirmar>
       </div>
     </li>
   );

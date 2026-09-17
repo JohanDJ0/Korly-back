@@ -1,4 +1,4 @@
-import { Button } from '@/components/ui/button';
+import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { useEliminarCategoria } from '@/hooks/use-eliminar-categoria';
 import type { Categoria } from '@/hooks/use-categorias';
 
@@ -15,11 +15,6 @@ interface FilaCategoriaProps {
 export function FilaCategoria({ categoria }: FilaCategoriaProps) {
   const eliminarCategoria = useEliminarCategoria();
 
-  function eliminar() {
-    if (!window.confirm(`¿Eliminar la categoría "${categoria.nombre}"?`)) return;
-    eliminarCategoria.mutate(categoria.id);
-  }
-
   return (
     <li className="flex flex-col gap-1 border-b py-3">
       <div className="flex items-center justify-between gap-2">
@@ -27,9 +22,16 @@ export function FilaCategoria({ categoria }: FilaCategoriaProps) {
         {categoria.esPredeterminada ? (
           <span className="shrink-0 text-sm text-muted-foreground">Predeterminada</span>
         ) : (
-          <Button size="sm" variant="ghost" className="text-destructive" onClick={eliminar} disabled={eliminarCategoria.isPending}>
+          <BotonConfirmar
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            pregunta={`¿Eliminar la categoría "${categoria.nombre}"?`}
+            onConfirmar={() => eliminarCategoria.mutate(categoria.id)}
+            disabled={eliminarCategoria.isPending}
+          >
             Eliminar
-          </Button>
+          </BotonConfirmar>
         )}
       </div>
       {eliminarCategoria.isError && <p className="text-sm text-destructive">{eliminarCategoria.error.message}</p>}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { FormularioCargo } from '@/components/FormularioCargo';
 import { useCargosTarjeta } from '@/hooks/use-cargos-tarjeta';
 import { useEliminarTarjeta } from '@/hooks/use-eliminar-tarjeta';
@@ -31,11 +32,6 @@ export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
   const { data: cargos, isLoading: cargandoCargos } = useCargosTarjeta(mostrarCargos ? tarjeta.id : undefined);
   const eliminarTarjeta = useEliminarTarjeta();
 
-  function eliminar() {
-    if (!window.confirm(`¿Eliminar la tarjeta "${tarjeta.nombre}"?`)) return;
-    eliminarTarjeta.mutate(tarjeta.id);
-  }
-
   return (
     <li className="flex flex-col gap-3 border-b py-4">
       <div className="flex items-start justify-between gap-2">
@@ -57,9 +53,16 @@ export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
           <Button size="sm" variant="ghost" onClick={() => setMostrarCargos((v) => !v)}>
             {mostrarCargos ? 'Ocultar compras' : 'Ver compras'}
           </Button>
-          <Button size="sm" variant="ghost" className="text-destructive" onClick={eliminar} disabled={eliminarTarjeta.isPending}>
+          <BotonConfirmar
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            pregunta={`¿Eliminar la tarjeta "${tarjeta.nombre}"?`}
+            onConfirmar={() => eliminarTarjeta.mutate(tarjeta.id)}
+            disabled={eliminarTarjeta.isPending}
+          >
             Eliminar
-          </Button>
+          </BotonConfirmar>
         </div>
       </div>
 

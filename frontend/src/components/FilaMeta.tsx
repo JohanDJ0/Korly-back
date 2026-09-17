@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { useAportarMeta } from '@/hooks/use-aportar-meta';
 import { useEliminarMeta } from '@/hooks/use-eliminar-meta';
 import type { Meta } from '@/hooks/use-metas';
@@ -34,11 +35,6 @@ export function FilaMeta({ meta }: FilaMetaProps) {
   const aportarMeta = useAportarMeta();
   const retirarMeta = useRetirarMeta();
   const eliminarMeta = useEliminarMeta();
-
-  function eliminar() {
-    if (!window.confirm(`¿Eliminar la meta "${meta.nombre}"?`)) return;
-    eliminarMeta.mutate(meta.id);
-  }
 
   function cerrar() {
     setModo(null);
@@ -89,9 +85,16 @@ export function FilaMeta({ meta }: FilaMetaProps) {
             <Button size="sm" variant="outline" onClick={() => setModo('retirar')}>
               Retirar
             </Button>
-            <Button size="sm" variant="ghost" className="text-destructive" onClick={eliminar} disabled={eliminarMeta.isPending}>
+            <BotonConfirmar
+              variant="ghost"
+              size="sm"
+              className="text-destructive"
+              pregunta={`¿Eliminar la meta "${meta.nombre}"?`}
+              onConfirmar={() => eliminarMeta.mutate(meta.id)}
+              disabled={eliminarMeta.isPending}
+            >
               Eliminar
-            </Button>
+            </BotonConfirmar>
           </div>
         )}
       </div>

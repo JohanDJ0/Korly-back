@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { CifraDisponible } from '@/components/CifraDisponible';
 import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
@@ -177,19 +178,19 @@ export function Home() {
       </Button>
 
       {periodoId && (
-        <Button
+        <BotonConfirmar
           variant="outline"
           size="sm"
           disabled={cerrarPeriodo.isPending}
-          onClick={() => {
-            if (!window.confirm('¿Cerrar este periodo ahora? No se puede deshacer.')) return;
+          pregunta="¿Cerrar este periodo ahora? No se puede deshacer."
+          onConfirmar={() => {
             cerrarPeriodo.mutate(periodoId, {
               onSuccess: (resumen) => navigate(`/resumen/${resumen.periodoId}`),
             });
           }}
         >
           {cerrarPeriodo.isPending ? 'Cerrando…' : 'Cerrar periodo'}
-        </Button>
+        </BotonConfirmar>
       )}
       {cerrarPeriodo.isError && <p className="text-sm text-destructive">{cerrarPeriodo.error.message}</p>}
 
