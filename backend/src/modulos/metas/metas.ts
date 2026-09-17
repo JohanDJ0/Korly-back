@@ -3,10 +3,14 @@ import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { metas } from '../../db/schema/metas.js';
 import { crearCuentaTx, registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
+import { obtenerPlanTenantTx } from '../planes/planes.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
+
+/** documento-maestro-v2.md §9.2: "Metas de ahorro: 1–2 (Free) / Ilimitadas (Pro)". */
+const LIMITE_METAS_FREE = 2;
 
 export interface Meta {
   id: string;
@@ -37,6 +41,14 @@ export async function crearMeta(tenantId: string, nombre: string, monto: bigint,
   }
 
   return conTenant(tenantId, async (tx) => {
+    const plan = await obtenerPlanTenantTx(tx, tenantId);
+    if (plan === 'free') {
+      const [fila] = await tx.select({ total: sql<number>`count(*)::int` }).from(metas).where(eq(metas.tenantId, tenantId));
+      if ((fila?.total ?? 0) >= LIMITE_METAS_FREE) {
+        throw new ErrorDominio('LIMITE_METAS_ALCANZADO', `Alcanzaste el límite de ${LIMITE_METAS_FREE} metas del plan gratuito — Korly Pro las tiene ilimitadas`);
+      }
+    }
+
     const cuenta = await crearCuentaTx(tx, tenantId, 'meta');
 
     const [meta] = await tx

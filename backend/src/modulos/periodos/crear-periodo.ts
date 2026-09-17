@@ -1,15 +1,20 @@
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, gte } from 'drizzle-orm';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
 import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
 import { reclamarArrastresTx } from '../cierre/materializar-arrastre.js';
 import { materializarRecurrentesTx } from '../recurrentes/materializar-recurrentes.js';
 import { materializarPagosTarjetaTx } from '../tarjetas/materializar-pagos-tarjeta.js';
+import { obtenerPlanTenantTx } from '../planes/planes.js';
 import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
+import { fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 import { calcularQuincenaDeCalendario } from './calcular-quincena.js';
+
+/** documento-maestro-v2.md §9.2: "Historial de reportes: 12 meses (Free) / Completo (Pro)". */
+const MESES_HISTORIAL_FREE = 12;
 
 export interface Periodo {
   id: string;
@@ -159,6 +164,22 @@ export async function listarPeriodos(tenantId: string, fechaReferencia: Date = n
   return conTenant(tenantId, async (tx) => {
     await resolverPendientesTx(tx, tenantId, fechaReferencia);
 
+    const condiciones = [eq(periodos.tenantId, tenantId)];
+
+    // documento-maestro-v2.md §9.2: el plan Free ve 12 meses de
+    // historial, no todo — a diferencia de los gates de "crear algo
+    // nuevo" (metas, exportar), este recorta una LECTURA, así que el
+    // corte se calcula en cada consulta contra `fechaReferencia`, nunca
+    // una fecha fija guardada en algún lado (un periodo de hace 11
+    // meses debe seguir viéndose el mes que entra, no desaparecer de
+    // golpe en una fecha ya decidida hoy).
+    const plan = await obtenerPlanTenantTx(tx, tenantId);
+    if (plan === 'free') {
+      const corte = new Date(fechaReferencia);
+      corte.setUTCMonth(corte.getUTCMonth() - MESES_HISTORIAL_FREE);
+      condiciones.push(gte(periodos.fechaInicio, fechaISO(corte)));
+    }
+
     // Desempate por `creadoEn`: dos periodos pueden compartir la misma
     // `fechaInicio` (un borrador creado el mismo día que el activo, misma
     // quincena de calendario) — sin un segundo criterio, el orden entre
@@ -166,7 +187,7 @@ export async function listarPeriodos(tenantId: string, fechaReferencia: Date = n
     const filas = await tx
       .select(COLUMNAS_PERIODO)
       .from(periodos)
-      .where(eq(periodos.tenantId, tenantId))
+      .where(and(...condiciones))
       .orderBy(desc(periodos.fechaInicio), desc(periodos.creadoEn));
 
     return filas.map((fila) => ({ ...fila, estado: fila.estado as EstadoPeriodo }));

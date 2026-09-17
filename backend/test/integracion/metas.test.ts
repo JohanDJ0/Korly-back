@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { tenants, type Plan } from '../../src/db/schema/tenants.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { obtenerSaldoCuenta } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
@@ -7,12 +9,18 @@ import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-period
 import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { aportarAMeta, crearMeta, eliminarMeta, listarMetas, retirarDeMeta } from '../../src/modulos/metas/metas.js';
+import { conTenant } from '../../src/shared/db.js';
 
 describe('metas de ahorro', () => {
   async function tenantConPeriodoActivo() {
     const { tenantId } = await resolverOcrearIdentidad(`test-metas-${randomUUID()}`);
     const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
     return { tenantId, periodo };
+  }
+
+  /** No hay endpoint público para esto a propósito (ver planes.ts) — se escribe directo, mismo criterio que insertarBorrador en tarjetas.test.ts. */
+  async function establecerPlan(tenantId: string, plan: Plan) {
+    return conTenant(tenantId, (tx) => tx.update(tenants).set({ plan }).where(eq(tenants.id, tenantId)));
   }
 
   const HOY = new Date('2026-08-01T00:00:00Z');
@@ -35,6 +43,25 @@ describe('metas de ahorro', () => {
     it('rechaza un nombre vacío', async () => {
       const { tenantId } = await tenantConPeriodoActivo();
       await expect(crearMeta(tenantId, '   ', 1000n, 'MXN')).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+
+    it('plan free: rechaza crear una tercera meta (límite 2, documento-maestro-v2.md §9.2)', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await crearMeta(tenantId, 'Fondo de emergencia', 2000n, 'MXN');
+
+      await expect(crearMeta(tenantId, 'Una tercera', 500n, 'MXN')).rejects.toMatchObject({ codigo: 'LIMITE_METAS_ALCANZADO' });
+      expect(await listarMetas(tenantId)).toHaveLength(2);
+    });
+
+    it('plan pro: no tiene límite de metas', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      await establecerPlan(tenantId, 'pro');
+      await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await crearMeta(tenantId, 'Fondo de emergencia', 2000n, 'MXN');
+
+      await expect(crearMeta(tenantId, 'Una tercera', 500n, 'MXN')).resolves.toBeDefined();
+      expect(await listarMetas(tenantId)).toHaveLength(3);
     });
   });
 

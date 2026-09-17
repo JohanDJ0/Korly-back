@@ -1,6 +1,9 @@
 import { sql } from 'drizzle-orm';
-import { boolean, pgPolicy, pgTable, timestamp, uuid } from 'drizzle-orm/pg-core';
+import { boolean, check, pgPolicy, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { appBackend } from './roles.js';
+
+export const PLANES = ['free', 'pro'] as const;
+export type Plan = (typeof PLANES)[number];
 
 /**
  * Unidad de aislamiento (ADR-005). En el MVP cada usuario personal es su
@@ -27,9 +30,20 @@ export const tenants = pgTable(
      * indirección de una tabla para un solo booleano.
      */
     recibirRecordatorios: boolean('recibir_recordatorios').notNull().default(true),
+    /**
+     * documento-maestro-v2.md §9.2 (Free/Pro/Business). Sin cobro real
+     * todavía (Stripe+PAC es Fase 3, requiere que el usuario resuelva
+     * primero su alta fiscal) — hasta entonces, subir un tenant a 'pro'
+     * es una operación manual (UPDATE directo), no un endpoint propio:
+     * un "actualízate a pro" de autoservicio sin nada de por medio que
+     * cobre sería un gate falso, no una función a medio construir que
+     * habría que rehacer cuando sí exista el cobro real.
+     */
+    plan: text('plan').notNull().default('free').$type<Plan>(),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
+    check('tenants_plan_valido', sql`${t.plan} in ('free', 'pro')`),
     pgPolicy('tenants_lectura_propia', {
       for: 'select',
       to: appBackend,

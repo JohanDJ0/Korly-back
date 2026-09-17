@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { tenants } from '../../src/db/schema/tenants.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { crearCategoriaPersonalizada } from '../../src/modulos/categorias/categorias.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { registrarIngreso, editarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { registrarGasto, editarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { exportarGastosCsv, exportarIngresosCsv } from '../../src/modulos/exportar/exportar.js';
+import { conTenant } from '../../src/shared/db.js';
 
 // Toda la quincena de prueba vive en esta ventana — cualquier llamada
 // que resuelva el periodo (registrar/editar) necesita una
@@ -15,8 +18,15 @@ import { exportarGastosCsv, exportarIngresosCsv } from '../../src/modulos/export
 const HOY_DE_PRUEBA = new Date('2026-08-05T00:00:00Z');
 
 describe('exportar a CSV', () => {
+  /**
+   * La exportación es una función de Korly Pro (documento-maestro-v2.md
+   * §9.2) — todo este archivo prueba el CSV en sí, no el gate, así que
+   * el tenant de prueba ya viene en Pro. El gate propio se prueba
+   * aparte, en su propio describe, con un tenant free explícito.
+   */
   async function tenantConPeriodo() {
     const { tenantId } = await resolverOcrearIdentidad(`test-exportar-${randomUUID()}`);
+    await conTenant(tenantId, (tx) => tx.update(tenants).set({ plan: 'pro' }).where(eq(tenants.id, tenantId)));
     const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
     return { tenantId, periodo };
   }
@@ -187,6 +197,18 @@ describe('exportar a CSV', () => {
       const lineas = csv.trim().split('\r\n').slice(1);
       expect(lineas.find((l) => l.startsWith('2026-08-01'))).toContain(',true,');
       expect(lineas.find((l) => l.startsWith('2026-08-02'))).toContain(',false,');
+    });
+  });
+
+  describe('gate de plan (documento-maestro-v2.md §9.2: exportación es función de Pro)', () => {
+    it('plan free: rechaza exportar gastos', async () => {
+      const { tenantId } = await resolverOcrearIdentidad(`test-exportar-${randomUUID()}`);
+      await expect(exportarGastosCsv(tenantId)).rejects.toMatchObject({ codigo: 'FUNCION_PRO' });
+    });
+
+    it('plan free: rechaza exportar ingresos', async () => {
+      const { tenantId } = await resolverOcrearIdentidad(`test-exportar-${randomUUID()}`);
+      await expect(exportarIngresosCsv(tenantId)).rejects.toMatchObject({ codigo: 'FUNCION_PRO' });
     });
   });
 });

@@ -1790,6 +1790,60 @@ política del registro (no es específico de Cloudflare) — los datos de
 contacto del registrante quedan públicamente visibles en cualquier
 búsqueda de WHOIS, sin opción de ocultarlos en ningún registrador.
 
+## Planes Free/Pro
+
+`documento-maestro-v2.md §9.2` define la matriz de qué va en cada plan.
+`tenants.plan` (`'free' | 'pro'`, default `'free'`) es el único campo
+nuevo — `modulos/planes/planes.ts` es el punto único donde el resto de
+los módulos preguntan "¿este tenant es Pro?" (`obtenerPlanTenantTx`) o
+exigen que lo sea (`requerirPlanProTx`, para funciones exclusivas de
+Pro como exportar).
+
+**Sin cobro real todavía a propósito.** Stripe+PAC (documento-maestro-v2.md
+§6.9) requiere que el usuario resuelva primero su alta fiscal (RFC,
+régimen) — no es un bloqueo técnico, es una decisión de negocio
+pendiente. Por eso **no existe ningún endpoint de autoservicio para
+subir de plan**: un "actualízate a Pro" sin nada real que cobre de por
+medio sería un gate falso, código a medio construir que habría que
+rehacer entero cuando exista el webhook de Stripe. Hasta entonces,
+subir un tenant a `'pro'` es un `UPDATE` manual (Supabase SQL Editor o
+Table Editor) — los tests lo hacen igual, escribiendo directo a
+`tenants` (ver `establecerPlan` en `test/integracion/metas.test.ts`,
+mismo criterio que `insertarBorrador` en `tarjetas.test.ts`).
+
+**Los tres gates construidos** (los otros dos de la matriz — categorías
+personalizadas y recordatorios básicos — el documento mismo dice que
+deben quedarse gratis para todos, así que no llevan gate):
+
+- **Metas de ahorro** (`crearMeta`, `metas.ts`): límite de 2 en Free
+  (el documento dice "1–2"; se eligió 2 por permitir un caso de uso
+  real — p. ej. "vacaciones" + "fondo de emergencia" — sin ser tan
+  restrictivo como una sola). `LIMITE_METAS_ALCANZADO` (403). Contando
+  el total de filas de `metas`, no "activas" — no existe el concepto de
+  meta inactiva; `eliminarMeta` (ya construido) es la forma de liberar
+  un cupo.
+- **Historial de reportes** (`listarPeriodos`, `crear-periodo.ts`):
+  Free ve solo los últimos 12 meses. A diferencia de los otros dos
+  (bloquean una escritura), este recorta una lectura — el corte se
+  calcula contra `fechaReferencia` en cada consulta, nunca una fecha
+  fija guardada: un periodo que hoy tiene 11 meses debe seguir viéndose
+  el mes que entra, no desaparecer de golpe en una fecha ya decidida
+  hoy.
+- **Exportación CSV** (`exportarGastosCsv`/`exportarIngresosCsv`,
+  `exportar.ts`): bloqueada por completo en Free. Hallazgo real al
+  revisar la matriz contra lo ya construido: la exportación llevaba
+  semanas funcionando **sin ningún gate** — cualquier tenant free podía
+  usarla gratis. `FUNCION_PRO` (403).
+
+**Sin cambios de frontend** — los tres gates devuelven su mensaje vía
+`ErrorDominio`, y los componentes ya existentes (`FormularioMeta.tsx`,
+`Historial.tsx`) ya renderizan `error.message` tal cual desde antes;
+el corte de historial es un filtro silencioso, no un error, así que
+tampoco necesita nada nuevo en pantalla.
+
+6 tests nuevos (2 por gate: bloquea en Free, permite en Pro) contra
+Postgres real.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

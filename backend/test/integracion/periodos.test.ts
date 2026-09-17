@@ -1,15 +1,37 @@
 import { randomUUID } from 'node:crypto';
+import { eq } from 'drizzle-orm';
 import { describe, expect, it } from 'vitest';
+import { periodos as periodosSchema } from '../../src/db/schema/periodos.js';
+import { tenants, type Plan } from '../../src/db/schema/tenants.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
-import { registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { crearCuentaTx, registrarMovimiento } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { crearPeriodo, listarPeriodos, obtenerPeriodoActivo } from '../../src/modulos/periodos/crear-periodo.js';
+import { conTenant } from '../../src/shared/db.js';
 
 describe('periodos (estados e invariante de un solo activo)', () => {
   async function tenantDePrueba() {
     const { tenantId } = await resolverOcrearIdentidad(`test-periodos-${randomUUID()}`);
     return tenantId;
+  }
+
+  /** No hay endpoint público para esto a propósito (ver planes.ts). */
+  async function establecerPlan(tenantId: string, plan: Plan) {
+    return conTenant(tenantId, (tx) => tx.update(tenants).set({ plan }).where(eq(tenants.id, tenantId)));
+  }
+
+  /** Mismo patrón que insertarBorrador en tarjetas.test.ts — control directo de fechaInicio, sin pasar por el ciclo de vida real de crearPeriodo. */
+  async function insertarPeriodoCerrado(tenantId: string, fechaInicio: string, fechaFin: string) {
+    return conTenant(tenantId, async (tx) => {
+      const cuenta = await crearCuentaTx(tx, tenantId, 'periodo');
+      const [periodo] = await tx
+        .insert(periodosSchema)
+        .values({ tenantId, cuentaId: cuenta.id, tipo: 'quincenal', estado: 'cerrado', fechaInicio, fechaFin })
+        .returning();
+      if (!periodo) throw new Error('setup falló');
+      return periodo;
+    });
   }
 
   it('el primer periodo de un tenant se crea activo', async () => {
@@ -100,6 +122,30 @@ describe('periodos (estados e invariante de un solo activo)', () => {
 
       expect(resultado).toHaveLength(1);
       expect(resultado[0]).toMatchObject({ id: periodo.id, estado: 'cerrado' });
+    });
+
+    it('plan free: no ve periodos de hace más de 12 meses (documento-maestro-v2.md §9.2)', async () => {
+      const tenantId = await tenantDePrueba();
+      const hoy = new Date('2026-08-01T00:00:00Z');
+      const viejo = await insertarPeriodoCerrado(tenantId, '2024-01-01', '2024-01-15'); // 31 meses atrás
+      const reciente = await insertarPeriodoCerrado(tenantId, '2026-01-01', '2026-01-15'); // 7 meses atrás
+
+      const resultado = await listarPeriodos(tenantId, hoy);
+
+      expect(resultado.map((p) => p.id)).toEqual([reciente.id]);
+      expect(resultado.map((p) => p.id)).not.toContain(viejo.id);
+    });
+
+    it('plan pro: ve el historial completo, sin el corte de 12 meses', async () => {
+      const tenantId = await tenantDePrueba();
+      await establecerPlan(tenantId, 'pro');
+      const hoy = new Date('2026-08-01T00:00:00Z');
+      const viejo = await insertarPeriodoCerrado(tenantId, '2024-01-01', '2024-01-15');
+      const reciente = await insertarPeriodoCerrado(tenantId, '2026-01-01', '2026-01-15');
+
+      const resultado = await listarPeriodos(tenantId, hoy);
+
+      expect(resultado.map((p) => p.id).sort()).toEqual([reciente.id, viejo.id].sort());
     });
   });
 

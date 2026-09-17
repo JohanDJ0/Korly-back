@@ -4,6 +4,7 @@ import { gastos } from '../../db/schema/gastos.js';
 import { ingresos } from '../../db/schema/ingresos.js';
 import { asientos, movimientos } from '../../db/schema/ledger.js';
 import { periodos } from '../../db/schema/periodos.js';
+import { requerirPlanProTx } from '../planes/planes.js';
 import { conTenant } from '../../shared/db.js';
 import { centavosADecimalCsv, filaCsv } from '../../shared/csv.js';
 
@@ -23,6 +24,8 @@ export interface FiltroExportacion {
  */
 export async function exportarGastosCsv(tenantId: string, filtro: FiltroExportacion = {}): Promise<string> {
   return conTenant(tenantId, async (tx) => {
+    await requerirPlanProTx(tx, tenantId, 'La exportación a CSV es una función de Korly Pro');
+
     const condiciones = [eq(gastos.tenantId, tenantId)];
     if (filtro.desde) condiciones.push(gte(movimientos.fechaEfectiva, filtro.desde));
     if (filtro.hasta) condiciones.push(lte(movimientos.fechaEfectiva, filtro.hasta));
@@ -83,6 +86,8 @@ export async function exportarGastosCsv(tenantId: string, filtro: FiltroExportac
 
 export async function exportarIngresosCsv(tenantId: string, filtro: FiltroExportacion = {}): Promise<string> {
   return conTenant(tenantId, async (tx) => {
+    await requerirPlanProTx(tx, tenantId, 'La exportación a CSV es una función de Korly Pro');
+
     const condiciones = [eq(ingresos.tenantId, tenantId)];
     if (filtro.desde) condiciones.push(gte(movimientos.fechaEfectiva, filtro.desde));
     if (filtro.hasta) condiciones.push(lte(movimientos.fechaEfectiva, filtro.hasta));

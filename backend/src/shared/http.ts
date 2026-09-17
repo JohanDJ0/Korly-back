@@ -46,6 +46,12 @@ const CODIGO_A_STATUS: Record<string, number> = {
   CATEGORIA_PREDETERMINADA: 409,
   CATEGORIA_EN_USO: 409,
   META_CON_HISTORIAL: 409,
+  // documento-maestro-v2.md §9.2 (Free/Pro) — mismo criterio que
+  // LIMITE_CATEGORIAS_ALCANZADO/LIMITE_CREDITO_EXCEDIDO (403): el
+  // request está bien formado, lo que falta es autorización de plan,
+  // no un dato inválido.
+  LIMITE_METAS_ALCANZADO: 403,
+  FUNCION_PRO: 403,
 };
 
 /**
