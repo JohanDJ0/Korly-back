@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
-import { crearCategoriaPersonalizada, eliminarCategoria, listarCategorias } from '../../src/modulos/categorias/categorias.js';
+import { actualizarCategoria, crearCategoriaPersonalizada, eliminarCategoria, listarCategorias } from '../../src/modulos/categorias/categorias.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.js';
@@ -24,6 +24,16 @@ describe('categorías', () => {
       expect(categorias.every((c) => c.esPredeterminada)).toBe(true);
       expect(categorias.map((c) => c.nombre)).toContain('Comida');
       expect(categorias.map((c) => c.nombre)).toContain('Otros');
+    });
+
+    it('las predeterminadas ya traen un ícono razonable, no null', async () => {
+      const tenantId = await tenantDePrueba();
+      const categorias = await listarCategorias(tenantId);
+
+      const comida = categorias.find((c) => c.nombre === 'Comida');
+      const otros = categorias.find((c) => c.nombre === 'Otros');
+      expect(comida?.icono).toBe('comida');
+      expect(otros?.icono).toBe('otros');
     });
 
     it('predeterminadas primero, alfabético dentro de cada grupo', async () => {
@@ -84,6 +94,125 @@ describe('categorías', () => {
       await expect(crearCategoriaPersonalizada(tenantId, 'Una de más')).rejects.toMatchObject({
         codigo: 'LIMITE_CATEGORIAS_ALCANZADO',
       });
+    });
+
+    it('acepta un ícono del set válido', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota', 'mascotas');
+      expect(categoria.icono).toBe('mascotas');
+    });
+
+    it('sin ícono, queda en null (el cliente cae al emparejamiento por palabra clave)', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+      expect(categoria.icono).toBeNull();
+    });
+
+    it('rechaza un ícono fuera del set válido', async () => {
+      const tenantId = await tenantDePrueba();
+      await expect(crearCategoriaPersonalizada(tenantId, 'Mascota', 'no-existe')).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+  });
+
+  describe('actualizarCategoria', () => {
+    it('cambia el ícono de una categoría personalizada', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+
+      const actualizada = await actualizarCategoria(tenantId, categoria.id, { icono: 'mascotas' });
+
+      expect(actualizada.icono).toBe('mascotas');
+    });
+
+    it('también aplica a una predeterminada — es cosmético, no choca con "no se puede eliminar"', async () => {
+      const tenantId = await tenantDePrueba();
+      const categorias = await listarCategorias(tenantId);
+      const comida = categorias.find((c) => c.nombre === 'Comida');
+
+      const actualizada = await actualizarCategoria(tenantId, comida!.id, { icono: 'otros' });
+
+      expect(actualizada.icono).toBe('otros');
+      expect(actualizada.nombre).toBe('Comida');
+      expect(actualizada.esPredeterminada).toBe(true);
+    });
+
+    it('null quita el ícono elegido', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota', 'mascotas');
+
+      const actualizada = await actualizarCategoria(tenantId, categoria.id, { icono: null });
+
+      expect(actualizada.icono).toBeNull();
+    });
+
+    it('rechaza un ícono fuera del set válido', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+      await expect(actualizarCategoria(tenantId, categoria.id, { icono: 'no-existe' })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+
+    it('cambia el nombre de una categoría personalizada', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+
+      const actualizada = await actualizarCategoria(tenantId, categoria.id, { nombre: 'Mascotas y veterinario' });
+
+      expect(actualizada.nombre).toBe('Mascotas y veterinario');
+    });
+
+    it('también deja renombrar una predeterminada — sigue siendo la misma fila sembrada, solo con otra etiqueta', async () => {
+      const tenantId = await tenantDePrueba();
+      const categorias = await listarCategorias(tenantId);
+      const comida = categorias.find((c) => c.nombre === 'Comida');
+
+      const actualizada = await actualizarCategoria(tenantId, comida!.id, { nombre: 'Comida y despensa' });
+
+      expect(actualizada.nombre).toBe('Comida y despensa');
+      expect(actualizada.esPredeterminada).toBe(true);
+    });
+
+    it('recorta espacios del nombre nuevo', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+      const actualizada = await actualizarCategoria(tenantId, categoria.id, { nombre: '  Perro  ' });
+      expect(actualizada.nombre).toBe('Perro');
+    });
+
+    it('rechaza un nombre vacío', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+      await expect(actualizarCategoria(tenantId, categoria.id, { nombre: '   ' })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+
+    it('rechaza renombrar a un nombre que ya usa otra categoría del mismo tenant', async () => {
+      const tenantId = await tenantDePrueba();
+      await crearCategoriaPersonalizada(tenantId, 'Perro');
+      const gato = await crearCategoriaPersonalizada(tenantId, 'Gato');
+
+      await expect(actualizarCategoria(tenantId, gato.id, { nombre: 'Perro' })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+
+    it('nombre e ícono se pueden cambiar juntos en un solo llamado', async () => {
+      const tenantId = await tenantDePrueba();
+      const categoria = await crearCategoriaPersonalizada(tenantId, 'Mascota');
+
+      const actualizada = await actualizarCategoria(tenantId, categoria.id, { nombre: 'Perro', icono: 'mascotas' });
+
+      expect(actualizada.nombre).toBe('Perro');
+      expect(actualizada.icono).toBe('mascotas');
+    });
+
+    it('rechaza una categoría que no existe (BOLA)', async () => {
+      const tenantId = await tenantDePrueba();
+      await expect(actualizarCategoria(tenantId, randomUUID(), { icono: 'otros' })).rejects.toMatchObject({ codigo: 'CATEGORIA_NO_ENCONTRADA' });
+    });
+
+    it('rechaza una categoría de otro tenant (BOLA)', async () => {
+      const tenantId = await tenantDePrueba();
+      const otroTenantId = await tenantDePrueba();
+      const ajena = await crearCategoriaPersonalizada(otroTenantId, 'Mascota');
+
+      await expect(actualizarCategoria(tenantId, ajena.id, { icono: 'otros' })).rejects.toMatchObject({ codigo: 'CATEGORIA_NO_ENCONTRADA' });
     });
   });
 

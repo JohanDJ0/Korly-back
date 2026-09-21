@@ -11,7 +11,57 @@ export interface Categoria {
   id: string;
   nombre: string;
   esPredeterminada: boolean;
+  icono: string | null;
 }
+
+/**
+ * Set fijo y curado — nunca el nombre de un ícono de una librería
+ * específica (ver el comentario de la columna en db/schema/categorias.ts).
+ * El frontend (lib/icono-categoria.tsx) mapea cada una de estas claves a
+ * un ícono real; agregar una nueva aquí no requiere migración, solo
+ * actualizar ambos lados. `'otros'` es el respaldo genérico, siempre
+ * disponible.
+ */
+export const ICONOS_CATEGORIA_VALIDOS = [
+  'comida',
+  'transporte',
+  'vivienda',
+  'servicios',
+  'salud',
+  'entretenimiento',
+  'ropa',
+  'educacion',
+  'ahorro',
+  'compras',
+  'proyectos',
+  'mascotas',
+  'viajes',
+  'regalos',
+  'tecnologia',
+  'otros',
+] as const;
+
+export type IconoCategoria = (typeof ICONOS_CATEGORIA_VALIDOS)[number];
+
+function validarIcono(icono: string | null | undefined): void {
+  if (icono !== null && icono !== undefined && !ICONOS_CATEGORIA_VALIDOS.includes(icono as IconoCategoria)) {
+    throw new ErrorDominio('VALIDACION', `El campo 'icono' debe ser uno de: ${ICONOS_CATEGORIA_VALIDOS.join(', ')}`);
+  }
+}
+
+/** Íconos razonables para las 10 predeterminadas (resolver-identidad.ts) — el usuario puede cambiarlos después, esto solo evita que nazcan todas con el genérico "otros". */
+export const ICONO_POR_NOMBRE_PREDETERMINADA: Record<string, IconoCategoria> = {
+  Comida: 'comida',
+  Transporte: 'transporte',
+  Vivienda: 'vivienda',
+  Servicios: 'servicios',
+  Salud: 'salud',
+  Entretenimiento: 'entretenimiento',
+  Ropa: 'ropa',
+  Educación: 'educacion',
+  Ahorro: 'ahorro',
+  Otros: 'otros',
+};
 
 /**
  * Documento Maestro §9.1: "categorías personalizadas gratis para
@@ -32,6 +82,7 @@ const COLUMNAS_CATEGORIA = {
   id: categorias.id,
   nombre: categorias.nombre,
   esPredeterminada: categorias.esPredeterminada,
+  icono: categorias.icono,
 } as const;
 
 /** Predeterminadas primero, alfabético dentro de cada grupo — orden estable para un selector en el cliente. */
@@ -45,11 +96,12 @@ export async function listarCategorias(tenantId: string): Promise<Categoria[]> {
   );
 }
 
-export async function crearCategoriaPersonalizada(tenantId: string, nombre: string): Promise<Categoria> {
+export async function crearCategoriaPersonalizada(tenantId: string, nombre: string, icono?: string | null): Promise<Categoria> {
   const nombreLimpio = nombre.trim();
   if (nombreLimpio.length === 0) {
     throw new ErrorDominio('VALIDACION', 'El nombre de la categoría no puede estar vacío');
   }
+  validarIcono(icono);
 
   return conTenant(tenantId, async (tx) => {
     const [fila] = await tx
@@ -63,13 +115,65 @@ export async function crearCategoriaPersonalizada(tenantId: string, nombre: stri
     try {
       const [categoria] = await tx
         .insert(categorias)
-        .values({ tenantId, nombre: nombreLimpio, esPredeterminada: false })
+        .values({ tenantId, nombre: nombreLimpio, esPredeterminada: false, icono: icono ?? null })
         .returning(COLUMNAS_CATEGORIA);
       if (!categoria) throw new Error('No se pudo crear la categoría');
       return categoria;
     } catch (error) {
       if (esViolacionDeIndiceUnico(error)) {
         throw new ErrorDominio('VALIDACION', `Ya existe una categoría llamada "${nombreLimpio}"`);
+      }
+      throw error;
+    }
+  });
+}
+
+export interface ActualizarCategoriaEntrada {
+  nombre?: string;
+  icono?: string | null;
+}
+
+/**
+ * Nombre e ícono, ambos opcionales — un `PATCH` real, solo toca lo que
+ * el caller mande. `esPredeterminada` nunca se toca aquí: nada le
+ * impide a una predeterminada cambiar de nombre o ícono (siguen siendo
+ * la misma fila sembrada, solo con otra etiqueta), lo único protegido
+ * de verdad es "no se puede eliminar" (`eliminarCategoria`) — esa sí es
+ * la garantía real de que todo tenant nuevo arranca con un set base.
+ */
+export async function actualizarCategoria(tenantId: string, categoriaId: string, entrada: ActualizarCategoriaEntrada): Promise<Categoria> {
+  validarIcono(entrada.icono);
+
+  const cambios: { nombre?: string; icono?: string | null } = {};
+  if (entrada.nombre !== undefined) {
+    const nombreLimpio = entrada.nombre.trim();
+    if (nombreLimpio.length === 0) {
+      throw new ErrorDominio('VALIDACION', 'El nombre de la categoría no puede estar vacío');
+    }
+    cambios.nombre = nombreLimpio;
+  }
+  if (entrada.icono !== undefined) {
+    cambios.icono = entrada.icono;
+  }
+
+  return conTenant(tenantId, async (tx) => {
+    const categoria = await obtenerCategoriaPorIdTx(tx, tenantId, categoriaId);
+    if (!categoria) {
+      throw new ErrorDominio('CATEGORIA_NO_ENCONTRADA', 'La categoría especificada no existe');
+    }
+    if (Object.keys(cambios).length === 0) return categoria;
+
+    try {
+      const [actualizada] = await tx
+        .update(categorias)
+        .set(cambios)
+        .where(and(eq(categorias.tenantId, tenantId), eq(categorias.id, categoriaId)))
+        .returning(COLUMNAS_CATEGORIA);
+      if (!actualizada) throw new Error('No se pudo actualizar la categoría');
+      return actualizada;
+    } catch (error) {
+      if (esViolacionDeIndiceUnico(error)) {
+        throw new ErrorDominio('VALIDACION', `Ya existe una categoría llamada "${cambios.nombre}"`);
       }
       throw error;
     }

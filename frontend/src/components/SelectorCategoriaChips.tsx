@@ -32,7 +32,7 @@ export function SelectorCategoriaChips({ value, onChange }: SelectorCategoriaChi
   function confirmarNueva() {
     const nombre = nombreNueva.trim();
     if (nombre.length === 0) return;
-    crearCategoria.mutate(nombre, {
+    crearCategoria.mutate({ nombre }, {
       onSuccess: (nueva) => {
         onChange(nueva.id);
         setCreando(false);
@@ -75,7 +75,7 @@ export function SelectorCategoriaChips({ value, onChange }: SelectorCategoriaChi
     <div className="flex flex-col gap-2.5">
       <div className="-mx-6 flex gap-2 overflow-x-auto px-6 pb-1">
         {categorias?.map((categoria) => {
-          const Icono = iconoCategoria(categoria.nombre);
+          const Icono = iconoCategoria(categoria.nombre, categoria.icono);
           const seleccionada = value === categoria.id;
           return (
             <button

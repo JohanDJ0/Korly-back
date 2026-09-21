@@ -5,6 +5,7 @@ import { categorias, NOMBRES_CATEGORIAS_PREDETERMINADAS } from '../../db/schema/
 import { identidadesExternas } from '../../db/schema/identidad.js';
 import { tenants } from '../../db/schema/tenants.js';
 import { usuarios } from '../../db/schema/identidad.js';
+import { ICONO_POR_NOMBRE_PREDETERMINADA } from '../categorias/categorias.js';
 
 const PROVEEDOR_SUPABASE = 'supabase';
 
@@ -80,7 +81,12 @@ async function aprovisionarIdentidadNueva(idEnProveedor: string): Promise<Identi
     // qué clasificar su primer gasto, sin depender de un endpoint de
     // "inicializar categorías" aparte.
     await tx.insert(categorias).values(
-      NOMBRES_CATEGORIAS_PREDETERMINADAS.map((nombre) => ({ tenantId, nombre, esPredeterminada: true }))
+      NOMBRES_CATEGORIAS_PREDETERMINADAS.map((nombre) => ({
+        tenantId,
+        nombre,
+        esPredeterminada: true,
+        icono: ICONO_POR_NOMBRE_PREDETERMINADA[nombre] ?? null,
+      }))
     );
 
     // La restricción única (proveedor, id_en_proveedor) en el schema

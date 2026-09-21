@@ -38,8 +38,9 @@ export function ActividadReciente({ periodoId }: ActividadRecienteProps) {
 
       <ul className="flex flex-col">
         {gastos.map((gasto, indice) => {
-          const nombreCategoria = categorias?.find((c) => c.id === gasto.categoriaId)?.nombre;
-          const Icono = iconoCategoria(nombreCategoria);
+          const categoriaDelGasto = categorias?.find((c) => c.id === gasto.categoriaId);
+          const nombreCategoria = categoriaDelGasto?.nombre;
+          const Icono = iconoCategoria(nombreCategoria, categoriaDelGasto?.icono);
           return (
             <li key={gasto.id}>
               {indice > 0 && <div className="bg-border h-px" />}

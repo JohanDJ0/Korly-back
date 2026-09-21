@@ -31,7 +31,7 @@ export function SelectorCategoria({ value, onChange, id }: SelectorCategoriaProp
   function confirmarNueva() {
     const nombre = nombreNueva.trim();
     if (nombre.length === 0) return;
-    crearCategoria.mutate(nombre, {
+    crearCategoria.mutate({ nombre }, {
       onSuccess: (nueva) => {
         onChange(nueva.id);
         setCreando(false);

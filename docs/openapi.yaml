@@ -505,6 +505,52 @@ paths:
               schema:
                 $ref: '#/components/schemas/Error'
 
+  /categorias/{categoriaId}:
+    parameters:
+      - name: categoriaId
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+
+    patch:
+      tags: [Categorías]
+      summary: Cambiar el nombre y/o el ícono de una categoría
+      description: >
+        PATCH real — manda solo el campo que quieras cambiar. Aplica igual
+        a predeterminadas y personalizadas: lo único que sigue protegido es
+        no poder eliminar una predeterminada (ver DELETE de este mismo path).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarCategoriaRequest'
+      responses:
+        '200':
+          description: Categoría actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Categoria'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+    delete:
+      tags: [Categorías]
+      summary: Eliminar una categoría personalizada
+      description: >
+        Nunca una predeterminada (`CATEGORIA_PREDETERMINADA`) ni una que ya
+        esté en uso en algún gasto, gasto recurrente o cargo de tarjeta
+        (`CATEGORIA_EN_USO`) — evita que un reporte ya generado quede
+        apuntando a una categoría que dejó de existir.
+      responses:
+        '204':
+          description: Categoría eliminada
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
 # ============================================================
 # COMPONENTES
 # ============================================================
@@ -954,6 +1000,15 @@ components:
 
     # ---------- Categorías ----------
 
+    IconoCategoria:
+      type: string
+      description: >
+        Set fijo y curado (backend/src/modulos/categorias/categorias.ts,
+        ICONOS_CATEGORIA_VALIDOS) — nunca el nombre de un ícono de una
+        librería específica. `'otros'` es el respaldo genérico.
+      enum:
+        [comida, transporte, vivienda, servicios, salud, entretenimiento, ropa, educacion, ahorro, compras, proyectos, mascotas, viajes, regalos, tecnologia, otros]
+
     CrearCategoriaRequest:
       type: object
       required: [nombre]
@@ -961,10 +1016,28 @@ components:
         nombre:
           type: string
           maxLength: 50
+        icono:
+          allOf: [$ref: '#/components/schemas/IconoCategoria']
+          nullable: true
+
+    ActualizarCategoriaRequest:
+      type: object
+      description: >
+        PATCH real — solo se cambia el campo que se manda. Aplica igual a
+        predeterminadas y personalizadas (lo único protegido de verdad es
+        no poder eliminarlas, ver DELETE /categorias/{categoriaId}).
+      properties:
+        nombre:
+          type: string
+          maxLength: 50
+        icono:
+          allOf: [$ref: '#/components/schemas/IconoCategoria']
+          nullable: true
+          description: 'null quita el ícono elegido — el cliente vuelve a emparejar por palabra clave sobre el nombre.'
 
     Categoria:
       type: object
-      required: [id, nombre, esPredeterminada]
+      required: [id, nombre, esPredeterminada, icono]
       properties:
         id:
           type: string
@@ -973,3 +1046,6 @@ components:
           type: string
         esPredeterminada:
           type: boolean
+        icono:
+          allOf: [$ref: '#/components/schemas/IconoCategoria']
+          nullable: true

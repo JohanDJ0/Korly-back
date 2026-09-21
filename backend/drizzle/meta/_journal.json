@@ -120,6 +120,13 @@
       "when": 1789610649248,
       "tag": "0016_agrega_plan_free_pro",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1789958485922,
+      "tag": "0017_agrega_icono_categoria",
+      "breakpoints": true
     }
   ]
 }

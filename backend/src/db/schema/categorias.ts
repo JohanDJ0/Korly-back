@@ -45,6 +45,16 @@ export const categorias = pgTable(
       .references(() => tenants.id),
     nombre: text('nombre').notNull(),
     esPredeterminada: boolean('es_predeterminada').notNull().default(false),
+    /**
+     * Identificador de un set fijo (ver ICONOS_CATEGORIA_VALIDOS en
+     * modulos/categorias/categorias.ts) — nunca el nombre de un ícono de
+     * una librería específica, para no acoplar la base de datos a
+     * lucide-react. `null` = sin ícono elegido, el cliente cae al
+     * emparejamiento por palabra clave de siempre (lib/icono-categoria.tsx
+     * en el frontend). La validación del set vive en la capa de dominio,
+     * no aquí, para poder agregar íconos nuevos sin una migración.
+     */
+    icono: text('icono'),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
