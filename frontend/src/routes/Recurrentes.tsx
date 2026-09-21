@@ -15,19 +15,19 @@ export function Recurrentes() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col md:max-w-4xl md:px-8 md:pt-8">
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
       <PageHeader
         titulo="Gastos recurrentes"
         accion={
-          <Button onClick={() => setMostrarFormulario(true)} className="hidden rounded-xl md:inline-flex">
+          <Button onClick={() => setMostrarFormulario(true)} className="hidden rounded-xl sm:inline-flex">
             <Plus size={16} strokeWidth={2.5} />
             Nuevo gasto recurrente
           </Button>
         }
       />
-      <p className="text-muted-foreground px-5 pb-3 text-[13px] md:px-0">Se aplican solos cuando toca — no hace falta capturarlos a mano.</p>
+      <p className="text-muted-foreground px-5 pb-3 text-[13px] sm:px-0">Se aplican solos cuando toca — no hace falta capturarlos a mano.</p>
 
-      <div className="flex flex-1 flex-col gap-2.5 px-5 pb-4 md:px-0">
+      <div className="flex flex-1 flex-col gap-2.5 px-5 pb-4 sm:px-0">
         {isLoading && <p className="text-muted-foreground">Cargando…</p>}
         {error && <p className="text-destructive">{error.message}</p>}
         {recurrentes?.length === 0 && <p className="text-muted-foreground">Todavía no tienes ninguna suscripción o gasto recurrente registrado.</p>}
@@ -40,7 +40,7 @@ export function Recurrentes() {
         )}
       </div>
 
-      <div className="px-5 pb-6 md:hidden">
+      <div className="px-5 pb-6 sm:hidden">
         <button
           onClick={() => setMostrarFormulario(true)}
           className="bg-primary text-primary-foreground flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-semibold"

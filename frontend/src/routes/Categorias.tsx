@@ -39,22 +39,22 @@ export function Categorias() {
   }
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-4 pb-8 md:max-w-4xl md:px-8 md:pt-8">
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-4 pb-8 sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
       <PageHeader titulo="Categorías" />
 
-      <div className="flex flex-col gap-4 px-5 md:px-0">
+      <div className="flex flex-col gap-4 px-5 sm:px-0">
         {isLoading && <p className="text-muted-foreground">Cargando…</p>}
         {error && <p className="text-destructive">{error.message}</p>}
 
         {categorias && (
-          <ul className="flex flex-col gap-2.5 md:grid md:grid-cols-2 md:items-start md:gap-3 lg:grid-cols-3">
+          <ul className="flex flex-col gap-2.5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 xl:grid-cols-3">
             {categorias.map((categoria) => (
               <FilaCategoria key={categoria.id} categoria={categoria} />
             ))}
           </ul>
         )}
 
-        <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-4 md:max-w-md">
+        <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-4 sm:max-w-md">
           <p className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">NUEVA CATEGORÍA</p>
           <Input
             value={nombreNueva}

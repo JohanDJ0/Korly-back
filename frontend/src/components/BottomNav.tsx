@@ -9,13 +9,14 @@ import { cn } from '@/lib/utils';
  * `NavLink` (no `Link`) porque el estado activo es visual, no algo que
  * este componente deba calcular a mano comparando rutas.
  *
- * Oculta en escritorio (`md:hidden`) — ahí la navegación vive en
- * Sidebar.tsx, siempre visible a la izquierda en vez de compitiendo con
- * el contenido por la franja inferior de la pantalla.
+ * Oculta desde `sm:` (640px, mismo corte que Sidebar.tsx) — ahí la
+ * navegación vive en el sidebar, siempre visible a la izquierda en vez
+ * de compitiendo con el contenido por la franja inferior de la
+ * pantalla.
  */
 export function BottomNav() {
   return (
-    <nav className="bg-card border-border sticky bottom-0 flex h-[76px] shrink-0 items-center border-t pb-2 md:hidden">
+    <nav className="bg-card border-border sticky bottom-0 flex h-[76px] shrink-0 items-center border-t pb-2 sm:hidden">
       {NAV_DESTINOS.map(({ to, etiqueta, Icono, fin }) => (
         <NavLink
           key={to}

@@ -22,7 +22,7 @@ export function ProtectedRoute() {
   if (!session) return <Navigate to="/login" replace />;
 
   return (
-    <div className="md:flex">
+    <div className="sm:flex">
       <Sidebar />
       <div className="min-w-0 flex-1">
         <Outlet />

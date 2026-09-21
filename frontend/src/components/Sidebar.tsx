@@ -7,12 +7,19 @@ import { cn } from '@/lib/utils';
  * Versión de escritorio de BottomNav.tsx — mismos 5 destinos, misma
  * navegación, pero como columna fija a la izquierda en vez de barra
  * inferior (que en una pantalla ancha competiría por espacio con el
- * contenido y se ve fuera de lugar). Oculta en móvil (`hidden md:flex`);
- * se monta una sola vez en ProtectedRoute.tsx, no en cada pantalla.
+ * contenido y se ve fuera de lugar). Aparece desde `sm:` (640px), no
+ * `md:` (768px) — hallazgo real: un tablet en vertical suele medir
+ * justo alrededor de 768px, así que con el corte en `md` el menú
+ * saltaba entre modo escritorio y modo móvil según el dispositivo
+ * cayera un pixel a un lado u otro de esa frontera. Corriendo el corte
+ * a `sm` deja todo el rango de tablet consistentemente en modo
+ * escritorio (con contenido a una sola columna hasta `lg`, ver
+ * Home.tsx/Metas.tsx). Se monta una sola vez en ProtectedRoute.tsx, no
+ * en cada pantalla.
  */
 export function Sidebar() {
   return (
-    <aside className="border-border bg-card sticky top-0 hidden h-svh w-60 shrink-0 flex-col gap-1 border-r p-5 md:flex">
+    <aside className="border-border bg-card sticky top-0 hidden h-svh w-60 shrink-0 flex-col gap-1 border-r p-5 sm:flex">
       <div className="flex items-center gap-2 px-2 pb-6">
         <img src="/logo/icon.svg" alt="" className="h-8 w-8 rounded-lg" />
         <span className="font-display text-base font-bold">Korly</span>

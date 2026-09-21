@@ -29,10 +29,10 @@ export function Ajustes() {
   });
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col md:max-w-2xl md:px-8 md:pt-8">
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8">
       <PageHeader titulo="Ajustes" />
 
-      <div className="flex flex-1 flex-col gap-5.5 px-5 pt-2 pb-4 md:px-0 md:pt-0">
+      <div className="flex flex-1 flex-col gap-5.5 px-5 pt-2 pb-4 sm:px-0 sm:pt-0">
         {isLoading && <p className="text-muted-foreground">Cargando…</p>}
         {error && <p className="text-destructive">{error.message}</p>}
 
@@ -92,10 +92,10 @@ export function Ajustes() {
         </section>
       </div>
 
-      <div className="px-5 pb-6 md:px-0">
+      <div className="px-5 pb-6 sm:px-0">
         <Button
           variant="outline"
-          className="border-destructive/25 text-destructive hover:bg-destructive/5 w-full rounded-2xl py-3 md:w-auto"
+          className="border-destructive/25 text-destructive hover:bg-destructive/5 w-full rounded-2xl py-3 sm:w-auto"
           onClick={() => supabase.auth.signOut()}
         >
           Cerrar sesión

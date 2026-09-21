@@ -93,10 +93,10 @@ export function Historial() {
   const viendoElPeriodoActivo = periodoViendose?.estado === 'activo';
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col md:max-w-3xl md:px-8 md:pt-8">
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
       <PageHeader titulo="Historial" />
 
-      <div className="flex flex-col gap-4 px-5 md:px-0">
+      <div className="flex flex-col gap-4 px-5 sm:px-0">
         {
           // Exporta TODO el historial del tenant (no solo el periodo que
           // se está viendo aquí) — documento-maestro-v2.md §12,
@@ -147,7 +147,7 @@ export function Historial() {
         )}
       </div>
 
-      <div className="flex flex-col gap-6 px-5 pt-4 md:px-0">
+      <div className="flex flex-col gap-6 px-5 pt-4 sm:px-0">
         {periodoId && (filtro === 'todo' || filtro === 'ingresos') && (
           <section>
             <div className="mb-1 flex items-start justify-between gap-2">

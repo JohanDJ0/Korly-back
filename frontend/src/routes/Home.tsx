@@ -30,9 +30,13 @@ import { formatearRangoFechas } from '@/lib/fechas';
  *
  * En escritorio, la navegación (logo, Ajustes) ya la da Sidebar.tsx
  * (montada en ProtectedRoute.tsx) — la barra propia de esta pantalla es
- * solo para móvil (`md:hidden`). La actividad reciente pasa a columna
- * lateral (`md:grid-cols-[1fr_360px]`) en vez de apilarse debajo del
- * CTA; en móvil el grid colapsa a una sola columna y el orden queda
+ * solo para móvil (`sm:hidden`, mismo corte que el sidebar). La
+ * actividad reciente pasa a columna lateral (`lg:grid-cols-[1fr_360px]`)
+ * en vez de apilarse debajo del CTA — a propósito en `lg` (1024px), no
+ * en `sm`/`md`: con el sidebar ya restando 240px, un tablet en ese
+ * rango no tiene espacio real para dos columnas (la de 360px fijos no
+ * cabría sin apretar la cifra) — hallazgo real, se veía roto en modo
+ * tablet. Hasta `lg`, una sola columna ancha; el orden en móvil queda
  * idéntico al de antes.
  */
 export function Home() {
@@ -54,8 +58,8 @@ export function Home() {
   const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col md:max-w-4xl md:px-8 md:pt-8">
-      <div className="flex items-center justify-between px-5 pt-5 pb-1 md:hidden">
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
+      <div className="flex items-center justify-between px-5 pt-5 pb-1 sm:hidden">
         <div className="flex items-center gap-2">
           <img src="/logo/icon.svg" alt="" className="h-[30px] w-[30px] rounded-[9px]" />
           <span className="font-display text-base font-bold">Korly</span>
@@ -73,12 +77,12 @@ export function Home() {
         // una quincena real (p. ej. al probar la app), los días
         // restantes reales son menos de 15. Mostrar el rango explica
         // por qué, en vez de dejar que el usuario asuma un conteo fijo.
-        <p className="text-muted-foreground px-5 pb-2 text-[13px] md:px-0 md:pb-5 md:text-sm">
+        <p className="text-muted-foreground px-5 pb-2 text-[13px] sm:px-0 sm:pb-5 sm:text-sm">
           Quincena · {formatearRangoFechas(periodoActivo.fechaInicio, periodoActivo.fechaFin)}
         </p>
       )}
 
-      <div className="flex flex-col gap-3.5 px-5 pt-2 pb-4 md:grid md:grid-cols-[1fr_360px] md:items-start md:gap-8 md:px-0 md:pt-0">
+      <div className="flex flex-col gap-3.5 px-5 pt-2 pb-4 sm:px-0 sm:pt-0 lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-8">
         <div className="flex flex-col gap-3.5">
           {
             // Hallazgo real de un usuario: cerrar un periodo y crear el
@@ -173,7 +177,7 @@ export function Home() {
         </div>
 
         {periodoId && (
-          <div className="md:border-border md:bg-card md:rounded-2xl md:border md:p-4">
+          <div className="lg:border-border lg:bg-card lg:rounded-2xl lg:border lg:p-4">
             <ActividadReciente periodoId={periodoId} />
           </div>
         )}
@@ -186,7 +190,7 @@ export function Home() {
         // atrapada en la columna izquierda.
       }
       {periodoId && (
-        <div className="mt-1 mb-4 flex justify-center px-5 md:px-0">
+        <div className="mt-1 mb-4 flex justify-center px-5 sm:px-0">
           <BotonConfirmar
             variant="ghost"
             size="sm"
