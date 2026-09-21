@@ -54,6 +54,16 @@ export function Historial() {
   } = useGastos(periodoId);
   const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
 
+  // Hallazgo del pase de QA/UX: un gasto/ingreso editado o eliminado
+  // (revertido: true, backend/README.md "nunca hard delete") se
+  // quedaba visible para siempre, atenuado y marcado "Corregido" — para
+  // el usuario, eso se veía como "lo eliminé y sigue apareciendo". El
+  // backend SÍ guarda la fila para siempre (ADR-001, integridad del
+  // ledger) — eso no cambia y no puede cambiar; lo que se ajusta aquí
+  // es solo que Historial ya no la MUESTRE por defecto una vez corregida.
+  const ingresosVigentes = (ingresos ?? []).filter((i) => !i.revertido);
+  const gastosVigentes = (gastos?.pages.flatMap((pagina) => pagina.datos) ?? []).filter((g) => !g.revertido);
+
   const periodosAnteriores = (periodos ?? []).filter(
     (p) => (p.estado === 'cerrado' || p.estado === 'archivado') && p.id !== periodoId
   );
@@ -83,10 +93,10 @@ export function Historial() {
   const viendoElPeriodoActivo = periodoViendose?.estado === 'activo';
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col">
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col md:max-w-3xl md:px-8 md:pt-8">
       <PageHeader titulo="Historial" />
 
-      <div className="flex flex-col gap-4 px-5">
+      <div className="flex flex-col gap-4 px-5 md:px-0">
         {
           // Exporta TODO el historial del tenant (no solo el periodo que
           // se está viendo aquí) — documento-maestro-v2.md §12,
@@ -137,7 +147,7 @@ export function Historial() {
         )}
       </div>
 
-      <div className="flex flex-col gap-6 px-5 pt-4">
+      <div className="flex flex-col gap-6 px-5 pt-4 md:px-0">
         {periodoId && (filtro === 'todo' || filtro === 'ingresos') && (
           <section>
             <div className="mb-1 flex items-start justify-between gap-2">
@@ -146,8 +156,8 @@ export function Historial() {
             </div>
             {cargandoIngresos && <p className="text-muted-foreground text-sm">Cargando…</p>}
             {errorIngresos && <p className="text-destructive text-sm">{errorIngresos.message}</p>}
-            {ingresos?.length === 0 && <p className="text-muted-foreground text-sm">Sin ingresos todavía.</p>}
-            <ul>{ingresos?.map((ingreso) => <FilaIngreso key={ingreso.id} ingreso={ingreso} />)}</ul>
+            {ingresosVigentes.length === 0 && <p className="text-muted-foreground text-sm">Sin ingresos todavía.</p>}
+            <ul>{ingresosVigentes.map((ingreso) => <FilaIngreso key={ingreso.id} ingreso={ingreso} />)}</ul>
           </section>
         )}
 
@@ -159,9 +169,9 @@ export function Historial() {
             </div>
             {cargandoGastos && <p className="text-muted-foreground text-sm">Cargando…</p>}
             {errorGastos && <p className="text-destructive text-sm">{errorGastos.message}</p>}
-            {gastos?.pages[0]?.datos.length === 0 && <p className="text-muted-foreground text-sm">Sin gastos todavía.</p>}
+            {gastosVigentes.length === 0 && <p className="text-muted-foreground text-sm">Sin gastos todavía.</p>}
             <ul>
-              {gastos?.pages.flatMap((pagina) => pagina.datos).map((gasto) => <FilaGasto key={gasto.id} gasto={gasto} />)}
+              {gastosVigentes.map((gasto) => <FilaGasto key={gasto.id} gasto={gasto} />)}
             </ul>
             {hasNextPage && (
               <Button variant="outline" className="mt-3 w-full rounded-xl" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>

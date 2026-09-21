@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 
+import { Sidebar } from '@/components/Sidebar';
 import { RestablecerPassword } from '@/routes/RestablecerPassword';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -20,5 +21,12 @@ export function ProtectedRoute() {
   if (esRecuperacion) return <RestablecerPassword />;
   if (!session) return <Navigate to="/login" replace />;
 
-  return <Outlet />;
+  return (
+    <div className="md:flex">
+      <Sidebar />
+      <div className="min-w-0 flex-1">
+        <Outlet />
+      </div>
+    </div>
+  );
 }

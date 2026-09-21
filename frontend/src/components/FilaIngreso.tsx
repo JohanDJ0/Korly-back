@@ -36,24 +36,6 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
     );
   }
 
-  if (ingreso.revertido) {
-    return (
-      <li className="flex items-center gap-3 border-b py-3 opacity-45 last:border-b-0">
-        <div className="bg-muted flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
-          <TrendingUp size={16} className="text-muted-foreground" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium line-through">{formatearMonto(ingreso.monto)}</p>
-          <p className="text-muted-foreground text-sm">
-            {ingreso.fechaEfectiva}
-            {ingreso.nota ? ` — ${ingreso.nota}` : ''}
-          </p>
-        </div>
-        <span className="text-muted-foreground shrink-0 text-sm">Corregido</span>
-      </li>
-    );
-  }
-
   if (editando) {
     return (
       <li className="flex flex-wrap items-center gap-2 border-b py-3 last:border-b-0">

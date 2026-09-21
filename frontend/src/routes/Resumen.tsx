@@ -30,10 +30,10 @@ export function Resumen() {
   const esDeficit = resumen ? resumen.sobrante.valorMinimo < 0 : false;
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-4 pb-8">
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-4 pb-8 md:max-w-xl md:px-8 md:pt-8">
       <PageHeader titulo="Resumen del periodo" />
 
-      <div className="flex flex-col gap-4 px-5">
+      <div className="flex flex-col gap-4 px-5 md:px-0">
         {isLoading && <p className="text-muted-foreground">Cargando…</p>}
         {error && <p className="text-destructive">{error.message}</p>}
 

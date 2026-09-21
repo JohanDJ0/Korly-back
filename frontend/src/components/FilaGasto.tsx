@@ -43,8 +43,9 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
   const editarGasto = useEditarGasto();
   const eliminarGasto = useEliminarGasto();
 
-  const nombreCategoria = categorias?.find((c) => c.id === gasto.categoriaId)?.nombre;
-  const Icono = iconoCategoria(nombreCategoria);
+  const categoriaDelGasto = categorias?.find((c) => c.id === gasto.categoriaId);
+  const nombreCategoria = categoriaDelGasto?.nombre;
+  const Icono = iconoCategoria(nombreCategoria, categoriaDelGasto?.icono);
 
   function guardar() {
     const valor = Number(monto);
@@ -61,30 +62,6 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
         fechaEfectiva,
       },
       { onSuccess: () => setEditando(false) }
-    );
-  }
-
-  // Ya se editó o eliminó antes (backend/README.md, "Listar gastos") —
-  // la fila queda para siempre por el "nunca hard delete", pero editarla
-  // o eliminarla de nuevo solo daría GASTO_YA_REVERTIDO. Se muestra
-  // atenuada y sin acciones en vez de invitar a un click que va a
-  // fallar seguro.
-  if (gasto.revertido) {
-    return (
-      <li className="flex items-center gap-3 border-b py-3 opacity-45 last:border-b-0">
-        <div className="bg-muted flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
-          <Icono size={16} className="text-muted-foreground" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <p className="font-medium line-through">{formatearMonto(gasto.monto)}</p>
-          <p className="text-muted-foreground text-sm">
-            {gasto.fechaEfectiva}
-            {nombreCategoria ? ` — ${nombreCategoria}` : ''}
-            {gasto.nota ? ` — ${gasto.nota}` : ''}
-          </p>
-        </div>
-        <span className="text-muted-foreground shrink-0 text-sm">Corregido</span>
-      </li>
     );
   }
 
