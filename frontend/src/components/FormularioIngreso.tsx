@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRegistrarIngreso } from '@/hooks/use-registrar-ingreso';
+import { hoyISO } from '@/lib/fechas';
 
 const esquemaIngreso = z.object({
   monto: z.coerce.number().positive('El monto debe ser mayor a cero'),
@@ -17,10 +18,6 @@ const esquemaIngreso = z.object({
 // necesita ambos por separado, no solo el de salida.
 type IngresoFormEntrada = z.input<typeof esquemaIngreso>;
 type IngresoFormSalida = z.output<typeof esquemaIngreso>;
-
-function hoyISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 interface FormularioIngresoProps {
   periodoId: string;

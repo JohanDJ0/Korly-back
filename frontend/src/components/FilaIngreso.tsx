@@ -1,3 +1,4 @@
+import { TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -37,22 +38,25 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
 
   if (ingreso.revertido) {
     return (
-      <li className="flex items-center justify-between gap-2 border-b py-3 opacity-50">
-        <div>
+      <li className="flex items-center gap-3 border-b py-3 opacity-45 last:border-b-0">
+        <div className="bg-muted flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
+          <TrendingUp size={16} className="text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
           <p className="font-medium line-through">{formatearMonto(ingreso.monto)}</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {ingreso.fechaEfectiva}
             {ingreso.nota ? ` — ${ingreso.nota}` : ''}
           </p>
         </div>
-        <span className="shrink-0 text-sm text-muted-foreground">Corregido</span>
+        <span className="text-muted-foreground shrink-0 text-sm">Corregido</span>
       </li>
     );
   }
 
   if (editando) {
     return (
-      <li className="flex flex-wrap items-center gap-2 border-b py-3">
+      <li className="flex flex-wrap items-center gap-2 border-b py-3 last:border-b-0">
         <Input
           value={monto}
           onChange={(evento) => {
@@ -80,21 +84,24 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
           Cancelar
         </Button>
         {(errorValidacion ?? editarIngreso.error?.message) && (
-          <p className="w-full text-sm text-destructive">{errorValidacion ?? editarIngreso.error?.message}</p>
+          <p className="text-destructive w-full text-sm">{errorValidacion ?? editarIngreso.error?.message}</p>
         )}
       </li>
     );
   }
 
   return (
-    <li className="flex items-center justify-between gap-2 border-b py-3">
-      <div>
-        <p className="font-medium">{formatearMonto(ingreso.monto)}</p>
-        <p className="text-sm text-muted-foreground">
+    <li className="flex items-center gap-3 border-b py-3 last:border-b-0">
+      <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
+        <TrendingUp size={16} className="text-secondary-foreground" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-primary font-medium">+{formatearMonto(ingreso.monto)}</p>
+        <p className="text-muted-foreground text-sm">
           {ingreso.fechaEfectiva}
           {ingreso.nota ? ` — ${ingreso.nota}` : ''}
         </p>
-        {eliminarIngreso.isError && <p className="text-sm text-destructive">{eliminarIngreso.error.message}</p>}
+        {eliminarIngreso.isError && <p className="text-destructive text-sm">{eliminarIngreso.error.message}</p>}
       </div>
       <div className="flex shrink-0 gap-2">
         <Button

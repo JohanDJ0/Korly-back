@@ -23,3 +23,24 @@ export function formatearFechaHora(fechaIso: string): string {
   const formato = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' });
   return formato.format(new Date(fechaIso));
 }
+
+/**
+ * Fecha local del navegador, no UTC — evita que "hoy" salte al día
+ * siguiente desde las 6pm hora de México (ver backend/src/shared/fechas.ts).
+ * Antes duplicada en FormularioGasto.tsx y FormularioIngreso.tsx.
+ */
+export function hoyISO(): string {
+  const ahora = new Date();
+  const anio = ahora.getFullYear();
+  const mes = String(ahora.getMonth() + 1).padStart(2, '0');
+  const dia = String(ahora.getDate()).padStart(2, '0');
+  return `${anio}-${mes}-${dia}`;
+}
+
+/** 'YYYY-MM-DD' (fecha pura, como fechaEfectiva) → "Hoy" o "16 sept", en la zona local — para listas de actividad, nunca para columnas `date` de un periodo (ver formatearRangoFechas). */
+export function formatearFechaActividad(fechaIso: string): string {
+  if (fechaIso === hoyISO()) return 'Hoy';
+  const [anio, mes, dia] = fechaIso.split('-').map(Number);
+  const formato = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' });
+  return formato.format(new Date(anio, mes - 1, dia));
+}

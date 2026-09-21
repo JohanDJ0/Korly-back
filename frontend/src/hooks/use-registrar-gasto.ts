@@ -8,6 +8,7 @@ interface RegistrarGastoInput {
   monto: MontoDto;
   fechaEfectiva: string;
   categoriaId?: string;
+  nota?: string;
 }
 
 interface GastoRegistrado {
@@ -32,6 +33,7 @@ export function useRegistrarGasto() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['gastos'] });
     },
   });
 }

@@ -1,9 +1,13 @@
+import { Download } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
+import { BottomNav } from '@/components/BottomNav';
 import { FilaGasto } from '@/components/FilaGasto';
 import { FilaIngreso } from '@/components/FilaIngreso';
 import { FormularioImportar } from '@/components/FormularioImportar';
+import { PageHeader } from '@/components/PageHeader';
 import { useExportar } from '@/hooks/use-exportar';
 import { useGastos } from '@/hooks/use-gastos';
 import { useIngresos } from '@/hooks/use-ingresos';
@@ -13,6 +17,9 @@ import { usePeriodos } from '@/hooks/use-periodos';
 import { ApiError } from '@/lib/api';
 import { formatearMonto } from '@/lib/dinero';
 import { formatearFechaHora, formatearRangoFechas } from '@/lib/fechas';
+import { cn } from '@/lib/utils';
+
+type Filtro = 'todo' | 'ingresos' | 'gastos';
 
 /**
  * Sin `:periodoId` en la URL, muestra el periodo activo (comportamiento
@@ -29,6 +36,7 @@ export function Historial() {
   const { periodoId: periodoIdDeUrl } = useParams<{ periodoId?: string }>();
   const { data: periodoActivo, error: errorPeriodoActivo } = usePeriodoActivo();
   const { data: periodos } = usePeriodos();
+  const [filtro, setFiltro] = useState<Filtro>('todo');
 
   const sinPeriodoActivo =
     !periodoIdDeUrl && errorPeriodoActivo instanceof ApiError && errorPeriodoActivo.codigo === 'PERIODO_NO_ENCONTRADO';
@@ -75,125 +83,144 @@ export function Historial() {
   const viendoElPeriodoActivo = periodoViendose?.estado === 'activo';
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col gap-6 p-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/">← Volver</Link>
-        </Button>
-        <h1 className="text-xl font-semibold">Historial</h1>
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col">
+      <PageHeader titulo="Historial" />
+
+      <div className="flex flex-col gap-4 px-5">
+        {
+          // Exporta TODO el historial del tenant (no solo el periodo que
+          // se está viendo aquí) — documento-maestro-v2.md §12,
+          // "importación/exportación" (ver backend/README.md, "Exportación").
+        }
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="rounded-xl" disabled={exportar.isPending} onClick={() => exportar.mutate('gastos')}>
+            <Download size={13} /> Gastos (CSV)
+          </Button>
+          <Button variant="outline" size="sm" className="rounded-xl" disabled={exportar.isPending} onClick={() => exportar.mutate('ingresos')}>
+            <Download size={13} /> Ingresos (CSV)
+          </Button>
+        </div>
+        {exportar.isError && <p className="text-destructive text-sm">{exportar.error.message}</p>}
+
+        {periodoViendose && (
+          <p className="text-muted-foreground text-[13px]">
+            Quincena · {formatearRangoFechas(periodoViendose.fechaInicio, periodoViendose.fechaFin)}
+            {periodoViendose.estado !== 'activo' && ` · ${periodoViendose.estado}`}
+            {periodoIdDeUrl && periodoActivo && periodoActivo.id !== periodoIdDeUrl && (
+              <>
+                {' · '}
+                <Link to="/historial" className="text-primary font-semibold">
+                  ver periodo activo
+                </Link>
+              </>
+            )}
+          </p>
+        )}
+
+        {sinPeriodoActivo && <p className="text-muted-foreground">No hay periodo activo todavía.</p>}
+
+        {periodoId && (
+          <div className="flex gap-2">
+            {(['todo', 'ingresos', 'gastos'] as const).map((opcion) => (
+              <button
+                key={opcion}
+                onClick={() => setFiltro(opcion)}
+                className={cn(
+                  'rounded-full px-4 py-2 text-[13px] font-medium capitalize',
+                  filtro === opcion ? 'bg-foreground text-background' : 'border-input bg-card border'
+                )}
+              >
+                {opcion}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {
-        // Exporta TODO el historial del tenant (no solo el periodo que
-        // se está viendo aquí) — documento-maestro-v2.md §12,
-        // "importación/exportación" (ver backend/README.md, "Exportación").
-      }
-      <div className="flex gap-2">
-        <Button variant="outline" size="sm" disabled={exportar.isPending} onClick={() => exportar.mutate('gastos')}>
-          Exportar gastos (CSV)
-        </Button>
-        <Button variant="outline" size="sm" disabled={exportar.isPending} onClick={() => exportar.mutate('ingresos')}>
-          Exportar ingresos (CSV)
-        </Button>
-      </div>
-      {exportar.isError && <p className="text-sm text-destructive">{exportar.error.message}</p>}
-
-      {periodoViendose && (
-        <p className="text-sm text-muted-foreground">
-          Quincena del {formatearRangoFechas(periodoViendose.fechaInicio, periodoViendose.fechaFin)}
-          {periodoViendose.estado !== 'activo' && ` · ${periodoViendose.estado}`}
-          {periodoIdDeUrl && periodoActivo && periodoActivo.id !== periodoIdDeUrl && (
-            <>
-              {' · '}
-              <Link to="/historial" className="underline-offset-4 hover:underline">
-                ver periodo activo
-              </Link>
-            </>
-          )}
-        </p>
-      )}
-
-      {sinPeriodoActivo && <p className="text-muted-foreground">No hay periodo activo todavía.</p>}
-
-      {periodoId && (
-        <>
+      <div className="flex flex-col gap-6 px-5 pt-4">
+        {periodoId && (filtro === 'todo' || filtro === 'ingresos') && (
           <section>
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <h2 className="pt-1 text-sm font-medium text-muted-foreground">Ingresos</h2>
+            <div className="mb-1 flex items-start justify-between gap-2">
+              <h2 className="text-muted-foreground pt-1 text-[12.5px] font-semibold tracking-wide">INGRESOS</h2>
               {viendoElPeriodoActivo && periodoId && <FormularioImportar tipo="ingresos" periodoId={periodoId} />}
             </div>
-            {cargandoIngresos && <p className="text-sm text-muted-foreground">Cargando…</p>}
-            {errorIngresos && <p className="text-sm text-destructive">{errorIngresos.message}</p>}
-            {ingresos?.length === 0 && <p className="text-sm text-muted-foreground">Sin ingresos todavía.</p>}
+            {cargandoIngresos && <p className="text-muted-foreground text-sm">Cargando…</p>}
+            {errorIngresos && <p className="text-destructive text-sm">{errorIngresos.message}</p>}
+            {ingresos?.length === 0 && <p className="text-muted-foreground text-sm">Sin ingresos todavía.</p>}
             <ul>{ingresos?.map((ingreso) => <FilaIngreso key={ingreso.id} ingreso={ingreso} />)}</ul>
           </section>
+        )}
 
+        {periodoId && (filtro === 'todo' || filtro === 'gastos') && (
           <section>
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <h2 className="pt-1 text-sm font-medium text-muted-foreground">Gastos</h2>
+            <div className="mb-1 flex items-start justify-between gap-2">
+              <h2 className="text-muted-foreground pt-1 text-[12.5px] font-semibold tracking-wide">GASTOS</h2>
               {viendoElPeriodoActivo && periodoId && <FormularioImportar tipo="gastos" periodoId={periodoId} />}
             </div>
-            {cargandoGastos && <p className="text-sm text-muted-foreground">Cargando…</p>}
-            {errorGastos && <p className="text-sm text-destructive">{errorGastos.message}</p>}
-            {gastos?.pages[0]?.datos.length === 0 && <p className="text-sm text-muted-foreground">Sin gastos todavía.</p>}
+            {cargandoGastos && <p className="text-muted-foreground text-sm">Cargando…</p>}
+            {errorGastos && <p className="text-destructive text-sm">{errorGastos.message}</p>}
+            {gastos?.pages[0]?.datos.length === 0 && <p className="text-muted-foreground text-sm">Sin gastos todavía.</p>}
             <ul>
               {gastos?.pages.flatMap((pagina) => pagina.datos).map((gasto) => <FilaGasto key={gasto.id} gasto={gasto} />)}
             </ul>
             {hasNextPage && (
-              <Button variant="outline" className="mt-3 w-full" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+              <Button variant="outline" className="mt-3 w-full rounded-xl" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
                 {isFetchingNextPage ? 'Cargando…' : 'Cargar más'}
               </Button>
             )}
           </section>
+        )}
 
-          {
-            // Hallazgo real: un pago de tarjeta nunca aparece arriba, en
-            // "Gastos" — es un tipo de movimiento distinto (ver
-            // backend/README.md, "Tarjetas de crédito y MSI"). Sin esta
-            // sección, no había ninguna forma de ver, desde el
-            // historial, qué mensualidades ya se aplicaron a este
-            // periodo. Solo se muestra si hay algo que mostrar.
-          }
-          {pagosTarjeta && pagosTarjeta.length > 0 && (
-            <section>
-              <h2 className="mb-2 text-sm font-medium text-muted-foreground">Pagos de tarjeta</h2>
-              <ul>
-                {pagosTarjeta.map((pago, indice) => (
-                  <li key={indice} className="flex items-center justify-between gap-2 border-b py-3">
-                    <div>
-                      <p className="font-medium">{formatearMonto(pago.monto)}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {pago.tarjetaNombre} — {pago.cargoDescripcion} ({pago.numeroPago}/{pago.numeroPlazos})
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-        </>
-      )}
+        {
+          // Hallazgo real: un pago de tarjeta nunca aparece arriba, en
+          // "Gastos" — es un tipo de movimiento distinto (ver
+          // backend/README.md, "Tarjetas de crédito y MSI"). Sin esta
+          // sección, no había ninguna forma de ver, desde el
+          // historial, qué mensualidades ya se aplicaron a este
+          // periodo. Solo se muestra si hay algo que mostrar.
+        }
+        {pagosTarjeta && pagosTarjeta.length > 0 && (
+          <section>
+            <h2 className="text-muted-foreground mb-1 text-[12.5px] font-semibold tracking-wide">PAGOS DE TARJETA</h2>
+            <ul>
+              {pagosTarjeta.map((pago, indice) => (
+                <li key={indice} className="flex items-center justify-between gap-2 border-b py-3 last:border-b-0">
+                  <div>
+                    <p className="font-medium">{formatearMonto(pago.monto)}</p>
+                    <p className="text-muted-foreground text-sm">
+                      {pago.tarjetaNombre} — {pago.cargoDescripcion} ({pago.numeroPago}/{pago.numeroPlazos})
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
 
-      {periodosAnteriores.length > 0 && (
-        <section>
-          <h2 className="mb-2 text-sm font-medium text-muted-foreground">Periodos anteriores</h2>
-          <ul>
-            {periodosAnteriores.map((p) => (
-              <li key={p.id} className="flex items-center justify-between gap-2 border-b py-3">
-                <Link to={`/historial/${p.id}`} className="underline-offset-4 hover:underline">
-                  {formatearRangoFechas(p.fechaInicio, p.fechaFin)}
-                  {rangosRepetidos.has(`${p.fechaInicio}|${p.fechaFin}`) && (
-                    <span className="text-muted-foreground"> — creado {formatearFechaHora(p.creadoEn)}</span>
-                  )}
-                </Link>
-                <Button asChild variant="outline" size="sm">
-                  <Link to={`/resumen/${p.id}`}>Ver resumen</Link>
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
+        {periodosAnteriores.length > 0 && (
+          <section>
+            <h2 className="text-muted-foreground mb-1 text-[12.5px] font-semibold tracking-wide">PERIODOS ANTERIORES</h2>
+            <ul>
+              {periodosAnteriores.map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-2 border-b py-3 last:border-b-0">
+                  <Link to={`/historial/${p.id}`} className="text-[14px] underline-offset-4 hover:underline">
+                    {formatearRangoFechas(p.fechaInicio, p.fechaFin)}
+                    {rangosRepetidos.has(`${p.fechaInicio}|${p.fechaFin}`) && (
+                      <span className="text-muted-foreground"> — creado {formatearFechaHora(p.creadoEn)}</span>
+                    )}
+                  </Link>
+                  <Button asChild variant="outline" size="sm" className="rounded-xl">
+                    <Link to={`/resumen/${p.id}`}>Ver resumen</Link>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+
+      <div className="pb-6" />
+      <BottomNav />
     </div>
   );
 }

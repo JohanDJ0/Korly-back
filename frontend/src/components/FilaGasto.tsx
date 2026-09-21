@@ -9,6 +9,7 @@ import { useEditarGasto } from '@/hooks/use-editar-gasto';
 import { useEliminarGasto } from '@/hooks/use-eliminar-gasto';
 import type { Gasto } from '@/hooks/use-gastos';
 import { formatearMonto } from '@/lib/dinero';
+import { iconoCategoria } from '@/lib/icono-categoria';
 
 interface FilaGastoProps {
   gasto: Gasto;
@@ -30,6 +31,10 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
   // accidente con solo abrir y guardar sin tocarla (sigue siendo
   // posible quitarla a propósito, eligiendo "Sin categoría").
   const [categoriaId, setCategoriaId] = useState(() => gasto.categoriaId ?? '');
+  // Precargada con la fecha actual del gasto — mismo criterio que
+  // categoriaId arriba: abrir y guardar sin tocarla no debe re-fecharlo
+  // a hoy por accidente.
+  const [fechaEfectiva, setFechaEfectiva] = useState(() => gasto.fechaEfectiva);
   // Hallazgo del pase de QA/UX: un monto inválido no debe fallar en
   // silencio — este formulario inline usa useState simple, no RHF+Zod
   // como FormularioGasto, así que el mensaje se arma a mano aquí.
@@ -39,6 +44,7 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
   const eliminarGasto = useEliminarGasto();
 
   const nombreCategoria = categorias?.find((c) => c.id === gasto.categoriaId)?.nombre;
+  const Icono = iconoCategoria(nombreCategoria);
 
   function guardar() {
     const valor = Number(monto);
@@ -48,7 +54,12 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
     }
     setErrorValidacion(null);
     editarGasto.mutate(
-      { gastoId: gasto.id, monto: { valorMinimo: Math.round(valor * 100), moneda: gasto.monto.moneda }, categoriaId: categoriaId || undefined },
+      {
+        gastoId: gasto.id,
+        monto: { valorMinimo: Math.round(valor * 100), moneda: gasto.monto.moneda },
+        categoriaId: categoriaId || undefined,
+        fechaEfectiva,
+      },
       { onSuccess: () => setEditando(false) }
     );
   }
@@ -60,23 +71,26 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
   // fallar seguro.
   if (gasto.revertido) {
     return (
-      <li className="flex items-center justify-between gap-2 border-b py-3 opacity-50">
-        <div>
+      <li className="flex items-center gap-3 border-b py-3 opacity-45 last:border-b-0">
+        <div className="bg-muted flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
+          <Icono size={16} className="text-muted-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
           <p className="font-medium line-through">{formatearMonto(gasto.monto)}</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {gasto.fechaEfectiva}
             {nombreCategoria ? ` — ${nombreCategoria}` : ''}
             {gasto.nota ? ` — ${gasto.nota}` : ''}
           </p>
         </div>
-        <span className="shrink-0 text-sm text-muted-foreground">Corregido</span>
+        <span className="text-muted-foreground shrink-0 text-sm">Corregido</span>
       </li>
     );
   }
 
   if (editando) {
     return (
-      <li className="flex flex-wrap items-center gap-2 border-b py-3">
+      <li className="flex flex-wrap items-center gap-2 border-b py-3 last:border-b-0">
         <Input
           value={monto}
           onChange={(evento) => {
@@ -89,6 +103,7 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
           autoFocus
           className="w-28"
         />
+        <Input value={fechaEfectiva} onChange={(evento) => setFechaEfectiva(evento.target.value)} type="date" className="w-40" />
         <div className="w-40">
           <SelectorCategoria value={categoriaId} onChange={setCategoriaId} />
         </div>
@@ -107,23 +122,26 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
           Cancelar
         </Button>
         {(errorValidacion ?? editarGasto.error?.message) && (
-          <p className="w-full text-sm text-destructive">{errorValidacion ?? editarGasto.error?.message}</p>
+          <p className="text-destructive w-full text-sm">{errorValidacion ?? editarGasto.error?.message}</p>
         )}
       </li>
     );
   }
 
   return (
-    <li className="flex items-center justify-between gap-2 border-b py-3">
-      <div>
+    <li className="flex items-center gap-3 border-b py-3 last:border-b-0">
+      <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
+        <Icono size={16} className="text-secondary-foreground" />
+      </div>
+      <div className="min-w-0 flex-1">
         <p className="font-medium">{formatearMonto(gasto.monto)}</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           {gasto.fechaEfectiva}
           {nombreCategoria ? ` — ${nombreCategoria}` : ''}
           {gasto.nota ? ` — ${gasto.nota}` : ''}
-          {gasto.esRecurrente ? ' — 🔄 Automático' : ''}
+          {gasto.esRecurrente ? ' — automático' : ''}
         </p>
-        {eliminarGasto.isError && <p className="text-sm text-destructive">{eliminarGasto.error.message}</p>}
+        {eliminarGasto.isError && <p className="text-destructive text-sm">{eliminarGasto.error.message}</p>}
       </div>
       <div className="flex shrink-0 gap-2">
         <Button

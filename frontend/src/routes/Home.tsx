@@ -1,12 +1,16 @@
+import { AlertTriangle, CreditCard, Plus, Settings } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ActividadReciente } from '@/components/ActividadReciente';
 import { BotonConfirmar } from '@/components/BotonConfirmar';
+import { BottomNav } from '@/components/BottomNav';
 import { CifraDisponible } from '@/components/CifraDisponible';
 import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
+import { HojaInferior } from '@/components/HojaInferior';
 import { RecordatorioContextual } from '@/components/RecordatorioContextual';
 import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
@@ -17,7 +21,6 @@ import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
 import { formatearMonto } from '@/lib/dinero';
 import { formatearRangoFechas } from '@/lib/fechas';
-import { supabase } from '@/lib/supabase';
 
 /**
  * El aha moment del producto (documento-maestro-v2.md §13.3): ver la
@@ -44,8 +47,18 @@ export function Home() {
   const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
 
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-6 p-6">
-      <img src="/logo/full.svg" alt="Korly" className="h-9" />
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col">
+      <div className="flex items-center justify-between px-5 pt-5 pb-1">
+        <div className="flex items-center gap-2">
+          <img src="/logo/icon.svg" alt="" className="h-[30px] w-[30px] rounded-[9px]" />
+          <span className="font-display text-base font-bold">Korly</span>
+        </div>
+        <Button asChild variant="outline" size="icon" className="border-input h-9 w-9 rounded-full">
+          <Link to="/ajustes" aria-label="Ajustes">
+            <Settings size={17} className="text-muted-foreground" />
+          </Link>
+        </Button>
+      </div>
 
       {periodoActivo && (
         // ADR-004: la quincena está anclada a calendario, no es
@@ -53,154 +66,135 @@ export function Home() {
         // una quincena real (p. ej. al probar la app), los días
         // restantes reales son menos de 15. Mostrar el rango explica
         // por qué, en vez de dejar que el usuario asuma un conteo fijo.
-        <p className="text-sm text-muted-foreground">Quincena del {formatearRangoFechas(periodoActivo.fechaInicio, periodoActivo.fechaFin)}</p>
+        <p className="text-muted-foreground px-5 pb-2 text-[13px]">Quincena · {formatearRangoFechas(periodoActivo.fechaInicio, periodoActivo.fechaFin)}</p>
       )}
 
-      {
-        // Hallazgo real de un usuario: cerrar un periodo y crear el
-        // siguiente sin decidir el sobrante lo dejaba `pendiente` sin
-        // ningún aviso — parecía que el dinero simplemente había
-        // desaparecido (aunque nunca se pierde: el barrido de N días lo
-        // arrastra solo si nadie decide). Este aviso es la corrección.
-      }
-      {resumenPendiente && (
-        <Card className="w-full max-w-sm border-brand-gold/60 bg-brand-gold/10 dark:bg-brand-gold/15">
-          <CardContent className="flex flex-col gap-2 pt-6">
-            <p className="text-sm">
-              Tienes un sobrante de <span className="font-semibold">{formatearMonto(resumenPendiente.sobrante)}</span> sin decidir de un
-              periodo anterior.
+      <div className="flex flex-1 flex-col gap-3.5 px-5 pt-2 pb-4">
+        {
+          // Hallazgo real de un usuario: cerrar un periodo y crear el
+          // siguiente sin decidir el sobrante lo dejaba `pendiente` sin
+          // ningún aviso — parecía que el dinero simplemente había
+          // desaparecido (aunque nunca se pierde: el barrido de N días lo
+          // arrastra solo si nadie decide). Este aviso es la corrección.
+        }
+        {resumenPendiente && (
+          <div className="flex items-center gap-2.5 rounded-2xl border border-[#F6DE9E] bg-[#FFF6E1] p-3 dark:border-brand-gold/30 dark:bg-brand-gold/10">
+            <div className="bg-brand-gold flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-full">
+              <AlertTriangle size={15} className="text-[#5A4300]" />
+            </div>
+            <p className="flex-1 text-[13px] leading-tight">
+              Tienes <span className="font-semibold">{formatearMonto(resumenPendiente.sobrante)}</span> sin decidir de un periodo anterior.
             </p>
-            <Button asChild size="sm" variant="outline" className="w-full">
-              <Link to={`/resumen/${resumenPendiente.periodoId}`}>Decidir ahora</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+            <Link to={`/resumen/${resumenPendiente.periodoId}`} className="text-primary shrink-0 text-[13px] font-semibold">
+              Decidir →
+            </Link>
+          </div>
+        )}
 
-      {
-        // Hallazgo real (el usuario preguntó si el pago de tarjeta se
-        // descuenta solo o hay que agregarlo a mano): sí es automático,
-        // pero antes no había ningún aviso — un 'pago_tarjeta' nunca
-        // aparece en el listado de gastos (es un tipo de movimiento
-        // distinto), así que el disponible bajaba sin ninguna
-        // explicación visible. Este aviso es la corrección.
-      }
-      {pagosTarjeta && pagosTarjeta.length > 0 && (
-        <Card className="w-full max-w-sm border-primary/40 bg-primary/5 dark:bg-primary/10">
-          <CardContent className="flex flex-col gap-2 pt-6">
-            <p className="text-sm font-medium">
-              Esta quincena ya se aplicaron {pagosTarjeta.length} pago{pagosTarjeta.length === 1 ? '' : 's'} de tarjeta a tu disponible:
-            </p>
-            <ul className="flex flex-col gap-1 text-sm text-muted-foreground">
+        {
+          // Hallazgo real (el usuario preguntó si el pago de tarjeta se
+          // descuenta solo o hay que agregarlo a mano): sí es automático,
+          // pero antes no había ningún aviso — un 'pago_tarjeta' nunca
+          // aparece en el listado de gastos (es un tipo de movimiento
+          // distinto), así que el disponible bajaba sin ninguna
+          // explicación visible. Este aviso es la corrección.
+        }
+        {pagosTarjeta && pagosTarjeta.length > 0 && (
+          <div className="border-primary/30 bg-primary/5 dark:bg-primary/10 flex flex-col gap-2 rounded-2xl border p-3.5">
+            <div className="flex items-center gap-2">
+              <CreditCard size={15} className="text-primary shrink-0" />
+              <p className="text-[13px] font-medium">
+                {pagosTarjeta.length} pago{pagosTarjeta.length === 1 ? '' : 's'} de tarjeta aplicados esta quincena
+              </p>
+            </div>
+            <ul className="text-muted-foreground flex flex-col gap-1 pl-[23px] text-[12.5px]">
               {pagosTarjeta.map((pago, indice) => (
                 <li key={indice}>
                   {pago.tarjetaNombre} — {pago.cargoDescripcion} ({pago.numeroPago}/{pago.numeroPlazos}): {formatearMonto(pago.monto)}
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+        {isLoading && <p className="text-muted-foreground">Cargando…</p>}
 
-      {errorInesperado && <p className="text-destructive">{error.message}</p>}
+        {errorInesperado && <p className="text-destructive">{error.message}</p>}
 
-      {sinPeriodoActivo && (
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle>Empecemos</CardTitle>
-            <CardDescription>Crea tu periodo quincenal para empezar a ver cuánto puedes gastar.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button onClick={() => crearPeriodo.mutate()} disabled={crearPeriodo.isPending} className="w-full">
-              {crearPeriodo.isPending ? 'Creando…' : 'Crear periodo'}
-            </Button>
-            {crearPeriodo.isError && <p className="mt-2 text-sm text-destructive">{crearPeriodo.error.message}</p>}
-          </CardContent>
-        </Card>
-      )}
+        {sinPeriodoActivo && (
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle>Empecemos</CardTitle>
+              <CardDescription>Crea tu periodo quincenal para empezar a ver cuánto puedes gastar.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button onClick={() => crearPeriodo.mutate()} disabled={crearPeriodo.isPending} className="w-full">
+                {crearPeriodo.isPending ? 'Creando…' : 'Crear periodo'}
+              </Button>
+              {crearPeriodo.isError && <p className="text-destructive mt-2 text-sm">{crearPeriodo.error.message}</p>}
+            </CardContent>
+          </Card>
+        )}
 
-      {!error && data?.estado === 'sin_ingreso' && (
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle>Registra tu ingreso</CardTitle>
-            <CardDescription>Para ver cuánto puedes gastar hoy, necesitamos saber cuánto recibiste.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <FormularioIngreso periodoId={data.periodoId} />
-          </CardContent>
-        </Card>
-      )}
+        {!error && data?.estado === 'sin_ingreso' && (
+          <Card className="rounded-2xl">
+            <CardHeader>
+              <CardTitle>Registra tu ingreso</CardTitle>
+              <CardDescription>Para ver cuánto puedes gastar hoy, necesitamos saber cuánto recibiste.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <FormularioIngreso periodoId={data.periodoId} />
+            </CardContent>
+          </Card>
+        )}
 
-      {!error && data?.estado === 'ok' && <CifraDisponible disponible={data} />}
-      {!error && data?.estado === 'ok' && <RecordatorioContextual disponible={data} />}
+        {!error && data?.estado === 'ok' && <CifraDisponible disponible={data} />}
+        {!error && data?.estado === 'ok' && <RecordatorioContextual disponible={data} />}
 
-      {periodoId && !mostrarFormularioGasto && (
-        <Button onClick={() => setMostrarFormularioGasto(true)} className="w-full max-w-sm">
-          Registrar gasto
-        </Button>
-      )}
+        {periodoId && (
+          <button
+            onClick={() => setMostrarFormularioGasto(true)}
+            className="bg-primary text-primary-foreground shadow-primary/30 flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15.5px] font-semibold shadow-lg"
+          >
+            <Plus size={18} strokeWidth={2.5} />
+            Registrar gasto
+          </button>
+        )}
+
+        {periodoId && <ActividadReciente periodoId={periodoId} />}
+
+        {
+          // Acciones secundarias, poco frecuentes — atenuadas a propósito
+          // para no competir con la cifra ni el CTA principal.
+        }
+        {periodoId && (
+          <div className="mt-1 flex justify-center">
+            <BotonConfirmar
+              variant="ghost"
+              size="sm"
+              className="text-muted-foreground"
+              disabled={cerrarPeriodo.isPending}
+              pregunta="¿Cerrar este periodo ahora? No se puede deshacer."
+              onConfirmar={() => {
+                cerrarPeriodo.mutate(periodoId, {
+                  onSuccess: (resumen) => navigate(`/resumen/${resumen.periodoId}`),
+                });
+              }}
+            >
+              {cerrarPeriodo.isPending ? 'Cerrando…' : 'Cerrar periodo'}
+            </BotonConfirmar>
+          </div>
+        )}
+        {cerrarPeriodo.isError && <p className="text-destructive text-center text-sm">{cerrarPeriodo.error.message}</p>}
+      </div>
+
+      <BottomNav />
 
       {periodoId && mostrarFormularioGasto && (
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <CardTitle>Nuevo gasto</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FormularioGasto
-              periodoId={periodoId}
-              onRegistrado={() => setMostrarFormularioGasto(false)}
-              onCancelar={() => setMostrarFormularioGasto(false)}
-            />
-          </CardContent>
-        </Card>
+        <HojaInferior titulo="Nuevo gasto" onCerrar={() => setMostrarFormularioGasto(false)}>
+          <FormularioGasto periodoId={periodoId} onRegistrado={() => setMostrarFormularioGasto(false)} />
+        </HojaInferior>
       )}
-
-      {
-        // Sin gate en periodoId a propósito: el historial puede seguir
-        // teniendo periodos anteriores que ver aunque ahora mismo no
-        // haya uno activo (p. ej. justo después de cerrar el último).
-      }
-      <Button asChild variant="link" size="sm">
-        <Link to="/historial">Ver historial</Link>
-      </Button>
-      <Button asChild variant="link" size="sm">
-        <Link to="/metas">Ver metas</Link>
-      </Button>
-      <Button asChild variant="link" size="sm">
-        <Link to="/recurrentes">Gastos recurrentes</Link>
-      </Button>
-      <Button asChild variant="link" size="sm">
-        <Link to="/tarjetas">Tarjetas de crédito</Link>
-      </Button>
-      <Button asChild variant="link" size="sm">
-        <Link to="/categorias">Categorías</Link>
-      </Button>
-      <Button asChild variant="link" size="sm">
-        <Link to="/ajustes">Ajustes</Link>
-      </Button>
-
-      {periodoId && (
-        <BotonConfirmar
-          variant="outline"
-          size="sm"
-          disabled={cerrarPeriodo.isPending}
-          pregunta="¿Cerrar este periodo ahora? No se puede deshacer."
-          onConfirmar={() => {
-            cerrarPeriodo.mutate(periodoId, {
-              onSuccess: (resumen) => navigate(`/resumen/${resumen.periodoId}`),
-            });
-          }}
-        >
-          {cerrarPeriodo.isPending ? 'Cerrando…' : 'Cerrar periodo'}
-        </BotonConfirmar>
-      )}
-      {cerrarPeriodo.isError && <p className="text-sm text-destructive">{cerrarPeriodo.error.message}</p>}
-
-      <Button variant="ghost" size="sm" onClick={() => supabase.auth.signOut()}>
-        Cerrar sesión
-      </Button>
     </div>
   );
 }

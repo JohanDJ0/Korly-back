@@ -1,10 +1,11 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BottomNav } from '@/components/BottomNav';
 import { FilaMeta } from '@/components/FilaMeta';
 import { FormularioMeta } from '@/components/FormularioMeta';
+import { HojaInferior } from '@/components/HojaInferior';
+import { PageHeader } from '@/components/PageHeader';
 import { useMetas } from '@/hooks/use-metas';
 
 /** Sin periodo activo no se bloquea la pantalla — se puede crear y ver metas siempre; solo aportar/retirar exigen uno (ver FilaMeta.tsx). */
@@ -13,36 +14,38 @@ export function Metas() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col gap-6 p-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/">← Volver</Link>
-        </Button>
-        <h1 className="text-xl font-semibold">Metas de ahorro</h1>
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col">
+      <PageHeader titulo="Metas de ahorro" />
+
+      <div className="flex flex-1 flex-col gap-3 px-5 pt-2 pb-4">
+        {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+        {error && <p className="text-destructive">{error.message}</p>}
+        {metas?.length === 0 && <p className="text-muted-foreground">Todavía no tienes ninguna meta.</p>}
+        {metas && metas.length > 0 && (
+          <ul className="flex flex-col gap-3">
+            {metas.map((meta) => (
+              <FilaMeta key={meta.id} meta={meta} />
+            ))}
+          </ul>
+        )}
       </div>
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
-      {error && <p className="text-destructive">{error.message}</p>}
-
-      {metas?.length === 0 && !mostrarFormulario && <p className="text-muted-foreground">Todavía no tienes ninguna meta.</p>}
-
-      {metas && metas.length > 0 && <ul>{metas.map((meta) => <FilaMeta key={meta.id} meta={meta} />)}</ul>}
-
-      {!mostrarFormulario && (
-        <Button variant="outline" onClick={() => setMostrarFormulario(true)}>
+      <div className="px-5 pb-6">
+        <button
+          onClick={() => setMostrarFormulario(true)}
+          className="bg-primary text-primary-foreground flex w-full items-center justify-center gap-2 rounded-2xl py-3.5 text-[15px] font-semibold"
+        >
+          <Plus size={17} strokeWidth={2.5} />
           Nueva meta
-        </Button>
-      )}
+        </button>
+      </div>
+
+      <BottomNav />
 
       {mostrarFormulario && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Nueva meta</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <FormularioMeta onCreada={() => setMostrarFormulario(false)} onCancelar={() => setMostrarFormulario(false)} />
-          </CardContent>
-        </Card>
+        <HojaInferior titulo="Nueva meta" onCerrar={() => setMostrarFormulario(false)}>
+          <FormularioMeta onCreada={() => setMostrarFormulario(false)} onCancelar={() => setMostrarFormulario(false)} />
+        </HojaInferior>
       )}
     </div>
   );

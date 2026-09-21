@@ -1,3 +1,4 @@
+import { Plus, Target } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -67,37 +68,47 @@ export function FilaMeta({ meta }: FilaMetaProps) {
 
   const pendiente = aportarMeta.isPending || retirarMeta.isPending;
   const mensajeError = errorValidacion ?? (aportarMeta.error ?? retirarMeta.error ?? eliminarMeta.error)?.message;
+  const porcentaje = Math.min(100, meta.porcentajeAvance);
 
   return (
-    <li className="flex flex-col gap-2 border-b py-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="font-medium">{meta.nombre}</p>
-          <p className="text-sm text-muted-foreground">
-            {formatearMonto(meta.montoAcumulado)} de {formatearMonto(meta.montoObjetivo)} ({meta.porcentajeAvance.toFixed(0)}%)
+    <li className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-4.5">
+      <div className="flex items-center gap-2.5">
+        <div className="bg-secondary flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px]">
+          <Target size={17} className="text-secondary-foreground" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-[15px] font-semibold">{meta.nombre}</p>
+          <p className="text-muted-foreground mt-px text-[12.5px]">
+            {formatearMonto(meta.montoAcumulado)} de {formatearMonto(meta.montoObjetivo)}
           </p>
         </div>
-        {modo === null && (
-          <div className="flex shrink-0 gap-2">
-            <Button size="sm" variant="outline" onClick={() => setModo('aportar')}>
-              Aportar
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => setModo('retirar')}>
-              Retirar
-            </Button>
-            <BotonConfirmar
-              variant="ghost"
-              size="sm"
-              className="text-destructive"
-              pregunta={`¿Eliminar la meta "${meta.nombre}"?`}
-              onConfirmar={() => eliminarMeta.mutate(meta.id)}
-              disabled={eliminarMeta.isPending}
-            >
-              Eliminar
-            </BotonConfirmar>
-          </div>
-        )}
+        <span className="font-display text-primary text-[15px] font-bold">{meta.porcentajeAvance.toFixed(0)}%</span>
       </div>
+
+      <div className="bg-muted h-2 overflow-hidden rounded-full">
+        <div className="bg-brand-gold h-full rounded-full" style={{ width: `${porcentaje}%` }} />
+      </div>
+
+      {modo === null && (
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" className="flex-1 rounded-xl" onClick={() => setModo('aportar')}>
+            <Plus size={14} /> Aportar
+          </Button>
+          <Button variant="outline" size="sm" className="flex-1 rounded-xl" onClick={() => setModo('retirar')}>
+            Retirar
+          </Button>
+          <BotonConfirmar
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            pregunta={`¿Eliminar la meta "${meta.nombre}"?`}
+            onConfirmar={() => eliminarMeta.mutate(meta.id)}
+            disabled={eliminarMeta.isPending}
+          >
+            Eliminar
+          </BotonConfirmar>
+        </div>
+      )}
 
       {modo !== null && (
         <div className="flex flex-wrap items-center gap-2">
@@ -133,7 +144,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
           </Button>
         </div>
       )}
-      {mensajeError && <p className="text-sm text-destructive">{mensajeError}</p>}
+      {mensajeError && <p className="text-destructive text-sm">{mensajeError}</p>}
     </li>
   );
 }

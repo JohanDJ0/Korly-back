@@ -8,6 +8,8 @@ interface EditarGastoInput {
   monto: MontoDto;
   /** Igual que la nota (backend/README.md, "Categorías"): omitirlo aquí no conserva la categoría anterior, la deja sin categoría. */
   categoriaId?: string;
+  /** 'YYYY-MM-DD'. Omitirlo deja la fila corregida fechada a hoy — igual que antes de agregar este campo. */
+  fechaEfectiva?: string;
 }
 
 interface EditarGastoResultado {
