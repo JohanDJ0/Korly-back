@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { periodos } from '../../src/db/schema/periodos.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { editarIngreso, eliminarIngreso, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
-import { eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
+import { editarGasto, eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { crearCuentaTx } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo, obtenerPeriodoActivo } from '../../src/modulos/periodos/crear-periodo.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
@@ -265,6 +265,38 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     expect(resultado.disponibleValorMinimo).toBe(5000n);
     expect(resultado.gastadoHoyValorMinimo).toBe(0n);
     expect(resultado.cifraDiariaValorMinimo).toBe(555n); // piso(5000/9), objetivo completo
+  });
+
+  it('hallazgo real: corregir la fecha de un gasto mal capturado hoy (en realidad fue ayer) hace que deje de contar como gastado hoy', async () => {
+    // El caso reportado: un gasto de $289.12 se capturó anoche cerca de
+    // las 9-10pm y, por el bug de zona horaria (ver shared/fechas.ts),
+    // quedó guardado con la fecha de hoy en vez de la de ayer. Se
+    // corrige hoy mismo con editarGasto + fechaEfectiva de ayer.
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-09-16T00:00:00Z'));
+    const hoy = new Date('2026-09-17T00:00:00Z'); // 14 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 500000n, moneda: 'MXN', fechaEfectiva: '2026-09-16', fechaReferencia: hoy });
+    const { id: gastoId } = await registrarGasto({
+      tenantId,
+      periodoId: periodo.id,
+      monto: 28912n,
+      moneda: 'MXN',
+      fechaEfectiva: '2026-09-17', // mal fechado por el bug — en realidad fue ayer
+      fechaReferencia: hoy,
+    });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 10800n, moneda: 'MXN', fechaEfectiva: '2026-09-17', fechaReferencia: hoy });
+
+    await editarGasto({ tenantId, gastoId, monto: 28912n, moneda: 'MXN', fechaEfectiva: '2026-09-16', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    // El disponible total sigue reflejando ambos gastos reales
+    // (500000 - 28912 - 10800), pero "gastado hoy" ya solo ve el de
+    // $108 real de hoy — el de $289.12, ahora fechado ayer, ya no
+    // aparece en el corte de hoy.
+    expect(resultado.disponibleValorMinimo).toBe(460288n);
+    expect(resultado.gastadoHoyValorMinimo).toBe(10800n);
   });
 
   it('gastar de más hoy sí baja la cifra del día siguiente — la redistribución ocurre entre días, no dentro del mismo día', async () => {

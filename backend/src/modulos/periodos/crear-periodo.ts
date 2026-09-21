@@ -9,7 +9,7 @@ import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { periodos, type EstadoPeriodo, type TipoPeriodoSoportado } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio, esViolacionDeIndiceUnico } from '../../shared/errores.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 import { calcularQuincenaDeCalendario } from './calcular-quincena.js';
 
@@ -89,7 +89,7 @@ const COLUMNAS_PERIODO = {
 export async function crearPeriodo(
   tenantId: string,
   tipo: TipoPeriodoSoportado,
-  fechaReferencia: Date = new Date()
+  fechaReferencia: Date = ahoraEnMexico()
 ): Promise<Periodo> {
   if (tipo !== 'quincenal') {
     throw new ErrorDominio('VALIDACION', `Tipo de periodo no soportado todavía: ${tipo}`);
@@ -143,7 +143,7 @@ export async function crearPeriodo(
   });
 }
 
-export async function obtenerPeriodoActivo(tenantId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
+export async function obtenerPeriodoActivo(tenantId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<Periodo | null> {
   return conTenant(tenantId, (tx) => obtenerPeriodoActivoTx(tx, tenantId, fechaReferencia));
 }
 
@@ -160,7 +160,7 @@ export async function obtenerPeriodoActivo(tenantId: string, fechaReferencia: Da
  * perezoso que el resto: si el periodo que iba a salir como `'activo'`
  * ya venció, esta llamada lo cierra primero.
  */
-export async function listarPeriodos(tenantId: string, fechaReferencia: Date = new Date()): Promise<Periodo[]> {
+export async function listarPeriodos(tenantId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<Periodo[]> {
   return conTenant(tenantId, async (tx) => {
     await resolverPendientesTx(tx, tenantId, fechaReferencia);
 
@@ -217,7 +217,7 @@ export async function obtenerPeriodoActivoTx(tx: Ejecutor, tenantId: string, fec
   return fila ? { ...fila, estado: fila.estado as EstadoPeriodo } : null;
 }
 
-export async function obtenerPeriodoPorId(tenantId: string, periodoId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
+export async function obtenerPeriodoPorId(tenantId: string, periodoId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<Periodo | null> {
   return conTenant(tenantId, (tx) => obtenerPeriodoPorIdTx(tx, tenantId, periodoId, fechaReferencia));
 }
 
@@ -235,7 +235,7 @@ export async function obtenerPeriodoPorId(tenantId: string, periodoId: string, f
  * cerrado, no dejar que ingresos/gastos escriban contra un periodo que
  * en la realidad ya terminó.
  */
-export async function obtenerPeriodoPorIdTx(tx: Ejecutor, tenantId: string, periodoId: string, fechaReferencia: Date = new Date()): Promise<Periodo | null> {
+export async function obtenerPeriodoPorIdTx(tx: Ejecutor, tenantId: string, periodoId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<Periodo | null> {
   if (!esUuidValido(periodoId)) return null;
 
   await resolverPendientesTx(tx, tenantId, fechaReferencia);

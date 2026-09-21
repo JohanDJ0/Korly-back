@@ -2,7 +2,7 @@ import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import { periodos } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 import { resolverDecisionesVencidasTx } from './decidir-sobrante.js';
 import { generarResumenTx, obtenerResumenTx, type ResumenGenerado } from './generar-resumen.js';
@@ -30,7 +30,7 @@ export const DIAS_DEFAULT_ARRASTRE = 7;
 export async function cerrarPeriodoManualmente(
   tenantId: string,
   periodoId: string,
-  fechaReferencia: Date = new Date()
+  fechaReferencia: Date = ahoraEnMexico()
 ): Promise<ResumenGenerado> {
   if (!esUuidValido(periodoId)) {
     throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
@@ -82,7 +82,7 @@ export async function cerrarPeriodoManualmente(
  * siguiendo el mismo principio perezoso: se resuelve en el siguiente
  * toque real, no de forma eager dentro del cierre).
  */
-export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date = new Date()): Promise<void> {
+export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<void> {
   const [activo] = await tx
     .select()
     .from(periodos)

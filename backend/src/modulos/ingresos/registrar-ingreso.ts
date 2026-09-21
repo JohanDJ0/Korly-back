@@ -5,7 +5,7 @@ import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar
 import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 
 export interface RegistrarIngresoEntrada {
@@ -20,7 +20,7 @@ export interface RegistrarIngresoEntrada {
   /**
    * Para el cierre perezoso que resuelve el periodo destino (ADR-004:
    * "fecha objetivo pasada como parámetro, nunca now() dentro del job").
-   * Por defecto `new Date()` — el caso real. Exponerlo (en vez de dejarlo
+   * Por defecto `ahoraEnMexico()` — el caso real. Exponerlo (en vez de dejarlo
    * fijo dentro de la función, como estaba antes) es lo que le permite a
    * un test fijar "hoy" y no depender de la fecha real de cuando corra.
    */
@@ -47,7 +47,7 @@ export async function registrarIngreso(entrada: RegistrarIngresoEntrada): Promis
   }
 
   return conTenant(entrada.tenantId, async (tx) => {
-    const periodo = await obtenerPeriodoPorIdTx(tx, entrada.tenantId, entrada.periodoId, entrada.fechaReferencia ?? new Date());
+    const periodo = await obtenerPeriodoPorIdTx(tx, entrada.tenantId, entrada.periodoId, entrada.fechaReferencia ?? ahoraEnMexico());
     if (!periodo) {
       throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
     }
@@ -154,7 +154,7 @@ export interface EliminarIngresoEntrada {
  * periodo activo actual.
  */
 export async function eliminarIngreso(entrada: EliminarIngresoEntrada): Promise<void> {
-  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
 
   await conTenant(entrada.tenantId, async (tx) => {
     const ingresoOriginal = await cargarIngresoParaCorreccionTx(tx, entrada.tenantId, entrada.ingresoId);
@@ -198,7 +198,7 @@ export async function editarIngreso(entrada: EditarIngresoEntrada): Promise<Ingr
   if (entrada.monto <= 0n) {
     throw new ErrorDominio('VALIDACION', 'El monto de un ingreso debe ser positivo');
   }
-  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
 
   return conTenant(entrada.tenantId, async (tx) => {
     const ingresoOriginal = await cargarIngresoParaCorreccionTx(tx, entrada.tenantId, entrada.ingresoId);
@@ -267,7 +267,7 @@ export interface IngresoDetallado {
 export async function listarIngresos(
   tenantId: string,
   periodoId: string,
-  fechaReferencia: Date = new Date()
+  fechaReferencia: Date = ahoraEnMexico()
 ): Promise<IngresoDetallado[]> {
   return conTenant(tenantId, async (tx) => {
     const periodo = await obtenerPeriodoPorIdTx(tx, tenantId, periodoId, fechaReferencia);

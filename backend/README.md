@@ -793,6 +793,51 @@ que el recurrente sigue contando (el recurrente no lo tapa), y el caso
 equivalente con una mensualidad de tarjeta materializada al activarse
 el periodo.
 
+### Cuarto hallazgo real: "hoy" saltaba al día siguiente desde las 6pm hora de México
+
+**Reportado por el usuario contra su cuenta real:** registró un gasto
+de $108 fechado hoy y "puedes gastar hoy" no se movió — como si el
+gasto se hubiera repartido entre todos los días restantes de la
+quincena en vez de descontarse del objetivo de hoy. Ocurría solo por
+la tarde/noche.
+
+**Causa:** todo default de `fechaReferencia: Date = new Date()` (o
+`?? new Date()`) en el código usaba la hora real en UTC. `fechaISO`
+(`shared/fechas.ts`) extrae el día calendario con `getUTC*()` — sin
+ninguna resolución a la zona horaria del usuario, tal como quedó
+documentado desde el inicio en este README pero nunca implementado
+(CLAUDE.md ya pedía "todo en UTC, resuelto a la zona IANA del usuario
+al leer"). México no tiene horario de verano desde 2022 (offset fijo
+-6h, excepto Baja California y la franja fronteriza, no cubierta
+aquí) — así que desde las 6pm hora de México (18:00 CST = 00:00 UTC),
+"hoy" en UTC ya es mañana para México. Un gasto capturado a las 9pm
+con fecha correcta (hoy) dejaba de coincidir con lo que
+`consultarDisponible` consideraba "hoy": el gasto bajaba el
+disponible total bien, pero nunca se restaba del objetivo del día.
+
+**Corregido:** `shared/fechas.ts` gana `ahoraEnMexico()`, que devuelve
+`new Date(Date.now() - 6h)` — un `Date` cuyo día calendario extraído
+vía `getUTC*()` coincide con el día calendario real de México.
+Deliberadamente **no se tocó `fechaISO`** (sigue siendo una extracción
+UTC pura y determinista, sin sorpresas — así se mantienen intactas
+todas las fechas de referencia explícitas que ya usan los 331 tests
+existentes) — en cambio, cada default `new Date()` que de verdad
+significaba "ahora mismo, en México" se reemplazó por
+`ahoraEnMexico()`, en `cerrar-periodo.ts`, `decidir-sobrante.ts`,
+`consultar-disponible.ts`, `importar.ts`, `registrar-gasto.ts`,
+`registrar-ingreso.ts`, `crear-periodo.ts`, `metas.ts`,
+`recurrentes.ts`, `tarjetas/registrar-cargo.ts` y
+`scripts/enviar-recordatorios.ts`. El `Date` que devuelve **no es un
+instante real** — nunca se usa como timestamp (`creadoEn`,
+`decisionSobranteFecha`, etc. siguen siendo `new Date()` de verdad).
+En el frontend, `hoyISO()` (`FormularioGasto.tsx`,
+`FormularioIngreso.tsx`) tenía el mismo problema por la vía opuesta:
+usaba `new Date().toISOString().slice(0, 10)`, que también extrae en
+UTC. Se cambió a getters locales del navegador
+(`getFullYear`/`getMonth`/`getDate`), que sí reflejan la zona horaria
+real del dispositivo — a diferencia del backend, aquí no hace falta
+un offset fijo: el navegador ya sabe la zona horaria real del usuario.
+
 ## Cierre
 
 ```

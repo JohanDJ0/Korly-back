@@ -7,7 +7,7 @@ import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { parsearFilasCsv, parsearMontoDecimalCsv } from '../../shared/csv.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { esFechaIsoValida } from '../../shared/fechas.js';
+import { ahoraEnMexico, esFechaIsoValida } from '../../shared/fechas.js';
 
 export interface ErrorImportacion {
   /** 1-indexado sobre las filas de datos, sin contar el encabezado — la línea que el usuario vería si abriera el CSV en un editor de texto (encabezado + esta fila). */
@@ -108,7 +108,7 @@ export async function importarGastosCsv(
   tenantId: string,
   periodoId: string,
   csvTexto: string,
-  fechaReferencia: Date = new Date()
+  fechaReferencia: Date = ahoraEnMexico()
 ): Promise<ResultadoImportacion> {
   return conTenant(tenantId, async (tx) => {
     const periodo = await obtenerPeriodoPorIdTx(tx, tenantId, periodoId, fechaReferencia);
@@ -154,7 +154,7 @@ export async function importarIngresosCsv(
   tenantId: string,
   periodoId: string,
   csvTexto: string,
-  fechaReferencia: Date = new Date()
+  fechaReferencia: Date = ahoraEnMexico()
 ): Promise<ResultadoImportacion> {
   return conTenant(tenantId, async (tx) => {
     const periodo = await obtenerPeriodoPorIdTx(tx, tenantId, periodoId, fechaReferencia);

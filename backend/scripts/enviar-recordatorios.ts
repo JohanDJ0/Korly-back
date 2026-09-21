@@ -16,11 +16,12 @@
 import 'dotenv/config';
 import { listarTenantIdsConRecordatoriosActivos, procesarRecordatorioDiarioDeTenant } from '../src/modulos/notificaciones/enviar-recordatorios.js';
 import { inicializarObservabilidad, reportarErrorInesperado } from '../src/shared/observabilidad.js';
+import { ahoraEnMexico } from '../src/shared/fechas.js';
 
 inicializarObservabilidad();
 
 async function main() {
-  const fechaReferencia = new Date();
+  const fechaReferencia = ahoraEnMexico();
   const tenantIds = await listarTenantIdsConRecordatoriosActivos();
 
   let enviados = 0;

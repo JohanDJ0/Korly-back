@@ -296,6 +296,81 @@ describe('gastos', () => {
       // rechace por VALIDACION en vez de por cualquier otra cosa.
       await expect(editarGasto({ tenantId, gastoId, monto: 0n, moneda: 'MXN' })).rejects.toMatchObject({ codigo: 'VALIDACION' });
     });
+
+    it('sin fechaEfectiva, la fila corregida queda fechada al día de la corrección — comportamiento de siempre', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-02',
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      await editarGasto({ tenantId, gastoId, monto: 900n, moneda: 'MXN', fechaReferencia: new Date('2026-08-05T00:00:00Z') });
+
+      const { datos } = await listarGastos(tenantId, periodo.id);
+      const corregido = datos.find((g) => !g.revertido);
+      expect(corregido?.fechaEfectiva).toBe('2026-08-05');
+    });
+
+    it('hallazgo real: reenviar fechaEfectiva corrige la fecha calendario de la fila nueva, sin tocar la de la reversión', async () => {
+      // El caso reportado: un gasto capturado la noche del 16 se guardó
+      // por error con fecha 17 (bug de zona horaria, ver
+      // shared/fechas.ts). Se corrige el mismo 17, pero la fila nueva
+      // debe quedar fechada 16 — el día real en que ocurrió. Periodo
+      // anclado al 16 (no al helper de arriba, que cierra el 15) para
+      // que el 16 y el 17 caigan dentro de la misma quincena activa.
+      const { tenantId } = await resolverOcrearIdentidad(`test-gastos-${randomUUID()}`);
+      const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 28912n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-17',
+        fechaReferencia: new Date('2026-08-17T00:00:00Z'),
+      });
+
+      const resultado = await editarGasto({
+        tenantId,
+        gastoId,
+        monto: 28912n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-16',
+        fechaReferencia: new Date('2026-08-17T00:00:00Z'),
+      });
+
+      expect(resultado.ajusteGenerado).toBe(false);
+      // fechaReferencia explícita: sin esto, listarGastos default a
+      // ahoraEnMexico() (hoy de verdad), muy posterior al fechaFin
+      // ficticio del periodo de esta prueba (2026-08-31) — cerraría el
+      // periodo de golpe como efecto secundario de una simple lectura.
+      const { datos } = await listarGastos(tenantId, periodo.id, { fechaReferencia: new Date('2026-08-17T00:00:00Z') });
+      const corregido = datos.find((g) => !g.revertido);
+      expect(corregido?.fechaEfectiva).toBe('2026-08-16');
+      // El saldo neto es el mismo de siempre: la reversión del original
+      // (+28912) y la fila nueva (-28912) se cancelan en el balance, solo
+      // cambia el día calendario al que queda atado el gasto real.
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(-28912n);
+    });
+
+    it('rechaza un fechaEfectiva con formato inválido antes de tocar la base de datos', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const { id: gastoId } = await registrarGasto({
+        tenantId,
+        periodoId: periodo.id,
+        monto: 1000n,
+        moneda: 'MXN',
+        fechaEfectiva: '2026-08-02',
+        fechaReferencia: HOY_DE_PRUEBA,
+      });
+
+      await expect(
+        editarGasto({ tenantId, gastoId, monto: 900n, moneda: 'MXN', fechaEfectiva: '31/08/2026' })
+      ).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
   });
 
   describe('listarGastos', () => {

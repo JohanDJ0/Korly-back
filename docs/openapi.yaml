@@ -792,6 +792,14 @@ components:
           nullable: true
         nota:
           type: string
+        fechaEfectiva:
+          type: string
+          format: date
+          description: >
+            Corrige la fecha calendario del gasto (hallazgo real: un gasto
+            capturado por la noche podía guardarse con la fecha del día
+            siguiente). Omitirlo deja la fila corregida fechada al momento
+            de esta edición, igual que antes de agregar este campo.
 
     EditarGastoResultado:
       type: object

@@ -28,6 +28,7 @@ interface EditarGastoBody {
   monto?: MontoDto;
   categoriaId?: string | null;
   nota?: string;
+  fechaEfectiva?: string;
 }
 
 /** Misma respuesta delgada que ingresos/rutas.ts, mismo motivo. */
@@ -87,6 +88,7 @@ export async function rutasGastos(app: FastifyInstance): Promise<void> {
       moneda,
       nota: body.nota,
       categoriaId: body.categoriaId,
+      fechaEfectiva: body.fechaEfectiva,
     });
 
     reply.send({

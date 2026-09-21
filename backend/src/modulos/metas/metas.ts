@@ -6,7 +6,7 @@ import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
 import { obtenerPlanTenantTx } from '../planes/planes.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 
 /** documento-maestro-v2.md §9.2: "Metas de ahorro: 1–2 (Free) / Ilimitadas (Pro)". */
@@ -186,7 +186,7 @@ export async function aportarAMeta(entrada: AportarAMetaEntrada): Promise<Aporte
   if (entrada.monto <= 0n) {
     throw new ErrorDominio('VALIDACION', 'El monto de un aporte debe ser positivo');
   }
-  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
 
   return conTenant(entrada.tenantId, async (tx) => {
     const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);
@@ -245,7 +245,7 @@ export async function retirarDeMeta(entrada: RetirarDeMetaEntrada): Promise<Reti
   if (entrada.motivo.trim().length === 0) {
     throw new ErrorDominio('VALIDACION', 'El motivo del retiro es obligatorio');
   }
-  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
 
   return conTenant(entrada.tenantId, async (tx) => {
     const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);

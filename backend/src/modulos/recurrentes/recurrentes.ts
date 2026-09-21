@@ -6,7 +6,7 @@ import { obtenerCategoriaPorIdTx } from '../categorias/categorias.js';
 import { registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 
 export interface GastoRecurrente {
@@ -158,7 +158,7 @@ export async function crearGastoRecurrente(entrada: CrearGastoRecurrenteEntrada)
     throw new ErrorDominio('VALIDACION', 'El monto de un gasto recurrente debe ser positivo');
   }
   const { frecuencia, diaMes } = validarFrecuenciaYDia(entrada.frecuencia, entrada.diaMes);
-  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
 
   return conTenant(entrada.tenantId, async (tx) => {
     const categoriaId = await resolverCategoriaIdTx(tx, entrada.tenantId, entrada.categoriaId);

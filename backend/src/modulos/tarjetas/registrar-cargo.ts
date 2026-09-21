@@ -7,7 +7,7 @@ import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { obtenerSaldoTarjetaTx, obtenerTarjetaPorIdTx } from './tarjetas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { calcularVencimientoMensualidad } from './calcular-ciclo.js';
 
 async function resolverCategoriaIdTx(tx: Ejecutor, tenantId: string, categoriaId: string | null | undefined): Promise<string | null> {
@@ -79,7 +79,7 @@ export async function registrarCargoTarjeta(entrada: RegistrarCargoEntrada): Pro
   if (!Number.isInteger(entrada.numeroPlazos) || entrada.numeroPlazos < 1) {
     throw new ErrorDominio('VALIDACION', "El campo 'numeroPlazos' debe ser un entero mayor o igual a 1");
   }
-  const fechaEfectiva = entrada.fechaCompra ?? fechaISO(new Date());
+  const fechaEfectiva = entrada.fechaCompra ?? fechaISO(ahoraEnMexico());
 
   return conTenant(entrada.tenantId, async (tx) => {
     const tarjeta = await obtenerTarjetaPorIdTx(tx, entrada.tenantId, entrada.tarjetaId);

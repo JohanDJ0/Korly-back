@@ -6,7 +6,7 @@ import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar
 import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, esFechaIsoValida, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 
 /**
@@ -61,7 +61,7 @@ export async function registrarGasto(entrada: RegistrarGastoEntrada): Promise<Ga
   }
 
   return conTenant(entrada.tenantId, async (tx) => {
-    const periodo = await obtenerPeriodoPorIdTx(tx, entrada.tenantId, entrada.periodoId, entrada.fechaReferencia ?? new Date());
+    const periodo = await obtenerPeriodoPorIdTx(tx, entrada.tenantId, entrada.periodoId, entrada.fechaReferencia ?? ahoraEnMexico());
     if (!periodo) {
       throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
     }
@@ -165,7 +165,7 @@ export interface EliminarGastoEntrada {
  * §7.6) — solo que su efecto en el ledger ya está anulado.
  */
 export async function eliminarGasto(entrada: EliminarGastoEntrada): Promise<void> {
-  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
 
   await conTenant(entrada.tenantId, async (tx) => {
     const gastoOriginal = await cargarGastoParaCorreccionTx(tx, entrada.tenantId, entrada.gastoId);
@@ -198,6 +198,17 @@ export interface EditarGastoEntrada {
    * que no se reenvíe en un `PATCH`.
    */
   categoriaId?: string | null;
+  /**
+   * 'YYYY-MM-DD'. Corrige la fecha calendario real del gasto (hallazgo
+   * real: un gasto capturado por la tarde/noche podía guardarse con la
+   * fecha del día siguiente por el bug de zona horaria, ver
+   * `shared/fechas.ts`) — a diferencia de `fechaReferencia` (cuándo
+   * ocurre la corrección misma, para el cierre perezoso), esto es la
+   * fecha efectiva de la fila nueva. Omitirlo conserva el comportamiento
+   * de siempre: la fila corregida queda fechada "hoy" (el momento de la
+   * corrección), no la fecha original.
+   */
+  fechaEfectiva?: string;
   fechaReferencia?: Date;
 }
 
@@ -225,12 +236,24 @@ export async function editarGasto(entrada: EditarGastoEntrada): Promise<GastoEdi
   if (entrada.monto <= 0n) {
     throw new ErrorDominio('VALIDACION', 'El monto de un gasto debe ser positivo');
   }
-  const fechaReferencia = entrada.fechaReferencia ?? new Date();
+  if (entrada.fechaEfectiva !== undefined && !esFechaIsoValida(entrada.fechaEfectiva)) {
+    throw new ErrorDominio('VALIDACION', "El campo 'fechaEfectiva' debe tener formato YYYY-MM-DD y ser una fecha real");
+  }
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
 
   return conTenant(entrada.tenantId, async (tx) => {
     const gastoOriginal = await cargarGastoParaCorreccionTx(tx, entrada.tenantId, entrada.gastoId);
     const periodoActivo = await periodoActivoObligatorioTx(tx, entrada.tenantId, fechaReferencia);
-    const fecha = fechaISO(fechaReferencia);
+    // La reversión SIEMPRE va fechada al día de la corrección (no al de
+    // `fechaEfectiva` corregida): es lo que hace que cancele exactamente
+    // al original dentro del corte de "gastado hoy" de ESE día (ver el
+    // comentario de `obtenerNetoCuentaEnFecha` en consultar-disponible.ts,
+    // "revertir un gasto el mismo día que se registró"). Si el original
+    // se había capturado hoy por error y en realidad fue de ayer, la
+    // reversión de hoy cancela su efecto en el corte de hoy, y la fila
+    // nueva (fechada ayer, más abajo) ya no vuelve a aparecer ahí.
+    const fechaCorreccion = fechaISO(fechaReferencia);
+    const fechaNueva = entrada.fechaEfectiva ?? fechaCorreccion;
     const categoriaId = await resolverCategoriaIdTx(tx, entrada.tenantId, entrada.categoriaId);
 
     await revertirMovimientoTx(
@@ -238,7 +261,7 @@ export async function editarGasto(entrada: EditarGastoEntrada): Promise<GastoEdi
       entrada.tenantId,
       gastoOriginal.movimientoId,
       periodoActivo.cuentaId,
-      fecha,
+      fechaCorreccion,
       'Reversión por edición de gasto'
     );
 
@@ -246,7 +269,7 @@ export async function editarGasto(entrada: EditarGastoEntrada): Promise<GastoEdi
       tenantId: entrada.tenantId,
       tipo: 'gasto',
       moneda: entrada.moneda,
-      fechaEfectiva: fecha,
+      fechaEfectiva: fechaNueva,
       nota: entrada.nota,
       partidas: [
         { cuentaId: periodoActivo.cuentaId, montoValorMinimo: -entrada.monto },
@@ -337,7 +360,7 @@ export async function listarGastos(
   opciones: ListarGastosOpciones = {}
 ): Promise<GastosPaginados> {
   const limite = Math.max(1, Math.min(opciones.limite ?? LIMITE_GASTOS_DEFAULT, LIMITE_GASTOS_MAXIMO));
-  const fechaReferencia = opciones.fechaReferencia ?? new Date();
+  const fechaReferencia = opciones.fechaReferencia ?? ahoraEnMexico();
   const cursor = opciones.cursor ? decodificarCursorGasto(opciones.cursor) : null;
 
   return conTenant(tenantId, async (tx) => {

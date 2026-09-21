@@ -1,7 +1,7 @@
 import { existeIngresoParaPeriodo } from '../ingresos/registrar-ingreso.js';
 import { obtenerNetoCuentaEnFecha, obtenerSaldoCuenta } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivo } from '../periodos/crear-periodo.js';
-import { fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { calcularDiasRestantes, pisoDivisionBigInt } from './motor-flujo-caja.js';
 
 export interface DisponibleOk {
@@ -112,7 +112,7 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * dominio define como recalculado en cada consulta, no como una
  * fotografía congelada.
  */
-export async function consultarDisponible(tenantId: string, fechaReferencia: Date = new Date()): Promise<Disponible | null> {
+export async function consultarDisponible(tenantId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<Disponible | null> {
   const periodo = await obtenerPeriodoActivo(tenantId, fechaReferencia);
   if (!periodo) return null;
 

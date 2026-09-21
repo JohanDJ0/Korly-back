@@ -3,6 +3,7 @@ import { resumenes } from '../../db/schema/cierre.js';
 import { metas } from '../../db/schema/metas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
+import { ahoraEnMexico } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 import { obtenerResumenTx } from './generar-resumen.js';
 import { reclamarArrastreComoAporteMetaTx } from './materializar-arrastre.js';
@@ -36,7 +37,7 @@ export async function decidirSobrante(
   periodoId: string,
   decision: DecisionSobranteEntrada,
   metaId?: string,
-  fechaReferencia: Date = new Date()
+  fechaReferencia: Date = ahoraEnMexico()
 ): Promise<DecisionSobranteResultado> {
   if (decision === 'ahorrar' && !metaId) {
     throw new ErrorDominio('VALIDACION', "El campo 'metaId' es obligatorio para decidir 'ahorrar'");
