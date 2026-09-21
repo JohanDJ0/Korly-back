@@ -5,9 +5,9 @@ import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AuthCard } from '@/components/AuthCard';
 import { supabase } from '@/lib/supabase';
 
 const esquemaOlvide = z.object({
@@ -49,50 +49,32 @@ export function OlvidePassword() {
 
   if (enviado) {
     return (
-      <div className="flex min-h-svh items-center justify-center p-6">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <img src="/logo/full.svg" alt="Korly" className="mx-auto mb-2 h-9" />
-            <CardTitle>Revisa tu correo</CardTitle>
-            <CardDescription>Si ese correo tiene una cuenta, te mandamos un enlace para poner una contraseña nueva.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/login">Volver a iniciar sesión</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthCard titulo="Revisa tu correo" descripcion="Si ese correo tiene una cuenta, te mandamos un enlace para poner una contraseña nueva.">
+        <Button asChild variant="outline" className="h-11 w-full rounded-xl">
+          <Link to="/login">Volver a iniciar sesión</Link>
+        </Button>
+      </AuthCard>
     );
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <img src="/logo/full.svg" alt="Korly" className="mx-auto mb-2 h-9" />
-          <CardTitle>¿Olvidaste tu contraseña?</CardTitle>
-          <CardDescription>Te mandamos un enlace a tu correo para poner una nueva.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Correo</Label>
-              <Input id="email" type="email" autoComplete="email" autoFocus {...register('email')} />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-            </div>
-            {errorGeneral && <p className="text-sm text-destructive">{errorGeneral}</p>}
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Enviando…' : 'Enviar enlace'}
-            </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              <Link to="/login" className="text-primary underline-offset-4 hover:underline">
-                Volver a iniciar sesión
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthCard titulo="¿Olvidaste tu contraseña?" descripcion="Te mandamos un enlace a tu correo para poner una nueva.">
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email">Correo</Label>
+          <Input id="email" type="email" autoComplete="email" autoFocus className="h-11 rounded-xl" {...register('email')} />
+          {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
+        </div>
+        {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
+        <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">
+          {isSubmitting ? 'Enviando…' : 'Enviar enlace'}
+        </Button>
+        <p className="text-muted-foreground text-center text-sm">
+          <Link to="/login" className="text-primary font-medium underline-offset-4 hover:underline">
+            Volver a iniciar sesión
+          </Link>
+        </p>
+      </form>
+    </AuthCard>
   );
 }

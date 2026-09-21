@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/PageHeader';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDecidirSobrante } from '@/hooks/use-decidir-sobrante';
 import { useMetas } from '@/hooks/use-metas';
@@ -30,44 +30,45 @@ export function Resumen() {
   const esDeficit = resumen ? resumen.sobrante.valorMinimo < 0 : false;
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-6 p-6">
-      <div className="flex items-center gap-3">
-        <Button asChild variant="ghost" size="sm">
-          <Link to="/">← Volver</Link>
-        </Button>
-        <h1 className="text-xl font-semibold">Resumen del periodo</h1>
-      </div>
+    <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-4 pb-8">
+      <PageHeader titulo="Resumen del periodo" />
 
-      {isLoading && <p className="text-muted-foreground">Cargando…</p>}
-      {error && <p className="text-destructive">{error.message}</p>}
+      <div className="flex flex-col gap-4 px-5">
+        {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+        {error && <p className="text-destructive">{error.message}</p>}
 
-      {resumen && (
-        <>
-          <Card>
-            <CardContent className="flex flex-col gap-2 pt-6">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ingresos</span>
-                <span className="font-medium">{formatearMonto(resumen.totalIngresos)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Gastado</span>
-                <span className="font-medium">{formatearMonto(resumen.totalGastado)}</span>
-              </div>
-              <div className="mt-2 flex justify-between border-t pt-2">
-                <span className="text-muted-foreground">{esDeficit ? 'Déficit' : 'Sobrante'}</span>
-                <span className={cn('font-semibold', esDeficit && 'text-destructive')}>{formatearMonto(resumen.sobrante)}</span>
-              </div>
-            </CardContent>
-          </Card>
+        {resumen && (
+          <>
+            <div className="bg-hero text-hero-foreground flex flex-col gap-3.5 rounded-3xl px-5.5 py-6">
+              <p className="text-hero-foreground-muted text-sm font-medium">{esDeficit ? 'Déficit del periodo' : 'Sobrante del periodo'}</p>
+              <p className={cn('font-display text-[44px] leading-none font-extrabold tracking-tight tabular-nums', esDeficit && 'text-red-400')}>
+                {formatearMonto(resumen.sobrante)}
+              </p>
 
-          {resumen.decisionSobrante === 'pendiente' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>¿Qué hacemos con el sobrante?</CardTitle>
-                <CardDescription>Si no decides en unos días, se arrastra automático al periodo siguiente.</CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2">
+              <div className="my-1 h-px bg-white/10" />
+
+              <div className="flex items-center">
+                <div className="flex-1">
+                  <div className="text-hero-foreground-muted text-[11.5px]">Ingresos</div>
+                  <div className="font-display mt-0.5 text-lg font-bold">{formatearMonto(resumen.totalIngresos)}</div>
+                </div>
+                <div className="h-7 w-px bg-white/10" />
+                <div className="flex-1 text-right">
+                  <div className="text-hero-foreground-muted text-[11.5px]">Gastado</div>
+                  <div className="font-display mt-0.5 text-lg font-bold">{formatearMonto(resumen.totalGastado)}</div>
+                </div>
+              </div>
+            </div>
+
+            {resumen.decisionSobrante === 'pendiente' && (
+              <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-4.5">
+                <div>
+                  <h2 className="font-display text-[15px] font-semibold">¿Qué hacemos con el sobrante?</h2>
+                  <p className="text-muted-foreground mt-0.5 text-[12.5px]">Si no decides en unos días, se arrastra automático al periodo siguiente.</p>
+                </div>
+
                 <Button
+                  className="h-11 rounded-xl"
                   onClick={() => decidirSobrante.mutate({ periodoId: resumen.periodoId, decision: 'arrastrar' })}
                   disabled={decidirSobrante.isPending}
                 >
@@ -77,11 +78,12 @@ export function Resumen() {
                 {!mostrarSelectorMeta && (
                   <Button
                     variant="outline"
+                    className="h-11 rounded-xl"
                     disabled={decidirSobrante.isPending || metas?.length === 0}
                     title={metas?.length === 0 ? 'Primero crea una meta en "Ver metas"' : undefined}
                     onClick={() => setMostrarSelectorMeta(true)}
                   >
-                    Ahorrar
+                    Ahorrar en una meta
                   </Button>
                 )}
 
@@ -90,7 +92,7 @@ export function Resumen() {
                     <select
                       value={metaSeleccionada}
                       onChange={(evento) => setMetaSeleccionada(evento.target.value)}
-                      className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
+                      className="border-input h-11 w-full rounded-xl border bg-transparent px-3 text-sm outline-none"
                     >
                       <option value="">Elige una meta…</option>
                       {metas?.map((meta) => (
@@ -101,40 +103,39 @@ export function Resumen() {
                     </select>
                     <div className="flex gap-2">
                       <Button
-                        size="sm"
+                        className="h-10 flex-1 rounded-xl"
                         disabled={!metaSeleccionada || decidirSobrante.isPending}
                         onClick={() => decidirSobrante.mutate({ periodoId: resumen.periodoId, decision: 'ahorrar', metaId: metaSeleccionada })}
                       >
                         {decidirSobrante.isPending ? 'Guardando…' : 'Confirmar'}
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => setMostrarSelectorMeta(false)}>
+                      <Button variant="ghost" className="h-10 rounded-xl" onClick={() => setMostrarSelectorMeta(false)}>
                         Cancelar
                       </Button>
                     </div>
                   </div>
                 )}
-                {decidirSobrante.isError && <p className="text-sm text-destructive">{decidirSobrante.error.message}</p>}
-              </CardContent>
-            </Card>
-          )}
+                {decidirSobrante.isError && <p className="text-destructive text-sm">{decidirSobrante.error.message}</p>}
+              </div>
+            )}
 
-          {resumen.decisionSobrante === 'arrastrado' && (
-            <p className="text-sm text-muted-foreground">
-              {esDeficit ? 'Este déficit' : 'Este sobrante'} se arrastrará al periodo siguiente.
-            </p>
-          )}
-          {resumen.decisionSobrante === 'ahorrado' && <p className="text-sm text-muted-foreground">Este sobrante se guardó como ahorro.</p>}
+            {resumen.decisionSobrante === 'arrastrado' && (
+              <p className="text-muted-foreground text-sm">{esDeficit ? 'Este déficit' : 'Este sobrante'} se arrastrará al periodo siguiente.</p>
+            )}
+            {resumen.decisionSobrante === 'ahorrado' && <p className="text-muted-foreground text-sm">Este sobrante se guardó como ahorro.</p>}
 
-          <Button
-            variant="secondary"
-            onClick={() => crearPeriodo.mutate(undefined, { onSuccess: () => navigate('/') })}
-            disabled={crearPeriodo.isPending}
-          >
-            {crearPeriodo.isPending ? 'Creando…' : 'Crear periodo siguiente'}
-          </Button>
-          {crearPeriodo.isError && <p className="text-sm text-destructive">{crearPeriodo.error.message}</p>}
-        </>
-      )}
+            <Button
+              variant="secondary"
+              className="h-11 rounded-xl"
+              onClick={() => crearPeriodo.mutate(undefined, { onSuccess: () => navigate('/') })}
+              disabled={crearPeriodo.isPending}
+            >
+              {crearPeriodo.isPending ? 'Creando…' : 'Crear periodo siguiente'}
+            </Button>
+            {crearPeriodo.isError && <p className="text-destructive text-sm">{crearPeriodo.error.message}</p>}
+          </>
+        )}
+      </div>
     </div>
   );
 }

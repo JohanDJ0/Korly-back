@@ -1,6 +1,7 @@
 import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { useEliminarCategoria } from '@/hooks/use-eliminar-categoria';
 import type { Categoria } from '@/hooks/use-categorias';
+import { iconoCategoria } from '@/lib/icono-categoria';
 
 interface FilaCategoriaProps {
   categoria: Categoria;
@@ -14,13 +15,17 @@ interface FilaCategoriaProps {
  */
 export function FilaCategoria({ categoria }: FilaCategoriaProps) {
   const eliminarCategoria = useEliminarCategoria();
+  const Icono = iconoCategoria(categoria.nombre);
 
   return (
-    <li className="flex flex-col gap-1 border-b py-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="font-medium">{categoria.nombre}</p>
+    <li className="border-border bg-card flex flex-col gap-1 rounded-2xl border p-3.5">
+      <div className="flex items-center gap-3">
+        <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
+          <Icono size={16} className="text-secondary-foreground" />
+        </div>
+        <p className="flex-1 text-[14.5px] font-medium">{categoria.nombre}</p>
         {categoria.esPredeterminada ? (
-          <span className="shrink-0 text-sm text-muted-foreground">Predeterminada</span>
+          <span className="text-muted-foreground shrink-0 text-xs">Predeterminada</span>
         ) : (
           <BotonConfirmar
             variant="ghost"
@@ -34,7 +39,7 @@ export function FilaCategoria({ categoria }: FilaCategoriaProps) {
           </BotonConfirmar>
         )}
       </div>
-      {eliminarCategoria.isError && <p className="text-sm text-destructive">{eliminarCategoria.error.message}</p>}
+      {eliminarCategoria.isError && <p className="text-destructive text-sm">{eliminarCategoria.error.message}</p>}
     </li>
   );
 }

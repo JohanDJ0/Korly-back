@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -32,16 +33,24 @@ export function Categorias() {
         {isLoading && <p className="text-muted-foreground">Cargando…</p>}
         {error && <p className="text-destructive">{error.message}</p>}
 
-        {categorias && <ul>{categorias.map((categoria) => <FilaCategoria key={categoria.id} categoria={categoria} />)}</ul>}
+        {categorias && (
+          <ul className="flex flex-col gap-2.5">
+            {categorias.map((categoria) => (
+              <FilaCategoria key={categoria.id} categoria={categoria} />
+            ))}
+          </ul>
+        )}
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
           <Input
             value={nombreNueva}
             onChange={(evento) => setNombreNueva(evento.target.value)}
+            onKeyDown={(evento) => evento.key === 'Enter' && crear()}
             placeholder="Nombre de la nueva categoría"
-            className="w-48"
+            className="h-11 flex-1 rounded-xl"
           />
-          <Button onClick={crear} disabled={crearCategoria.isPending}>
+          <Button onClick={crear} disabled={crearCategoria.isPending} className="h-11 rounded-xl">
+            <Plus size={16} strokeWidth={2.5} />
             {crearCategoria.isPending ? 'Creando…' : 'Crear'}
           </Button>
         </div>

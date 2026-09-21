@@ -5,9 +5,9 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { AuthCard } from '@/components/AuthCard';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -62,61 +62,43 @@ export function Registro() {
 
   if (cuentaCreada) {
     return (
-      <div className="flex min-h-svh items-center justify-center p-6">
-        <Card className="w-full max-w-sm">
-          <CardHeader>
-            <img src="/logo/full.svg" alt="Korly" className="mx-auto mb-2 h-9" />
-            <CardTitle>Revisa tu correo</CardTitle>
-            <CardDescription>Te mandamos un enlace para confirmar tu cuenta antes de poder entrar.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild variant="outline" className="w-full">
-              <Link to="/login">Volver a iniciar sesión</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthCard titulo="Revisa tu correo" descripcion="Te mandamos un enlace para confirmar tu cuenta antes de poder entrar.">
+        <Button asChild variant="outline" className="h-11 w-full rounded-xl">
+          <Link to="/login">Volver a iniciar sesión</Link>
+        </Button>
+      </AuthCard>
     );
   }
 
   return (
-    <div className="flex min-h-svh items-center justify-center p-6">
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <img src="/logo/full.svg" alt="Korly" className="mx-auto mb-2 h-9" />
-          <CardTitle>Crea tu cuenta</CardTitle>
-          <CardDescription>Registro para empezar a ver cuánto puedes gastar hoy.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="email">Correo</Label>
-              <Input id="email" type="email" autoComplete="email" {...register('email')} />
-              {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="password">Contraseña</Label>
-              <Input id="password" type="password" autoComplete="new-password" {...register('password')} />
-              {errors.password && <p className="text-sm text-destructive">{errors.password.message}</p>}
-            </div>
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmarPassword">Confirma tu contraseña</Label>
-              <Input id="confirmarPassword" type="password" autoComplete="new-password" {...register('confirmarPassword')} />
-              {errors.confirmarPassword && <p className="text-sm text-destructive">{errors.confirmarPassword.message}</p>}
-            </div>
-            {errorGeneral && <p className="text-sm text-destructive">{errorGeneral}</p>}
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}
-            </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              ¿Ya tienes cuenta?{' '}
-              <Link to="/login" className="text-primary underline-offset-4 hover:underline">
-                Inicia sesión
-              </Link>
-            </p>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthCard titulo="Crea tu cuenta" descripcion="Regístrate para empezar a ver cuánto puedes gastar hoy.">
+      <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="email">Correo</Label>
+          <Input id="email" type="email" autoComplete="email" className="h-11 rounded-xl" {...register('email')} />
+          {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="password">Contraseña</Label>
+          <Input id="password" type="password" autoComplete="new-password" className="h-11 rounded-xl" {...register('password')} />
+          {errors.password && <p className="text-destructive text-sm">{errors.password.message}</p>}
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="confirmarPassword">Confirma tu contraseña</Label>
+          <Input id="confirmarPassword" type="password" autoComplete="new-password" className="h-11 rounded-xl" {...register('confirmarPassword')} />
+          {errors.confirmarPassword && <p className="text-destructive text-sm">{errors.confirmarPassword.message}</p>}
+        </div>
+        {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
+        <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">
+          {isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}
+        </Button>
+        <p className="text-muted-foreground text-center text-sm">
+          ¿Ya tienes cuenta?{' '}
+          <Link to="/login" className="text-primary font-medium underline-offset-4 hover:underline">
+            Inicia sesión
+          </Link>
+        </p>
+      </form>
+    </AuthCard>
   );
 }
