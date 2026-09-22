@@ -14,6 +14,8 @@ import { rutasExportar } from './modulos/exportar/rutas.js';
 import { rutasImportar } from './modulos/importar/rutas.js';
 import { rutasTarjetas } from './modulos/tarjetas/rutas.js';
 import { rutasNotificaciones } from './modulos/notificaciones/rutas.js';
+import { rutasSuscripciones } from './modulos/suscripciones/rutas.js';
+import { rutasWebhookStripe } from './modulos/suscripciones/rutas-webhook.js';
 
 export function crearApp() {
   const app = Fastify({ logger: true });
@@ -81,9 +83,15 @@ export function crearApp() {
       v1.register(rutasImportar);
       v1.register(rutasTarjetas);
       v1.register(rutasNotificaciones);
+      v1.register(rutasSuscripciones);
     },
     { prefix: '/v1' }
   );
+
+  // Fuera del bloque de arriba a propósito: Stripe llama este endpoint sin
+  // el Bearer token de Supabase que `authPlugin` exige ahí dentro (ver
+  // modulos/suscripciones/rutas-webhook.ts).
+  app.register(rutasWebhookStripe, { prefix: '/v1/webhooks' });
 
   return app;
 }

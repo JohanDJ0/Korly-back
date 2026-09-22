@@ -127,6 +127,13 @@
       "when": 1789958485922,
       "tag": "0017_agrega_icono_categoria",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1790055678545,
+      "tag": "0018_agrega_suscripciones_stripe",
+      "breakpoints": true
     }
   ]
 }

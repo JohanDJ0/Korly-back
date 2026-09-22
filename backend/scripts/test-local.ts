@@ -109,6 +109,9 @@ async function main(): Promise<void> {
         // aquí por la misma razón que DATABASE_URL arriba: que un
         // backend/.env real no filtre una API key real hacia los tests.
         RESEND_API_KEY: '',
+        // Mismo motivo: los tests de modulos/suscripciones/ siempre pasan
+        // un cliente de Stripe stub inyectado, nunca el real.
+        STRIPE_SECRET_KEY: '',
       },
     });
     codigoSalida = resultado.status ?? 1;

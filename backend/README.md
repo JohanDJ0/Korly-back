@@ -1844,17 +1844,24 @@ los módulos preguntan "¿este tenant es Pro?" (`obtenerPlanTenantTx`) o
 exigen que lo sea (`requerirPlanProTx`, para funciones exclusivas de
 Pro como exportar).
 
-**Sin cobro real todavía a propósito.** Stripe+PAC (documento-maestro-v2.md
-§6.9) requiere que el usuario resuelva primero su alta fiscal (RFC,
-régimen) — no es un bloqueo técnico, es una decisión de negocio
-pendiente. Por eso **no existe ningún endpoint de autoservicio para
-subir de plan**: un "actualízate a Pro" sin nada real que cobre de por
-medio sería un gate falso, código a medio construir que habría que
-rehacer entero cuando exista el webhook de Stripe. Hasta entonces,
-subir un tenant a `'pro'` es un `UPDATE` manual (Supabase SQL Editor o
-Table Editor) — los tests lo hacen igual, escribiendo directo a
-`tenants` (ver `establecerPlan` en `test/integracion/metas.test.ts`,
-mismo criterio que `insertarBorrador` en `tarjetas.test.ts`).
+**Actualización `[F3]`:** lo de abajo describía la etapa "sin cobro
+real" del proyecto. Esa etapa terminó — ver `## Suscripciones (Stripe)`
+más abajo para el autoservicio real. Se deja el resto del párrafo tal
+cual por su valor histórico (por qué se difirió al principio) y porque
+los tests de otros módulos (`metas.test.ts`, `tarjetas.test.ts`) siguen
+subiendo un tenant a `'pro'` con un `UPDATE` directo — no tiene sentido
+que un test de metas dependa de un cliente de Stripe stub solo para
+poner `plan = 'pro'`.
+
+**Sin cobro real, al principio, a propósito.** Stripe+PAC
+(documento-maestro-v2.md §6.9) requiere que el usuario resuelva primero
+su alta fiscal (RFC, régimen) — no era un bloqueo técnico, era una
+decisión de negocio pendiente. Por eso no existía ningún endpoint de
+autoservicio para subir de plan: un "actualízate a Pro" sin nada real
+que cobre de por medio habría sido un gate falso, código a medio
+construir que habría que rehacer entero cuando existiera el webhook de
+Stripe. CFDI/PAC sigue pendiente (fuera del alcance de esta iteración,
+ver `## Suscripciones (Stripe)`); el cobro con Stripe ya no.
 
 **Los tres gates construidos** (los otros dos de la matriz — categorías
 personalizadas y recordatorios básicos — el documento mismo dice que
@@ -1888,6 +1895,90 @@ tampoco necesita nada nuevo en pantalla.
 
 6 tests nuevos (2 por gate: bloquea en Free, permite en Pro) contra
 Postgres real.
+
+## Suscripciones (Stripe)
+
+**F3 del roadmap** (documento-maestro-v2.md §14) — cobro real del plan
+Pro. **CFDI/PAC queda fuera a propósito**: requiere RFC/constancia
+fiscal propia y una cuenta con un PAC (Facturama, Finkok, etc.), un
+trámite aparte que no bloquea el cobro. `modulos/suscripciones/`.
+
+**Modelo:** `tenants` gana `stripeCustomerId` (único, `null` hasta el
+primer checkout), `stripeSubscriptionId`, `estadoSuscripcion`
+(`trialing`/`activa`/`pago_pendiente`/`cancelada`, `null` = nunca
+empezó uno) y `suscripcionVigenteHasta`. `eventos_webhook_stripe` (solo
+`id` del evento de Stripe + `tipo` + `procesadoEn`) existe únicamente
+para idempotencia — sin política RLS para `app_backend` a propósito
+(ver el comentario en el propio schema): nada que una request de un
+tenant deba tocar jamás, solo el webhook vía `dbAdmin`.
+
+**Checkout** (`crearSesionCheckout`): crea el Customer de Stripe la
+primera vez (y lo reutiliza siempre después, nunca uno nuevo por
+intento) y abre un Checkout Session hospedado por Stripe con
+`trial_period_days: 21` — punto medio del rango 17–30 que
+documento-maestro-v2.md §9.3 recomienda. Dos `Price` fijos (creados una
+sola vez vía script ad hoc contra la cuenta de Stripe, nunca en
+código): `STRIPE_PRICE_MENSUAL` ($89 MXN/mes) y `STRIPE_PRICE_ANUAL`
+($790 MXN/año).
+
+**Portal** (`crearSesionPortal`): Customer Portal de Stripe para
+cancelar, cambiar método de pago o ver facturas — ninguna de esas
+pantallas se construye a mano. Falla con `SIN_SUSCRIPCION` (409) si el
+tenant nunca ha empezado un checkout (no hay Customer que gestionar).
+
+**Webhook** (`POST /v1/webhooks/stripe`, `webhook.ts` +
+`rutas-webhook.ts`): registrado **fuera** del bloque `/v1` con
+`authPlugin` en `app.ts` — Stripe llama este endpoint sin el Bearer
+token de Supabase que el resto de la API exige; la autenticación real
+es la firma `Stripe-Signature`, verificada contra el **body crudo**
+(un content type parser propio deja el payload como string sin tocar,
+porque Stripe firma los bytes exactos que mandó — un
+`JSON.parse`+`JSON.stringify` de por medio rompería la verificación si
+el re-serializado no es idéntico byte a byte).
+
+Solo tres tipos de evento manejados: `customer.subscription.created`,
+`.updated`, `.deleted` — la Subscription de Stripe (su `status`) es la
+única fuente de verdad para `plan`/`estadoSuscripcion`, no
+`checkout.session.completed` (Stripe mismo lo recomienda así). Mapeo:
+`trialing`/`active` → Pro; `past_due`/`unpaid` → Pro sigue activo
+(**dunning**: Stripe ya reintenta el cobro solo con Smart Retries, la
+gracia no se re-implementa aquí) con `estadoSuscripcion = pago_pendiente`;
+`canceled`/`incomplete_expired` → Free. Idempotente vía
+`eventos_webhook_stripe`: Stripe garantiza *al menos una* entrega,
+nunca exactamente una.
+
+**`current_period_end` no vive en la Subscription** en la versión de
+API de este SDK (`stripe` v22) — se movió a cada item
+(`subscription.items.data[0].current_period_end`). Con un solo `Price`
+por suscripción, el primer item siempre es el correcto.
+
+**dbAdmin, segunda razón legítima** (`shared/db-admin.ts`): el evento
+de Stripe no trae `app.tenant_id` — no hay sesión de usuario, la
+request viene firmada por Stripe — y el primer paso es justo
+*descubrir* a qué tenant pertenece buscando por `stripeCustomerId`,
+algo que RLS por diseño no permite bajo `app_backend`.
+
+**Frontend** (`Ajustes.tsx`): sección "Plan" — en Free, dos botones
+("Pro — $89/mes", "Pro — $790/año") que abren el Checkout; en Pro,
+estado actual (prueba/vigente/pago pendiente/cancelada) + botón
+"Gestionar suscripción". Redirige de vuelta a `/ajustes?suscripcion=exito`
+o `?suscripcion=cancelado` (`FRONTEND_URL`, no `CORS_ORIGIN`: ese es una
+lista de orígenes permitidos, esto es un único destino de redirección).
+
+**Probar en local:** `stripe listen --forward-to
+localhost:3000/v1/webhooks/stripe --events
+customer.subscription.created,customer.subscription.updated,customer.subscription.deleted`
+imprime un `whsec_...` — va en `STRIPE_WEBHOOK_SECRET` (reiniciar el
+backend para que lo recoja). **Verificado en vivo contra la cuenta real
+de Stripe en modo prueba**: checkout completo con la tarjeta de prueba
+`4242 4242 4242 4242`, evento `customer.subscription.created` recibido
+y verificado, tenant subido a `pro`/`trialing` con la vigencia correcta,
+y el Portal de Stripe abre y muestra la suscripción real.
+
+9 tests nuevos contra Postgres real, con el cliente de Stripe inyectado
+como stub (`ClienteStripeSuscripciones`) — mismo patrón que
+`resolverCorreo` en recordatorios; nunca se llama a Stripe de verdad en
+`test:local` (`STRIPE_SECRET_KEY: ''`, ver `scripts/test-local.ts`).
 
 ## CORS
 

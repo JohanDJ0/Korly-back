@@ -24,6 +24,12 @@ export function formatearFechaHora(fechaIso: string): string {
   return formato.format(new Date(fechaIso));
 }
 
+/** Como `formatearFechaHora`, pero sin la hora — "vigente hasta" (Ajustes.tsx) no la necesita. */
+export function formatearFecha(fechaIso: string): string {
+  const formato = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
+  return formato.format(new Date(fechaIso));
+}
+
 /**
  * Fecha local del navegador, no UTC — evita que "hoy" salte al día
  * siguiente desde las 6pm hora de México (ver backend/src/shared/fechas.ts).

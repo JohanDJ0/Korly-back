@@ -24,7 +24,8 @@
     "fastify": "^5.12.4",
     "fastify-plugin": "^5.0.1",
     "postgres": "^3.4.5",
-    "resend": "^6.28.1"
+    "resend": "^6.28.1",
+    "stripe": "^22.6.2"
   },
   "devDependencies": {
     "@types/node": "^22.16.0",

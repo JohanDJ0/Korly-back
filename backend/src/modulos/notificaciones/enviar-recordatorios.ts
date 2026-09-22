@@ -1,5 +1,4 @@
 import { and, desc, eq, gte, inArray, lt } from 'drizzle-orm';
-import { identidadesExternas } from '../../db/schema/identidad.js';
 import { movimientos } from '../../db/schema/ledger.js';
 import { recordatoriosEnviados } from '../../db/schema/recordatorios.js';
 import { tenants } from '../../db/schema/tenants.js';
@@ -8,7 +7,7 @@ import { enviarCorreo } from '../../shared/email.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { dbAdmin } from '../../shared/db-admin.js';
 import { fechaISO } from '../../shared/fechas.js';
-import { supabaseAdmin } from '../../shared/supabase-admin.js';
+import { obtenerCorreoTenantTx, resolverCorreoViaSupabase, type ResolverCorreo } from '../../shared/correo-tenant.js';
 
 const MONEDA_DEFAULT = 'MXN';
 const VENTANA_ACTIVIDAD_MS = 24 * 60 * 60 * 1000;
@@ -17,42 +16,6 @@ const DIAS_ESPERA_EN_BACKOFF = 3;
 
 function formatearMontoMXN(valorMinimo: bigint): string {
   return new Intl.NumberFormat('es-MX', { style: 'currency', currency: MONEDA_DEFAULT }).format(Number(valorMinimo) / 100);
-}
-
-/** Firma de "dado el id en Supabase Auth, dame el correo" — ver `resolverCorreoViaSupabase` y el comentario de `obtenerCorreoTenantTx`. */
-type ResolverCorreo = (idEnProveedor: string) => Promise<string | null>;
-
-async function resolverCorreoViaSupabase(idEnProveedor: string): Promise<string | null> {
-  const { data, error } = await supabaseAdmin.auth.admin.getUserById(idEnProveedor);
-  if (error || !data.user?.email) return null;
-  return data.user.email;
-}
-
-/**
- * `usuario_id`/`tenant_id` de `usuarios` ni se tocan aquí — el correo
- * no vive en la base propia (ADR-003: el proveedor de auth es
- * desacoplado), así que la única fuente de verdad es preguntarle a
- * Supabase Auth por el usuario detrás de la identidad externa
- * `'supabase'` de este tenant. `null` si el tenant no tiene ninguna
- * identidad todavía (no debería pasar en la práctica: se crea junto
- * con el tenant) o si Supabase no devuelve un email.
- *
- * `resolverCorreo` inyectable a propósito — es una llamada de red real
- * a Supabase Auth, y `scripts/test-local.ts` documenta como invariante
- * que "los tests nunca llaman a Supabase de verdad". El valor por
- * defecto (`resolverCorreoViaSupabase`) es lo único que usa
- * `scripts/enviar-recordatorios.ts` en producción; los tests pasan un
- * stub.
- */
-async function obtenerCorreoTenantTx(tx: Ejecutor, tenantId: string, resolverCorreo: ResolverCorreo): Promise<string | null> {
-  const [identidad] = await tx
-    .select({ idEnProveedor: identidadesExternas.idEnProveedor })
-    .from(identidadesExternas)
-    .where(and(eq(identidadesExternas.tenantId, tenantId), eq(identidadesExternas.proveedor, 'supabase')))
-    .limit(1);
-  if (!identidad) return null;
-
-  return resolverCorreo(identidad.idEnProveedor);
 }
 
 /**

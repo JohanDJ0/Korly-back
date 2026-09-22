@@ -27,6 +27,16 @@ if (!connectionString) {
  * el único uso real es `listarTenantIdsConRecordatoriosActivosTx`
  * (enumerar, nunca leer datos de dominio de un tenant específico); todo
  * lo demás en ese módulo sigue pasando por `conTenant`/`app_backend`.
+ *
+ * **Segundo uso legítimo:** el webhook de Stripe
+ * (`modulos/suscripciones/webhook.ts`). Un evento de Stripe llega sin
+ * `app.tenant_id` — no hay sesión de usuario, la request viene firmada
+ * por Stripe — y el primer paso es justo *descubrir* a qué tenant
+ * pertenece buscando por `stripeCustomerId`, algo que RLS por diseño no
+ * permite bajo `app_backend`. Mismo criterio de riesgo: la firma de
+ * Stripe ya se verificó antes de tocar la BD (ver `webhook.ts`), y solo
+ * toca las columnas de suscripción de la fila que el propio evento
+ * identifica, nunca datos de dominio de otro tenant.
  */
 const client = postgres(connectionString, { prepare: false });
 

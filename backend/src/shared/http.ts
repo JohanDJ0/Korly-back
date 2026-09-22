@@ -52,6 +52,10 @@ const CODIGO_A_STATUS: Record<string, number> = {
   // no un dato inválido.
   LIMITE_METAS_ALCANZADO: 403,
   FUNCION_PRO: 403,
+  // modulos/suscripciones/: pedir el Portal de facturación sin haber
+  // empezado nunca un checkout. Mismo criterio que SIN_PERIODO_ACTIVO:
+  // el request está bien formado, lo que falta es un estado previo.
+  SIN_SUSCRIPCION: 409,
 };
 
 /**
