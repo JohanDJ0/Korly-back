@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ahoraEnMexico, esFechaIsoValida, fechaISO } from '../../src/shared/fechas.js';
+import { ahoraEnMexico, diaCalendarioEnMexico, esFechaIsoValida, fechaISO } from '../../src/shared/fechas.js';
 
 describe('esFechaIsoValida', () => {
   it('acepta una fecha real', () => {
@@ -61,5 +61,21 @@ describe('ahoraEnMexico', () => {
 
     const diferenciaMs = new Date().getTime() - ahoraEnMexico().getTime();
     expect(diferenciaMs).toBe(6 * 60 * 60 * 1000);
+  });
+});
+
+describe('diaCalendarioEnMexico', () => {
+  it('un instante de la noche en México, que en UTC ya es el día siguiente, cuenta como del día de México', () => {
+    // 9pm del 5 de octubre en México = 03:00 UTC del 6.
+    expect(diaCalendarioEnMexico(new Date('2026-10-06T03:00:00Z'))).toBe('2026-10-05');
+  });
+
+  it('el límite exacto: 06:00 UTC es la medianoche de México', () => {
+    expect(diaCalendarioEnMexico(new Date('2026-10-06T05:59:59Z'))).toBe('2026-10-05');
+    expect(diaCalendarioEnMexico(new Date('2026-10-06T06:00:00Z'))).toBe('2026-10-06');
+  });
+
+  it('cruza el fin de año sin tropezar', () => {
+    expect(diaCalendarioEnMexico(new Date('2027-01-01T04:00:00Z'))).toBe('2026-12-31');
   });
 });

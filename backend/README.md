@@ -2178,6 +2178,41 @@ exenciones, `X-Forwarded-For` con y sin `trustProxy`, cabeceras, `/salud/listo`
 y regresión de la autenticación con un token simulado),
 `test/unidad/entorno.test.ts` y el filtro de Sentry.
 
+## Métricas del piloto
+
+`npm run metricas` imprime el embudo de activación, la constancia y la
+retención de los usuarios, calculados solo con lo que el ledger ya guarda (sin
+analítica de terceros ni seguimiento nuevo). Mide el riesgo #1 del producto, la
+fatiga de captura (`documento-maestro-v2.md` §11).
+
+```bash
+npm run metricas                                      # todos los usuarios
+npm run metricas -- --desde=2026-10-15                # solo quien entró desde esa fecha
+npm run metricas -- --desde=2026-10-15 --hasta=2026-11-01
+npm run metricas -- --json                            # salida para máquinas
+```
+
+- **Actividad = capturar a mano un gasto o un cargo de tarjeta.** No cuenta abrir
+  la app, registrar el ingreso ni los gastos que se materializan solos
+  (recurrentes, mensualidades). Corregir un gasto sí cuenta.
+- **Ventanas completas:** cada indicador solo mira a quien ya pasó por toda su
+  ventana (la semana 2 de retención exige que sus 7 días ya hayan transcurrido).
+  Mezclar ventanas a medias regala números optimistas que luego se desploman.
+- **Lee siempre `n de N`**, no solo el porcentaje: con cohortes de pocas personas
+  un porcentaje engaña.
+- **Retención de la semana k** = capturó al menos un día entre los días 7k y 7k+6
+  contados desde su alta. Los días son de México (UTC-6).
+- **`--desde` deja fuera las cuentas de prueba:** pon la fecha en que arrancó el piloto.
+- Si hay usuarios con recordatorios activos y 0 correos en 7 días, el reporte avisa
+  que probablemente el cron de recordatorios no está corriendo.
+- **Privacidad:** por usuario solo se leen banderas, fechas y conteos; el reporte
+  no imprime ids, correos, montos ni categorías. Usa la conexión de administración
+  (`DATABASE_URL`, `dbAdmin`), así que se corre solo desde una máquina de confianza.
+
+Tests: `test/unidad/metricas.test.ts` (casos exactos de embudo, ventana de 24 h,
+mediana, constancia, retención y zona horaria) y
+`test/integracion/metricas.test.ts` (consultas contra Postgres real).
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

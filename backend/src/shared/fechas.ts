@@ -56,6 +56,18 @@ export function ahoraEnMexico(): Date {
 }
 
 /**
+ * Día calendario de México ('YYYY-MM-DD') en que ocurrió un **instante real**
+ * — p. ej. `movimientos.fecha_registro`. A diferencia de `ahoraEnMexico()`,
+ * que corre el "ahora" para usarlo como fecha de referencia, esto recibe
+ * cualquier instante guardado y devuelve el día que marcaba el reloj de
+ * México en ese momento (un gasto capturado a las 9pm del día 5, que en UTC
+ * ya es el día 6, cuenta como del 5).
+ */
+export function diaCalendarioEnMexico(instante: Date): string {
+  return fechaISO(new Date(instante.getTime() + OFFSET_MEXICO_MS));
+}
+
+/**
  * A diferencia de solo comprobar el formato `YYYY-MM-DD` con una regex,
  * esto rechaza fechas que tienen esa forma pero no existen en el
  * calendario (`2026-02-30`, `2026-13-01`) — `Date.UTC` normaliza esos
