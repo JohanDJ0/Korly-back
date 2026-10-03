@@ -10,6 +10,12 @@ import {
   type ClienteStripeSuscripciones,
 } from '../../src/modulos/suscripciones/suscripciones.js';
 
+// Ids de Price de mentira, fijados aquí y no leídos de backend/.env: el CI no tiene .env, y en una máquina de
+// desarrollo el .env trae los Price reales de la cuenta de Stripe — la prueba no debe depender de ninguno de los dos.
+// Asignación incondicional a propósito (no `??=`), para que un valor real nunca se cuele.
+process.env.STRIPE_PRICE_MENSUAL = 'price_test_mensual';
+process.env.STRIPE_PRICE_ANUAL = 'price_test_anual';
+
 describe('suscripciones', () => {
   async function tenantNuevo() {
     const { tenantId } = await resolverOcrearIdentidad(`test-suscripciones-${randomUUID()}`);
