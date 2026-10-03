@@ -16,6 +16,7 @@ import { rutasTarjetas } from './modulos/tarjetas/rutas.js';
 import { rutasNotificaciones } from './modulos/notificaciones/rutas.js';
 import { rutasSuscripciones } from './modulos/suscripciones/rutas.js';
 import { rutasDesglose } from './modulos/desglose/rutas.js';
+import { rutasCuenta } from './modulos/cuenta/rutas.js';
 import { rutasWebhookStripe } from './modulos/suscripciones/rutas-webhook.js';
 
 export function crearApp() {
@@ -86,6 +87,7 @@ export function crearApp() {
       v1.register(rutasNotificaciones);
       v1.register(rutasSuscripciones);
       v1.register(rutasDesglose);
+      v1.register(rutasCuenta);
     },
     { prefix: '/v1' }
   );

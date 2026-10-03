@@ -46,7 +46,7 @@ Están justificadas en los ADRs. **No proponer alternativas sin leer el ADR corr
 - Un solo lugar en el código convierte entre entero y presentación.
 - Todo en **UTC**, resuelto a la zona IANA del usuario al leer. México sin DST desde 2022 (excepto Baja California y franja fronteriza).
 - **Los jobs pueden duplicarse o saltarse.** Todos deben ser idempotentes: fecha objetivo pasada como parámetro, nunca `now()` dentro del job.
-- Nada de hard delete en el dominio financiero.
+- Nada de hard delete en el dominio financiero. Única excepción: la purga completa de una cuenta cerrada por su titular (derecho de cancelación), con candado en la base de datos — ver ADR-008.
 
 ---
 

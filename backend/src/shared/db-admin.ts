@@ -37,6 +37,15 @@ if (!connectionString) {
  * Stripe ya se verificó antes de tocar la BD (ver `webhook.ts`), y solo
  * toca las columnas de suscripción de la fila que el propio evento
  * identifica, nunca datos de dominio de otro tenant.
+ *
+ * **Tercer uso legítimo:** la eliminación de cuenta
+ * (`modulos/cuenta/eliminar-cuenta.ts`, ADR-008) — el único camino que
+ * puede borrar ledger, porque los triggers de inmutabilidad solo abren el
+ * DELETE a una sesión que no sea `app_backend` y que lo declare. Sí es
+ * alcanzable desde una ruta HTTP autenticada, así que la seguridad no
+ * descansa en "nadie llega aquí" sino en que el `tenantId` sale SIEMPRE
+ * de la identidad ya verificada del request (jamás del cuerpo) y en que
+ * cada DELETE está acotado a ese tenant.
  */
 const client = postgres(connectionString, { prepare: false });
 

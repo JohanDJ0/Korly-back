@@ -1,13 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronRight, Crown, Repeat, Tag } from 'lucide-react';
+import { Bell, ChevronRight, Crown, Download, Repeat, ShieldCheck, Tag } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
+import { EliminarCuenta } from '@/components/EliminarCuenta';
 import { PageHeader } from '@/components/PageHeader';
 import { useActualizarPreferencias } from '@/hooks/use-actualizar-preferencias';
 import { useCrearCheckout } from '@/hooks/use-crear-checkout';
 import { useCrearPortal } from '@/hooks/use-crear-portal';
+import { useDescargarDatos } from '@/hooks/use-descargar-datos';
 import { usePreferencias } from '@/hooks/use-preferencias';
 import { useSuscripcion } from '@/hooks/use-suscripcion';
 import { formatearFecha } from '@/lib/fechas';
@@ -34,6 +36,7 @@ export function Ajustes() {
   const { data: suscripcion } = useSuscripcion();
   const crearCheckout = useCrearCheckout();
   const crearPortal = useCrearPortal();
+  const descargarDatos = useDescargarDatos();
   const [parametros] = useSearchParams();
   const resultadoCheckout = parametros.get('suscripcion');
 
@@ -148,6 +151,24 @@ export function Ajustes() {
               <span className="flex-1 text-[14px] font-medium">Gastos recurrentes</span>
               <ChevronRight size={16} className="text-muted-foreground" />
             </Link>
+          </div>
+        </section>
+        <section className="flex flex-col gap-2.5">
+          <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">PRIVACIDAD Y DATOS</h2>
+          <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3.5">
+            <Link to="/privacidad" className="flex items-center gap-3">
+              <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-[11px]">
+                <ShieldCheck size={17} className="text-secondary-foreground" />
+              </div>
+              <span className="flex-1 text-[14px] font-medium">Aviso de privacidad</span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </Link>
+            <Button variant="outline" className="h-10 w-full rounded-xl" onClick={() => descargarDatos.mutate()} disabled={descargarDatos.isPending}>
+              <Download size={15} />
+              {descargarDatos.isPending ? 'Preparando…' : 'Descargar mis datos'}
+            </Button>
+            {descargarDatos.isError && <p className="text-destructive text-sm">{descargarDatos.error.message}</p>}
+            <EliminarCuenta />
           </div>
         </section>
       </div>

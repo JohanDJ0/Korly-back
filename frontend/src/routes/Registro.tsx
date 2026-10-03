@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
+import { VERSION_AVISO_PRIVACIDAD } from '@/lib/datos-responsable';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -16,6 +17,8 @@ const esquemaRegistro = z
     email: z.string().email('Correo inválido'),
     password: z.string().min(6, 'La contraseña necesita al menos 6 caracteres'),
     confirmarPassword: z.string().min(1, 'Confirma tu contraseña'),
+    // Datos financieros = patrimoniales: consentimiento expreso, no tácito.
+    aceptaAviso: z.boolean().refine((acepta) => acepta, { message: 'Debes aceptar el aviso de privacidad para crear tu cuenta' }),
   })
   .refine((datos) => datos.password === datos.confirmarPassword, {
     message: 'Las contraseñas no coinciden',
@@ -46,7 +49,12 @@ export function Registro() {
 
   async function onSubmit(datos: RegistroForm) {
     setErrorGeneral(null);
-    const { data, error } = await supabase.auth.signUp({ email: datos.email, password: datos.password });
+    // La versión y la fecha del aviso aceptado quedan en la cuenta como constancia del consentimiento.
+    const { data, error } = await supabase.auth.signUp({
+      email: datos.email,
+      password: datos.password,
+      options: { data: { aviso_privacidad_version: VERSION_AVISO_PRIVACIDAD, aviso_privacidad_aceptado_en: new Date().toISOString() } },
+    });
     if (error) {
       setErrorGeneral(error.message);
       return;
@@ -87,6 +95,19 @@ export function Registro() {
           <Label htmlFor="confirmarPassword">Confirma tu contraseña</Label>
           <Input id="confirmarPassword" type="password" autoComplete="new-password" className="h-11 rounded-xl" {...register('confirmarPassword')} />
           {errors.confirmarPassword && <p className="text-destructive text-sm">{errors.confirmarPassword.message}</p>}
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="flex items-start gap-2.5 text-[13px] leading-snug">
+            <input type="checkbox" className="accent-primary mt-0.5 h-4 w-4 shrink-0" {...register('aceptaAviso')} />
+            <span>
+              He leído y acepto el{' '}
+              <Link to="/privacidad" target="_blank" className="text-primary font-medium underline-offset-4 hover:underline">
+                Aviso de privacidad
+              </Link>
+              , incluido el tratamiento de mis datos financieros.
+            </span>
+          </label>
+          {errors.aceptaAviso && <p className="text-destructive text-sm">{errors.aceptaAviso.message}</p>}
         </div>
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
         <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">

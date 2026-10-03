@@ -134,6 +134,13 @@
       "when": 1790055678545,
       "tag": "0018_agrega_suscripciones_stripe",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1791015025150,
+      "tag": "0019_purga_controlada_de_cuenta",
+      "breakpoints": true
     }
   ]
 }

@@ -2054,6 +2054,60 @@ cada mutación que ya invalidaba `['disponible']` ahora invalida también
 Sin gate de plan por ahora (§9.2 pone los reportes completos como Pro).
 23 tests nuevos (10 de las fechas en `test/unidad/`, 13 de integración).
 
+## Privacidad y derechos ARCO
+
+Nueva LFPDPPP (DOF 20-mar-2025): el aviso de privacidad debe decir cómo se
+ejercen los derechos ARCO y cómo se revoca el consentimiento. Cada derecho
+tiene su mecanismo dentro de la app:
+
+- **Acceso** — `GET /v1/cuenta/datos` (`modulos/cuenta/exportar-datos.ts`):
+  un JSON con una entrada por cada tabla con `tenant_id`, más el correo (que
+  vive en Supabase Auth, ADR-003). **Gratis en todos los planes**, a
+  diferencia de la exportación CSV (Pro): ver tus propios datos no es una
+  función de pago. Los montos `bigint` salen como texto para no perder
+  precisión. Va por `conTenant`/RLS como cualquier request.
+- **Rectificación** — editar gastos, ingresos, categorías, etc., que ya
+  existía. Cambiar el correo de la cuenta no está en la app todavía.
+- **Cancelación** — `POST /v1/cuenta/eliminar` con `{"confirmacion":
+  "ELIMINAR"}` (POST y no DELETE porque lleva cuerpo). Ver ADR-008. Orden:
+  borrar el Customer de Stripe (cancela sus suscripciones; si falla por algo
+  distinto de `resource_missing`, se aborta con los datos intactos), purgar la
+  base en una transacción y borrar el usuario de Supabase Auth (si esto
+  último falla, los datos ya no existen y se reporta a Sentry; el resultado
+  trae `usuarioAuthEliminado: false`).
+- **Oposición** — `PATCH /preferencias` para apagar los recordatorios.
+
+**La purga y ADR-001.** Los triggers de inmutabilidad siguen activos; la
+migración 0019 hace que el `DELETE` (solo el `DELETE`) se permita cuando la
+transacción declara `app.purga_cuenta = 'on'` **y** la sesión no es
+`app_backend`. También el chequeo diferido de balance, que sin esto vería una
+suma `NULL` al borrar todos los asientos de un movimiento. El orden de
+borrado (hijos antes que padres, sin `ON DELETE CASCADE`) vive en
+`modulos/cuenta/tablas-tenant.ts`, que es además la lista de lo que se
+exporta, y una prueba la compara contra `information_schema` para que una
+tabla nueva con `tenant_id` no pueda quedar fuera.
+
+**Frontend:** `Privacidad.tsx` (pública, `/privacidad`), enlazada desde Login,
+Registro y Ajustes; casilla obligatoria en el registro (los datos financieros
+son patrimoniales: consentimiento expreso) que guarda en la cuenta de Supabase
+la versión del aviso y la fecha; y la sección "Privacidad y datos" de Ajustes
+con "Descargar mis datos" y "Eliminar mi cuenta" (hay que escribir la palabra;
+el backend la vuelve a exigir). Los datos del responsable (nombre, domicilio,
+correo ARCO) se llenan en `frontend/src/lib/datos-responsable.ts`; mientras
+alguno diga `PENDIENTE` el aviso muestra un banner de borrador.
+
+**Pendiente antes de publicar:** completar esos datos del responsable y
+**revisión legal del texto** — el aviso es un borrador redactado a partir de
+lo que la app realmente hace, no asesoría jurídica. Tampoco se verificó el
+plazo legal de respuesta a una solicitud ARCO; el diseño no depende de él
+porque acceso y cancelación son inmediatos.
+
+13 tests nuevos (`test/integracion/cuenta.test.ts`): cobertura de la lista de
+tablas contra el catálogo, exportación, purga completa sin tocar a otro
+tenant, Stripe/Auth con fallos, y que ni el rol de la aplicación ni la
+conexión de administración sin declarar (ni siquiera una purga declarada,
+para un `UPDATE`) pueden saltarse el candado.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

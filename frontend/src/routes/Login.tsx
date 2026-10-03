@@ -67,6 +67,11 @@ export function Login() {
             Regístrate
           </Link>
         </p>
+        <p className="text-muted-foreground text-center text-xs">
+          <Link to="/privacidad" className="underline-offset-4 hover:underline">
+            Aviso de privacidad
+          </Link>
+        </p>
       </form>
     </AuthCard>
   );
