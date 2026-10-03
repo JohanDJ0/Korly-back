@@ -81,6 +81,28 @@ export interface ResultadoRecordatorioDiario {
 }
 
 /**
+ * Línea de resumen del job. Desglosa los omitidos por motivo: un "0
+ * enviados" sin ese desglose no distingue "nadie lo necesitaba hoy" de
+ * "algo está roto". Solo cuenta — no incluye ids ni correos.
+ */
+export function resumirCorrida(resultados: ResultadoRecordatorioDiario[], fallidos: number): string {
+  const enviados = resultados.filter((resultado) => resultado.enviado).length;
+  const omitidos = resultados.filter((resultado) => !resultado.enviado);
+
+  const porMotivo = new Map<string, number>();
+  for (const resultado of omitidos) {
+    const motivo = resultado.motivo ?? 'desconocido';
+    porMotivo.set(motivo, (porMotivo.get(motivo) ?? 0) + 1);
+  }
+  const detalle = [...porMotivo]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .map(([motivo, cantidad]) => `${motivo}: ${cantidad}`)
+    .join(', ');
+
+  return `tenants: ${resultados.length + fallidos} — enviados: ${enviados}, omitidos: ${omitidos.length}${detalle ? ` (${detalle})` : ''}, fallidos: ${fallidos}`;
+}
+
+/**
  * Todo el trabajo de un tenant para el recordatorio diario, en el
  * orden de las reglas obligatorias: datos completos (regla 5) →
  * silencio si ya hubo actividad (regla 2) → no duplicar → frecuencia

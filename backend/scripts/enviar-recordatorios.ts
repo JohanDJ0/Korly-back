@@ -14,7 +14,12 @@
  * aceptable para un aviso informativo, no para un movimiento del ledger.
  */
 import 'dotenv/config';
-import { listarTenantIdsConRecordatoriosActivos, procesarRecordatorioDiarioDeTenant } from '../src/modulos/notificaciones/enviar-recordatorios.js';
+import {
+  listarTenantIdsConRecordatoriosActivos,
+  procesarRecordatorioDiarioDeTenant,
+  resumirCorrida,
+  type ResultadoRecordatorioDiario,
+} from '../src/modulos/notificaciones/enviar-recordatorios.js';
 import { inicializarObservabilidad, reportarErrorInesperado } from '../src/shared/observabilidad.js';
 import { ahoraEnMexico } from '../src/shared/fechas.js';
 
@@ -24,18 +29,12 @@ async function main() {
   const fechaReferencia = ahoraEnMexico();
   const tenantIds = await listarTenantIdsConRecordatoriosActivos();
 
-  let enviados = 0;
-  let omitidos = 0;
+  const resultados: ResultadoRecordatorioDiario[] = [];
   let fallidos = 0;
 
   for (const tenantId of tenantIds) {
     try {
-      const resultado = await procesarRecordatorioDiarioDeTenant(tenantId, fechaReferencia);
-      if (resultado.enviado) {
-        enviados++;
-      } else {
-        omitidos++;
-      }
+      resultados.push(await procesarRecordatorioDiarioDeTenant(tenantId, fechaReferencia));
     } catch (error) {
       fallidos++;
       console.error(`[recordatorios] tenant ${tenantId} falló:`, error);
@@ -43,7 +42,7 @@ async function main() {
     }
   }
 
-  console.log(`[recordatorios] tenants: ${tenantIds.length} — enviados: ${enviados}, omitidos: ${omitidos}, fallidos: ${fallidos}`);
+  console.log(`[recordatorios] ${resumirCorrida(resultados, fallidos)}`);
 }
 
 main()
