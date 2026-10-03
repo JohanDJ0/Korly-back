@@ -1825,10 +1825,31 @@ y verificado en Resend vía los registros DNS que Resend pide (DKIM TXT
 + dos CNAME de SPF + TXT de DMARC opcional), todos con proxy de
 Cloudflare **apagado** — un CNAME/TXT de verificación de correo tiene
 que resolver al valor real, no a la IP del proxy de Cloudflare.
-`RESEND_REMITENTE` ya apunta a `hola@korly.com.mx`. Probado con un
-envío real directo contra la API de Resend (sin pasar por la app,
-para aislar la variable): llegó a la bandeja principal, no a spam —
-confirma que SPF/DKIM/DMARC quedaron bien configurados.
+`RESEND_REMITENTE` apunta a `Korly <recordatorios@korly.com.mx>` (antes
+`hola@`, demasiado informal). Probado con un envío real directo contra la
+API de Resend (sin pasar por la app, para aislar la variable): llegó a la
+bandeja principal, no a spam — confirma que SPF/DKIM/DMARC quedaron bien
+configurados.
+
+### Dominios y direcciones de correo
+
+| Qué | Dónde |
+|---|---|
+| App | `https://app.korly.com.mx` (Vercel, CNAME `app`, proxy de Cloudflare apagado) |
+| API | `https://api.korly.com.mx` (Railway; CNAME `api` + TXT `_railway-verify.api`) |
+| Recordatorios (envío) | `Korly <recordatorios@korly.com.mx>` vía Resend |
+| Correos de cuenta (envío) | `Korly <no-responder@korly.com.mx>`: confirmación, recuperar contraseña (Supabase → SMTP de Resend) |
+| Respuestas y contacto (recepción) | `soporte@korly.com.mx` y `privacidad@korly.com.mx` → reenvío de Cloudflare Email Routing |
+
+- Resend solo **envía**; para **recibir** se usa Cloudflare Email Routing (MX en
+  la raíz). El envío de Resend va por los subdominios `send.` y `rsend.`, así que
+  no chocan. El *catch-all* está apagado a propósito: una dirección inventada
+  rebota en vez de llegar a la bandeja.
+- Los HTML de los correos de Supabase están en `docs/correos-supabase/` y se
+  generan con `npx tsx scripts/generar-plantillas-supabase.ts` (no se editan a
+  mano; el texto vive en `src/shared/plantillas-supabase.ts`). El recordatorio usa
+  el mismo molde (`src/shared/plantilla-correo.ts`).
+- `CORS_ORIGIN` acepta una lista separada por comas **sin espacios**.
 
 **Nota del registro `.com.mx`:** no admite privacidad de WHOIS por
 política del registro (no es específico de Cloudflare) — los datos de

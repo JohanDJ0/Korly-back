@@ -4,6 +4,7 @@ import { recordatoriosEnviados } from '../../db/schema/recordatorios.js';
 import { tenants } from '../../db/schema/tenants.js';
 import { consultarDisponible, type DisponibleOk } from '../disponible/consultar-disponible.js';
 import { enviarCorreo } from '../../shared/email.js';
+import { CORREO_SOPORTE, renderizarCorreo } from '../../shared/plantilla-correo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { dbAdmin } from '../../shared/db-admin.js';
 import { fechaISO } from '../../shared/fechas.js';
@@ -157,17 +158,37 @@ export async function procesarRecordatorioDiarioDeTenant(
 
     await enviarCorreo({
       para: correo,
-      asunto: `Hoy puedes gastar hasta ${formatearMontoMXN(disponible.cifraDiariaValorMinimo)}`,
-      textoPlano: construirTextoRecordatorio(disponible),
+      responderA: CORREO_SOPORTE,
+      ...construirCorreoRecordatorio(disponible, process.env.FRONTEND_URL ?? 'http://localhost:5173'),
     });
 
     return { tenantId, enviado: true };
   });
 }
 
-function construirTextoRecordatorio(disponible: DisponibleOk): string {
+/**
+ * Asunto, HTML y texto plano del recordatorio diario. La cifra accionable va
+ * primero y en grande (regla 1, documento-maestro-v2.md §13.4): lo que se
+ * lee en la bandeja sin abrir el correo es "Hoy puedes gastar hasta $X".
+ */
+export function construirCorreoRecordatorio(disponible: DisponibleOk, urlApp: string): { asunto: string; html: string; textoPlano: string } {
+  const cifraDiaria = formatearMontoMXN(disponible.cifraDiariaValorMinimo);
   const dias = disponible.diasRestantes === 1 ? '1 día' : `${disponible.diasRestantes} días`;
-  return `Te quedan ${dias} con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible — hoy puedes gastar hasta ${formatearMontoMXN(disponible.cifraDiariaValorMinimo)}.`;
+
+  const { html, textoPlano } = renderizarCorreo(
+    {
+      preencabezado: `Te quedan ${dias} con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible.`,
+      titulo: 'Tu recordatorio de hoy',
+      parrafos: [`Te quedan ${dias} de tu quincena con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible.`],
+      cifra: { etiqueta: 'Hoy puedes gastar hasta', valor: cifraDiaria },
+      boton: { texto: 'Registrar un gasto', url: urlApp },
+      enlaceAlterno: false,
+      pie: ['Recibes este recordatorio porque lo activaste en Korly. Puedes desactivarlo en Ajustes.'],
+    },
+    { urlApp }
+  );
+
+  return { asunto: `Hoy puedes gastar hasta ${cifraDiaria}`, html, textoPlano };
 }
 
 /**

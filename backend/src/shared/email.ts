@@ -10,6 +10,10 @@ export interface CorreoEntrada {
   para: string;
   asunto: string;
   textoPlano: string;
+  /** Versión con diseño (ver plantilla-correo.ts); el texto plano queda como alternativa. */
+  html?: string;
+  /** A dónde llegan las respuestas, cuando el remitente es una dirección de "no responder". */
+  responderA?: string;
 }
 
 /**
@@ -44,6 +48,8 @@ export async function enviarCorreo(entrada: CorreoEntrada): Promise<void> {
     to: entrada.para,
     subject: entrada.asunto,
     text: entrada.textoPlano,
+    ...(entrada.html ? { html: entrada.html } : {}),
+    ...(entrada.responderA ? { replyTo: entrada.responderA } : {}),
   });
   if (error) {
     throw new Error(`Resend rechazó el envío: ${error.message}`);

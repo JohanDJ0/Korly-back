@@ -12,7 +12,7 @@ export const RESPONSABLE = {
   /** Domicilio para oír y recibir notificaciones. */
   domicilio: PENDIENTE,
   /** Correo al que se dirigen las solicitudes de derechos ARCO. */
-  correoArco: 'hola@korly.com.mx',
+  correoArco: 'privacidad@korly.com.mx',
 } as const;
 
 /** Versión del texto que acepta el usuario al registrarse — se guarda junto con la fecha como constancia del consentimiento. */
