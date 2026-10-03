@@ -25,7 +25,8 @@ export async function rutasSuscripciones(app: FastifyInstance): Promise<void> {
     reply.send(await obtenerEstadoSuscripcion(request.identidad.tenantId));
   });
 
-  app.post('/suscripcion/checkout', async (request, reply) => {
+  // Cada llamada crea una sesión (y a veces un Customer) en Stripe: límite estricto para no gastar cuota ni ensuciar la cuenta.
+  app.post('/suscripcion/checkout', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const body = request.body as CrearCheckoutBody | undefined;
     if (body?.intervalo !== 'mensual' && body?.intervalo !== 'anual') {
       throw new ErrorDominio('VALIDACION', "El campo 'intervalo' es obligatorio y debe ser 'mensual' o 'anual'");
@@ -40,7 +41,7 @@ export async function rutasSuscripciones(app: FastifyInstance): Promise<void> {
     reply.send(sesion);
   });
 
-  app.post('/suscripcion/portal', async (request, reply) => {
+  app.post('/suscripcion/portal', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
     const sesion = await crearSesionPortal({
       tenantId: request.identidad.tenantId,
       urlRetorno: `${urlFrontend()}/ajustes`,

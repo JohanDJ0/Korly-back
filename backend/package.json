@@ -17,6 +17,8 @@
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
+    "@fastify/helmet": "^13.1.1",
+    "@fastify/rate-limit": "^11.2.0",
     "@sentry/node": "^10.74.0",
     "@supabase/supabase-js": "^2.112.2",
     "dotenv": "^16.4.5",
@@ -25,13 +27,13 @@
     "fastify-plugin": "^5.0.1",
     "postgres": "^3.4.5",
     "resend": "^6.28.1",
-    "stripe": "^22.6.2"
+    "stripe": "^22.6.2",
+    "tsx": "^4.19.2"
   },
   "devDependencies": {
     "@types/node": "^22.16.0",
     "drizzle-kit": "^0.31.10",
     "embedded-postgres": "^18.4.0-beta.17",
-    "tsx": "^4.19.2",
     "typescript": "^5.7.3",
     "vitest": "^4.1.10"
   },

@@ -19,7 +19,8 @@ export async function rutasWebhookStripe(app: FastifyInstance): Promise<void> {
     done(null, body);
   });
 
-  app.post('/stripe', async (request, reply) => {
+  // Sin límite: Stripe reintenta y manda ráfagas legítimas; la defensa es la firma, que se verifica antes de tocar nada.
+  app.post('/stripe', { config: { rateLimit: false } }, async (request, reply) => {
     const firma = request.headers['stripe-signature'];
     if (typeof firma !== 'string') {
       return reply.code(400).send({ codigo: 'FIRMA_FALTANTE', mensaje: 'Falta el encabezado Stripe-Signature' });

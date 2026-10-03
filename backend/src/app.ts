@@ -1,5 +1,9 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import rateLimit from '@fastify/rate-limit';
+import { sql } from 'drizzle-orm';
+import { db } from './shared/db.js';
 import { authPlugin } from './shared/auth.js';
 import { registrarManejadorErroresDominio } from './shared/http.js';
 import { rutasPeriodos } from './modulos/periodos/rutas.js';
@@ -19,8 +23,30 @@ import { rutasDesglose } from './modulos/desglose/rutas.js';
 import { rutasCuenta } from './modulos/cuenta/rutas.js';
 import { rutasWebhookStripe } from './modulos/suscripciones/rutas-webhook.js';
 
-export function crearApp() {
-  const app = Fastify({ logger: true });
+export interface OpcionesApp {
+  /** Peticiones por minuto, por IP y por ruta. Por defecto `RATE_LIMIT_POR_MINUTO` o 600. */
+  limitePorMinuto?: number;
+  /** Por defecto `true`; las pruebas lo apagan. */
+  logger?: boolean;
+  /**
+   * Por defecto `TRUST_PROXY === 'true'`. Detrás de un proxy (Railway,
+   * Cloudflare...) TODOS los requests llegan desde la IP del proxy: sin
+   * esto, el límite por IP sería uno solo compartido por todos los
+   * usuarios. Pero activado sin proxy delante, cualquiera puede falsear
+   * `X-Forwarded-For` y esquivar el límite — por eso es opt-in explícito.
+   */
+  trustProxy?: boolean;
+}
+
+const LIMITE_POR_MINUTO_POR_DEFECTO = 600;
+
+function limiteDesdeEntorno(): number {
+  const valor = Number(process.env.RATE_LIMIT_POR_MINUTO);
+  return Number.isFinite(valor) && valor > 0 ? valor : LIMITE_POR_MINUTO_POR_DEFECTO;
+}
+
+export function crearApp(opciones: OpcionesApp = {}) {
+  const app = Fastify({ logger: opciones.logger ?? true, trustProxy: opciones.trustProxy ?? process.env.TRUST_PROXY === 'true' });
   registrarManejadorErroresDominio(app);
 
   /**
@@ -57,8 +83,59 @@ export function crearApp() {
     credentials: true,
   });
 
-  // Fuera de /v1 y sin auth: healthcheck de infraestructura, no de dominio.
-  app.get('/salud', async () => ({ estado: 'ok' }));
+  /**
+   * Cabeceras de seguridad estándar (nosniff, HSTS, no-referrer...). Es una
+   * API JSON, no sirve HTML, así que el valor es modesto pero gratis.
+   * `Cross-Origin-Resource-Policy: cross-origin` porque el frontend vive
+   * en otro origen — el valor por defecto de helmet (`same-origin`) es para
+   * recursos que no se piden desde otro sitio.
+   */
+  app.register(helmet, { crossOriginResourcePolicy: { policy: 'cross-origin' } });
+
+  /**
+   * Límite de peticiones por IP. El contador global es **uno solo**,
+   * compartido por todas las rutas sin configuración propia; las rutas con
+   * `config.rateLimit` (cuenta, suscripción...) llevan un contador aparte y
+   * mucho más estricto. Generoso por defecto — la app hace varias
+   * peticiones por pantalla y refresca sola — porque está para frenar
+   * inundaciones y abuso, no para dosificar a un usuario normal. El contador
+   * vive en memoria: vale con una sola instancia; con varias habría que
+   * moverlo a un almacén compartido.
+   *
+   * Corre ANTES de la autenticación (que por eso vive en `preValidation`,
+   * ver shared/auth.ts), así que también frena a quien manda tokens falsos
+   * y, con ello, las llamadas a Supabase Auth que cada uno provocaría.
+   */
+  app.register(rateLimit, {
+    global: true,
+    max: opciones.limitePorMinuto ?? limiteDesdeEntorno(),
+    timeWindow: '1 minute',
+    errorResponseBuilder: (_request, contexto) => ({
+      statusCode: 429,
+      error: 'Too Many Requests',
+      message: `Demasiadas solicitudes. Intenta de nuevo en ${Math.max(1, Math.ceil(contexto.ttl / 1000))} segundos.`,
+    }),
+  });
+
+  // Fuera de /v1 y sin auth: healthchecks de infraestructura, no de dominio.
+  // Sin límite de peticiones: el orquestador los llama a intervalo fijo.
+  app.get('/salud', { config: { rateLimit: false } }, async () => ({ estado: 'ok' }));
+
+  /**
+   * "Listo para recibir tráfico": además de estar vivo, la base de datos
+   * contesta. Distinto de `/salud` a propósito — si la base cae, reiniciar
+   * el proceso no la arregla; esto sirve para que el balanceador deje de
+   * mandarle tráfico, no para matar el contenedor.
+   */
+  app.get('/salud/listo', { config: { rateLimit: false } }, async (_request, reply) => {
+    try {
+      await db.execute(sql`select 1`);
+      return { estado: 'ok' };
+    } catch (error) {
+      app.log.error(error);
+      return reply.code(503).send({ estado: 'sin_base_de_datos' });
+    }
+  });
 
   app.register(
     async (v1) => {

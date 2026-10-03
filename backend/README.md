@@ -2108,6 +2108,76 @@ tenant, Stripe/Auth con fallos, y que ni el rol de la aplicación ni la
 conexión de administración sin declarar (ni siquiera una purga declarada,
 para un `UPDATE`) pueden saltarse el candado.
 
+## Endurecimiento y despliegue
+
+Lo necesario para abrir la app a usuarios reales, sin atarla a un hosting.
+
+**Límite de peticiones** (`@fastify/rate-limit`, `app.ts`). Un contador por
+IP compartido por todas las rutas normales (600/min por defecto,
+`RATE_LIMIT_POR_MINUTO`) y contadores propios, mucho más estrictos, en las
+rutas sensibles: eliminar cuenta 5/hora, descargar datos 10/hora, checkout y
+portal de Stripe 10/min. Healthchecks y webhook de Stripe no se limitan (su
+defensa es la firma). Responde 429 con `{codigo: "DEMASIADAS_SOLICITUDES"}` y
+`Retry-After`. El contador es en memoria: vale con una sola instancia.
+**Hallazgo al probarlo:** el hook del límite es por ruta y corría *después*
+del de autenticación (que respondía 401 antes de contar), así que quien
+mandaba tokens falsos nunca se contaba — justo el abuso que había que frenar,
+y cada uno costaba una llamada a Supabase Auth. Por eso la autenticación pasó
+de `onRequest` a `preValidation` (`shared/auth.ts`); el preflight CORS no se
+afecta (lo responde @fastify/cors antes).
+
+**`TRUST_PROXY`.** Detrás de un proxy todos los requests llegan desde su IP:
+sin esto el límite sería uno solo para todos los usuarios. Pero activado sin
+proxy, cualquiera falsea `X-Forwarded-For`. Por eso es opt-in (`true` solo si
+hay proxy); ambos comportamientos tienen prueba.
+
+**Cabeceras** (`@fastify/helmet`): nosniff, HSTS, etc.; `Cross-Origin-Resource-Policy:
+cross-origin` porque el frontend vive en otro origen.
+
+**Sentry sin datos financieros** (`limpiarEventoSentry`). Un error de Drizzle
+trae los *valores* de la consulta en el mensaje (`params: tacos con Laura,123450`):
+montos, notas y nombres, hacia un tercero. Se quitan antes de enviar; el SQL
+parametrizado se conserva. También `sendDefaultPii: false` explícito.
+
+**Validación del entorno al arrancar** (`shared/entorno.ts`, primer import de
+`server.ts`). Solo con `NODE_ENV=production`; lista *todos* los problemas a la
+vez y sale con código 1: variables obligatorias, `APP_DATABASE_URL` con un rol
+que no sea `app_backend` o igual a `DATABASE_URL` (el servidor se saltaría RLS,
+ADR-005), `CORS_ORIGIN`/`FRONTEND_URL` ausentes o en localhost (fallan en
+silencio: rompen el frontend o mandan al usuario de Stripe a `localhost`), y
+Stripe a medias (aceptaría cobros pero nunca activaría el plan). Faltar
+Resend, Sentry o `TRUST_PROXY` solo avisa.
+
+**`/salud` y `/salud/listo`.** `/salud` = vivo (para reiniciar el contenedor);
+`/salud/listo` = vivo *y* la base contesta, 503 si no (para que el balanceador
+deje de mandarle tráfico: reiniciar no arregla una base caída).
+
+**Cierre ordenado:** `SIGTERM`/`SIGINT` cierran el servidor dejando terminar
+las peticiones en curso (un cobro, una purga de cuenta) y salen con código 0.
+
+**Imagen** (`Dockerfile`, `.dockerignore`). Multi-etapa; una imagen, dos
+comandos: la API (`node dist/server.js`) y el Cron Job de recordatorios
+(`npx tsx scripts/enviar-recordatorios.ts`, por eso `tsx` pasó a
+`dependencies`). Las migraciones **no** corren en la imagen: se aplican a mano
+con `npm run db:migrate` desde una máquina de confianza, como hasta ahora.
+**No se pudo construir en esta máquina (no hay Docker)**; en su lugar se
+reprodujeron sus pasos: compilar, `npm ci --omit=dev` en una carpeta limpia y
+arrancar `node dist/server.js` desde ahí con y sin entorno válido, comprobando
+cabeceras, `/salud/listo`, 401 sin token y CORS. Falta probar la construcción
+real y el `HEALTHCHECK` la primera vez que haya Docker.
+
+**Pendiente, depende del hosting:** el frontend es una SPA estática (cualquier
+host estático con fallback a `index.html`); `TRUST_PROXY=true` y las variables
+de producción en el panel del host; registrar el webhook de Stripe en el
+dashboard (hoy solo existe con `stripe listen`); el Cron Job de recordatorios.
+Un almacén compartido para el límite de peticiones si algún día hay más de una
+instancia.
+
+30 tests nuevos entre `test/integracion/endurecimiento.test.ts` (límites,
+exenciones, `X-Forwarded-For` con y sin `trustProxy`, cabeceras, `/salud/listo`
+y regresión de la autenticación con un token simulado),
+`test/unidad/entorno.test.ts` y el filtro de Sentry.
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

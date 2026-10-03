@@ -14,7 +14,7 @@ interface EliminarCuentaBody {
  */
 export async function rutasCuenta(app: FastifyInstance): Promise<void> {
   /** Sin gate de plan, a propósito: ver los propios datos no es una función de pago. */
-  app.get('/cuenta/datos', async (request, reply) => {
+  app.get('/cuenta/datos', { config: { rateLimit: { max: 10, timeWindow: '1 hour' } } }, async (request, reply) => {
     const datos = await exportarDatosCuenta(request.identidad.tenantId);
     reply
       .header('Content-Type', 'application/json; charset=utf-8')
@@ -27,7 +27,8 @@ export async function rutasCuenta(app: FastifyInstance): Promise<void> {
    * todos los clientes/proxies aceptan cuerpo en un DELETE. El tenant sale
    * siempre de la identidad verificada, nunca del cuerpo.
    */
-  app.post('/cuenta/eliminar', async (request, reply) => {
+  // Irreversible: 5 intentos por hora de sobra para un error de tecleo, muy poco para quien adivina.
+  app.post('/cuenta/eliminar', { config: { rateLimit: { max: 5, timeWindow: '1 hour' } } }, async (request, reply) => {
     const body = request.body as EliminarCuentaBody | undefined;
     const resultado = await eliminarCuenta(request.identidad.tenantId, body?.confirmacion);
     reply.send(resultado);

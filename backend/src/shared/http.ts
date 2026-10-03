@@ -89,7 +89,9 @@ export function registrarManejadorErroresDominio(app: FastifyInstance): void {
     const errorConStatus = error as { statusCode?: number; message: string };
     const statusDeFastify = errorConStatus.statusCode;
     if (statusDeFastify && statusDeFastify >= 400 && statusDeFastify < 500) {
-      reply.code(statusDeFastify).send({ codigo: 'SOLICITUD_INVALIDA', mensaje: errorConStatus.message });
+      // 429 lo genera @fastify/rate-limit (app.ts): código propio para que el cliente distinga "ve más despacio" de "tu solicitud está mal".
+      const codigo = statusDeFastify === 429 ? 'DEMASIADAS_SOLICITUDES' : 'SOLICITUD_INVALIDA';
+      reply.code(statusDeFastify).send({ codigo, mensaje: errorConStatus.message });
       return;
     }
 
