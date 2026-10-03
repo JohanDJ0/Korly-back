@@ -31,6 +31,7 @@ export function useImportar() {
       void queryClient.invalidateQueries({ queryKey: [tipo, periodoId] });
       void queryClient.invalidateQueries({ queryKey: ['periodo-activo'] });
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
     },
   });
 }

@@ -10,6 +10,7 @@ import { SelectorCategoria } from '@/components/SelectorCategoria';
 import { useRegistrarCargo } from '@/hooks/use-registrar-cargo';
 
 const PLAZOS_MSI = [3, 6, 9, 12, 18] as const;
+const OTRO_PLAZO = 'otro';
 
 const esquemaCargo = z.object({
   descripcion: z.string().trim().min(1, "Descríbelo (p. ej. 'Laptop')"),
@@ -26,14 +27,22 @@ interface FormularioCargoProps {
 
 /**
  * `numeroPlazos` vive fuera de react-hook-form (no es un campo de texto
- * libre, es una elección entre "de contado" y los plazos de MSI que de
- * verdad ofrecen los bancos) — mismo criterio que `categoriaId` en
- * FormularioGasto.tsx.
+ * libre en el caso común, es una elección entre "de contado" y los
+ * plazos de MSI que de verdad ofrecen los bancos) — mismo criterio que
+ * `categoriaId` en FormularioGasto.tsx. "Otro" revela un número libre
+ * para el caso de una compra que ya traías de antes de usar Korly con
+ * un número de pagos restantes que no es ninguno de los MSI estándar
+ * (p. ej. una compra a 12 meses de la que ya pagaste 5 — ahí van 7, no
+ * 12; ver el aviso de "saldo restante" más abajo).
  */
 export function FormularioCargo({ tarjetaId, onRegistrado }: FormularioCargoProps) {
   const registrarCargo = useRegistrarCargo();
-  const [numeroPlazos, setNumeroPlazos] = useState(1);
+  const [seleccionPlazo, setSeleccionPlazo] = useState<number | typeof OTRO_PLAZO>(1);
+  const [plazoLibre, setPlazoLibre] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
+
+  const numeroPlazos = seleccionPlazo === OTRO_PLAZO ? Number(plazoLibre) : seleccionPlazo;
+  const numeroPlazosValido = Number.isInteger(numeroPlazos) && numeroPlazos >= 1;
 
   const {
     register,
@@ -43,6 +52,7 @@ export function FormularioCargo({ tarjetaId, onRegistrado }: FormularioCargoProp
   } = useForm<CargoFormEntrada, unknown, CargoFormSalida>({ resolver: zodResolver(esquemaCargo) });
 
   function onSubmit(datos: CargoFormSalida) {
+    if (!numeroPlazosValido) return;
     registrarCargo.mutate(
       {
         tarjetaId,
@@ -54,7 +64,8 @@ export function FormularioCargo({ tarjetaId, onRegistrado }: FormularioCargoProp
       {
         onSuccess: () => {
           reset();
-          setNumeroPlazos(1);
+          setSeleccionPlazo(1);
+          setPlazoLibre('');
           setCategoriaId('');
           onRegistrado?.();
         },
@@ -80,8 +91,8 @@ export function FormularioCargo({ tarjetaId, onRegistrado }: FormularioCargoProp
         <Label htmlFor="plazos-cargo">Plazo</Label>
         <select
           id="plazos-cargo"
-          value={numeroPlazos}
-          onChange={(evento) => setNumeroPlazos(Number(evento.target.value))}
+          value={seleccionPlazo}
+          onChange={(evento) => setSeleccionPlazo(evento.target.value === OTRO_PLAZO ? OTRO_PLAZO : Number(evento.target.value))}
           className="border-input flex h-9 w-full rounded-md border bg-transparent px-3 py-1 text-sm shadow-xs outline-none"
         >
           <option value={1}>De contado (1 pago)</option>
@@ -90,7 +101,33 @@ export function FormularioCargo({ tarjetaId, onRegistrado }: FormularioCargoProp
               {plazos} meses sin intereses
             </option>
           ))}
+          <option value={OTRO_PLAZO}>Otro número de plazos…</option>
         </select>
+        {seleccionPlazo === OTRO_PLAZO && (
+          <Input
+            type="number"
+            step="1"
+            min="1"
+            inputMode="numeric"
+            placeholder="Número de plazos"
+            value={plazoLibre}
+            onChange={(evento) => setPlazoLibre(evento.target.value)}
+            aria-label="Número de plazos"
+          />
+        )}
+        {/*
+          No es un campo nuevo ni una validación nueva — es la misma
+          "Monto total"/"Plazo" de siempre, usadas para representar lo
+          que falta en vez de lo original. Sin esto, no había ninguna
+          forma de registrar bien una compra que ya traías a medias al
+          empezar a usar Korly (hallazgo real: se intentó anotar una
+          compra a 12 MSI ya con varios pagos hechos, y no había dónde
+          decir "van 5 pagados, faltan 7").
+        */}
+        <p className="text-muted-foreground text-xs">
+          ¿Esta compra ya tenía pagos hechos antes de usar Korly? Pon aquí el <strong>saldo que aún debes</strong>, y en plazo los{' '}
+          <strong>pagos que te faltan</strong> — no el monto ni el plazo originales.
+        </p>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -98,8 +135,11 @@ export function FormularioCargo({ tarjetaId, onRegistrado }: FormularioCargoProp
         <SelectorCategoria id="categoria-cargo" value={categoriaId} onChange={setCategoriaId} />
       </div>
 
+      {seleccionPlazo === OTRO_PLAZO && plazoLibre.length > 0 && !numeroPlazosValido && (
+        <p className="text-sm text-destructive">El número de plazos debe ser un entero de 1 o más</p>
+      )}
       {registrarCargo.isError && <p className="text-sm text-destructive">{registrarCargo.error.message}</p>}
-      <Button type="submit" disabled={registrarCargo.isPending}>
+      <Button type="submit" disabled={registrarCargo.isPending || !numeroPlazosValido}>
         {registrarCargo.isPending ? 'Guardando…' : 'Registrar cargo'}
       </Button>
     </form>

@@ -1,5 +1,5 @@
 import { existeIngresoParaPeriodo } from '../ingresos/registrar-ingreso.js';
-import { obtenerNetoCuentaEnFecha, obtenerSaldoCuenta } from '../ledger/registrar-movimiento.js';
+import { existeActividadCuentaEnFecha, obtenerNetoCuentaEnFecha, obtenerSaldoCuenta } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivo } from '../periodos/crear-periodo.js';
 import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
 import { calcularDiasRestantes, pisoDivisionBigInt } from './motor-flujo-caja.js';
@@ -12,6 +12,16 @@ export interface DisponibleOk {
   cifraDiariaValorMinimo: bigint;
   /** Cuánto se ha gastado (neto, tras restas por reversión) específicamente hoy. Nunca negativo. */
   gastadoHoyValorMinimo: bigint;
+  /**
+   * `gastadoHoyValorMinimo === 0n` NO significa "no pasó nada hoy" — un
+   * retiro de meta que cubre un gasto el mismo día también da neto cero
+   * (ver el comentario grande más abajo). Este campo sí distingue "nada
+   * pasó" de "pasó algo pero se canceló": existe para que el frontend
+   * (`RecordatorioContextual.tsx`) deje de usar `gastadoHoy === 0` como
+   * proxy de "sin actividad hoy" — hallazgo real, reportado por el
+   * usuario contra su cuenta real.
+   */
+  huboActividadHoy: boolean;
   calculadoEn: Date;
 }
 
@@ -57,18 +67,36 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * menos) y `díasRestantes` bajó uno - ahí es donde ocurre la
  * redistribución, nunca a mitad del mismo día.
  *
- * **Por qué el corte se restringe a `['gasto', 'aporte_meta']` y no al
- * neto de "todo lo de hoy":** se probó primero con el neto de TODOS los
- * asientos de hoy, y falla justo en el caso más común - el día 1, con
- * el ingreso y el primer gasto fechados el mismo día. Un ingreso de
- * 5000 y un gasto de 555 el mismo día dan un neto de +4445 (positivo),
+ * **Por qué el corte se restringe a `['gasto', 'aporte_meta', 'retiro_meta']`
+ * y no al neto de "todo lo de hoy":** se probó primero con el neto de
+ * TODOS los asientos de hoy, y falla justo en el caso más común - el día
+ * 1, con el ingreso y el primer gasto fechados el mismo día. Un ingreso
+ * de 5000 y un gasto de 555 el mismo día dan un neto de +4445 (positivo),
  * así que "gastado hoy" habría salido en 0 - el gasto real quedó
  * escondido detrás del ingreso, más grande. Restringir a tipos
- * específicos evita que un ingreso (o un retiro de meta) del mismo día
- * tape un gasto real. `'aporte_meta'` se cuenta junto con `'gasto'`
- * porque modelo-dominio.md §6 confirma que un aporte "se trata como un
- * gasto más" — sin esto, aportar a una meta el mismo día no bajaría
- * "puedes gastar hoy" aunque sí baje `disponible`.
+ * específicos evita que un ingreso del mismo día tape un gasto real.
+ * `'aporte_meta'` se cuenta junto con `'gasto'` porque modelo-dominio.md
+ * §6 confirma que un aporte "se trata como un gasto más" — sin esto,
+ * aportar a una meta el mismo día no bajaría "puedes gastar hoy" aunque
+ * sí baje `disponible`.
+ *
+ * **`'retiro_meta'` entra a este mismo corte (hallazgo real, reportado
+ * por el usuario contra su cuenta real)** — a diferencia de un
+ * `'ingreso'` normal, que debe quedar FUERA para no tapar un gasto real
+ * del mismo día (ver arriba), un retiro de meta que el usuario usa para
+ * cubrir un gasto el mismo día es la situación contraria: sin este tipo
+ * en el corte, `objetivoHoy` repartía el retiro completo entre TODOS los
+ * días restantes (como ingreso nuevo) mientras `gastadoHoy` descontaba
+ * el gasto que cubrió completo solo de HOY — las dos mitades de la misma
+ * operación quedaban descompensadas entre sí, y un retiro usado el mismo
+ * día para pagar algo podía verse como "te excediste hoy" aunque ese
+ * dinero nunca salió del presupuesto diario, salió de la meta. Con
+ * `'retiro_meta'` en el corte, un retiro y el gasto que cubre el mismo
+ * día se cancelan entre sí en `gastadoHoy` — exactamente como si nunca
+ * hubieran pasado para la cifra de hoy — y solo en días sin un gasto que
+ * los compense su efecto neto sigue sumando de inmediato a `disponible`
+ * (igual que un ingreso), que es lo correcto: es dinero real que vuelve
+ * a estar disponible.
  *
  * **`obtenerNetoCuentaEnFecha` resuelve una reversión a lo que
  * revierte, no a `'reversion'` en sí (ver su comentario en
@@ -124,13 +152,22 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
   const disponibleValorMinimo = await obtenerSaldoCuenta(tenantId, periodo.cuentaId);
   const diasRestantes = calcularDiasRestantes(periodo.fechaFin, fechaReferencia);
 
-  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), ['gasto', 'aporte_meta'], {
+  const tiposActividadHoy = ['gasto', 'aporte_meta', 'retiro_meta'] as const;
+  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), [...tiposActividadHoy], {
     excluirGastosRecurrentes: true,
   });
   const gastadoHoyValorMinimo = netoGastosHoy < 0n ? -netoGastosHoy : 0n;
   const disponibleBaseHoy = disponibleValorMinimo + gastadoHoyValorMinimo;
   const objetivoHoy = pisoDivisionBigInt(disponibleBaseHoy, BigInt(diasRestantes));
   const cifraDiariaValorMinimo = objetivoHoy - gastadoHoyValorMinimo;
+
+  // Mismos tipos y misma exclusión de recurrentes que el corte de
+  // arriba — "hubo actividad" significa lo mismo que "el usuario decidió
+  // algo hoy", no "algo automático coincidió con hoy" (ver el comentario
+  // grande de esta función sobre pago_tarjeta/recurrentes).
+  const huboActividadHoy = await existeActividadCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), [...tiposActividadHoy], {
+    excluirGastosRecurrentes: true,
+  });
 
   return {
     estado: 'ok',
@@ -139,6 +176,7 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
     diasRestantes,
     cifraDiariaValorMinimo,
     gastadoHoyValorMinimo,
+    huboActividadHoy,
     calculadoEn: fechaReferencia,
   };
 }

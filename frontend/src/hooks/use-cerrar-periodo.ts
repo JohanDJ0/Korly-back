@@ -18,6 +18,7 @@ export function useCerrarPeriodo() {
     mutationFn: (periodoId: string) => apiFetch<Resumen>(`/periodos/${periodoId}/cerrar`, { method: 'POST' }),
     onSuccess: (resumen) => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
       void queryClient.invalidateQueries({ queryKey: ['periodo-activo'] });
       void queryClient.invalidateQueries({ queryKey: ['resumen-pendiente'] });
       queryClient.setQueryData(['resumen', resumen.periodoId], resumen);

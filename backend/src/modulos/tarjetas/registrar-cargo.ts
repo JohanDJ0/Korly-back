@@ -1,13 +1,15 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { cargosTarjeta, pagosTarjeta } from '../../db/schema/cargos-tarjeta.js';
+import { asientos, movimientos } from '../../db/schema/ledger.js';
 import { tarjetas } from '../../db/schema/tarjetas.js';
 import { obtenerCategoriaPorIdTx } from '../categorias/categorias.js';
-import { registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
-import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
+import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar-movimiento.js';
+import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { obtenerSaldoTarjetaTx, obtenerTarjetaPorIdTx } from './tarjetas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
+import { esUuidValido } from '../../shared/validacion.js';
 import { calcularVencimientoMensualidad } from './calcular-ciclo.js';
 
 async function resolverCategoriaIdTx(tx: Ejecutor, tenantId: string, categoriaId: string | null | undefined): Promise<string | null> {
@@ -157,6 +159,8 @@ export interface CargoDetallado {
   numeroPlazos: number;
   categoriaId: string | null;
   fechaCompra: string;
+  /** true si `eliminarCargoTarjeta` ya corrigió este cargo (mismo criterio que `revertido` en listarGastos). */
+  revertido: boolean;
   mensualidades: { numeroPago: number; montoValorMinimo: bigint; fechaVencimiento: string; pagado: boolean }[];
 }
 
@@ -177,10 +181,25 @@ export async function listarCargosTarjeta(tenantId: string, tarjetaId: string): 
         numeroPlazos: cargosTarjeta.numeroPlazos,
         categoriaId: cargosTarjeta.categoriaId,
         fechaCompra: cargosTarjeta.fechaCompra,
+        movimientoId: cargosTarjeta.movimientoId,
       })
       .from(cargosTarjeta)
       .where(and(eq(cargosTarjeta.tenantId, tenantId), eq(cargosTarjeta.tarjetaId, tarjetaId)))
       .orderBy(asc(cargosTarjeta.fechaCompra));
+
+    // Mismo criterio que listarGastos (registrar-gasto.ts): "¿ya se
+    // revirtió?" se responde con una segunda consulta sobre la misma
+    // tabla de movimientos, no con una columna de estado propia — el
+    // ledger ya lo sabe.
+    const movimientoIds = cargos.map((c) => c.movimientoId);
+    const revertidos =
+      movimientoIds.length === 0
+        ? []
+        : await tx
+            .select({ movimientoRevertidoId: movimientos.movimientoRevertidoId })
+            .from(movimientos)
+            .where(and(eq(movimientos.tenantId, tenantId), inArray(movimientos.movimientoRevertidoId, movimientoIds)));
+    const idsRevertidos = new Set(revertidos.map((fila) => fila.movimientoRevertidoId));
 
     const resultado: CargoDetallado[] = [];
     for (const cargo of cargos) {
@@ -197,6 +216,7 @@ export async function listarCargosTarjeta(tenantId: string, tarjetaId: string): 
 
       resultado.push({
         ...cargo,
+        revertido: idsRevertidos.has(cargo.movimientoId),
         mensualidades: pagos.map((p) => ({
           numeroPago: p.numeroPago,
           montoValorMinimo: p.montoValorMinimo,
@@ -206,6 +226,170 @@ export async function listarCargosTarjeta(tenantId: string, tarjetaId: string): 
       });
     }
     return resultado;
+  });
+}
+
+export interface EliminarCargoEntrada {
+  tenantId: string;
+  tarjetaId: string;
+  cargoId: string;
+  fechaReferencia?: Date;
+}
+
+export interface CargoCorregido {
+  mensualidadesRevertidas: number;
+  mensualidadesEliminadas: number;
+}
+
+/**
+ * `revertirMovimientoTx` (ledger/registrar-movimiento.ts) asume una sola
+ * pata "real" (cuenta) y una externa (`cuentaId: null`) — cierto para
+ * gastos/ingresos/cargo_tarjeta, falso para `pago_tarjeta`, que es una
+ * transferencia interna con DOS patas reales (periodo ↔ tarjeta, mismo
+ * patrón que `arrastre_sobrante`). Reutilizar el helper genérico ahí
+ * redirigiría las DOS patas a `cuentaDestino`, dejando la pata de la
+ * tarjeta sin revertir de verdad — hallazgo real, atrapado por el test
+ * de esta función. Esta versión solo redirige la pata del periodo (a
+ * la del periodo activo de hoy, igual que cualquier corrección); la de
+ * la tarjeta se revierte contra sí misma.
+ */
+async function revertirPagoTarjetaTx(
+  tx: Ejecutor,
+  tenantId: string,
+  pagoMovimientoId: string,
+  tarjetaCuentaId: string,
+  periodoActivoCuentaId: string,
+  fechaEfectiva: string,
+  nota: string
+): Promise<void> {
+  const [movimientoOriginal] = await tx
+    .select({ moneda: movimientos.moneda })
+    .from(movimientos)
+    .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.id, pagoMovimientoId)))
+    .limit(1);
+  if (!movimientoOriginal) throw new Error('No se encontró el pago de tarjeta a revertir');
+
+  const asientosOriginales = await tx
+    .select({ cuentaId: asientos.cuentaId, montoValorMinimo: asientos.montoValorMinimo })
+    .from(asientos)
+    .where(and(eq(asientos.tenantId, tenantId), eq(asientos.movimientoId, pagoMovimientoId)));
+
+  const partidasInvertidas = asientosOriginales.map((asiento) => ({
+    cuentaId: asiento.cuentaId === tarjetaCuentaId ? tarjetaCuentaId : periodoActivoCuentaId,
+    montoValorMinimo: -asiento.montoValorMinimo,
+  }));
+
+  await registrarMovimientoTx(tx, {
+    tenantId,
+    tipo: 'reversion',
+    moneda: movimientoOriginal.moneda,
+    fechaEfectiva,
+    nota,
+    movimientoRevertidoId: pagoMovimientoId,
+    partidas: partidasInvertidas,
+  });
+}
+
+/**
+ * Corrige un cargo mal registrado, siempre por reversión, nunca por
+ * borrado — ni siquiera cuando ninguna mensualidad había cobrado
+ * todavía. `asientos`/`movimientos` tienen un trigger de Postgres que
+ * rechaza cualquier `UPDATE`/`DELETE` sobre ellos sin excepción (ver
+ * `ledger_bloquear_mutacion`, migración 0002): ADR-001 aquí no es solo
+ * una convención de la aplicación, la base de datos misma lo impide.
+ * Un intento anterior de esta función borraba de verdad el movimiento
+ * del cargo cuando ninguna mensualidad se había cobrado — el propio
+ * trigger lo rechazó en pruebas contra Postgres real.
+ *
+ * Por eso una tarjeta con al menos un cargo, por corregido que esté,
+ * nunca vuelve a tener cero filas en `cargos_tarjeta` — `eliminarTarjeta`
+ * (tarjetas.ts) sigue bloqueada para siempre en cuanto existe un primer
+ * cargo, sin ningún caso especial que distinga "corregido" de "real".
+ *
+ * Lo que SÍ se revierte de verdad:
+ * - El movimiento del cargo, contra la propia cuenta de la tarjeta.
+ * - Cada mensualidad que YA se hubiera cobrado sola
+ *   (`materializarPagosTarjetaTx`), devolviendo ese dinero al disponible
+ *   del periodo ACTIVO de hoy — nunca al periodo original, que puede ya
+ *   estar cerrado (misma regla que `eliminarGasto`).
+ *
+ * Lo único que sí se borra: las mensualidades que todavía no se habían
+ * cobrado (`pagos_tarjeta` sin `movimiento_id`) — son solo una fecha
+ * programada a futuro, nunca generaron ningún asiento, así que borrarlas
+ * no choca con ningún trigger ni con ADR-001.
+ */
+export async function eliminarCargoTarjeta(entrada: EliminarCargoEntrada): Promise<CargoCorregido> {
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
+
+  return conTenant(entrada.tenantId, async (tx) => {
+    if (!esUuidValido(entrada.cargoId)) {
+      throw new ErrorDominio('CARGO_NO_ENCONTRADO', 'El cargo especificado no existe');
+    }
+
+    const [cargo] = await tx
+      .select({ id: cargosTarjeta.id, movimientoId: cargosTarjeta.movimientoId, tarjetaId: cargosTarjeta.tarjetaId })
+      .from(cargosTarjeta)
+      .where(and(eq(cargosTarjeta.tenantId, entrada.tenantId), eq(cargosTarjeta.id, entrada.cargoId), eq(cargosTarjeta.tarjetaId, entrada.tarjetaId)))
+      .limit(1);
+    if (!cargo) {
+      throw new ErrorDominio('CARGO_NO_ENCONTRADO', 'El cargo especificado no existe');
+    }
+
+    const [reversionExistente] = await tx
+      .select({ id: movimientos.id })
+      .from(movimientos)
+      .where(and(eq(movimientos.tenantId, entrada.tenantId), eq(movimientos.movimientoRevertidoId, cargo.movimientoId)))
+      .limit(1);
+    if (reversionExistente) {
+      throw new ErrorDominio('CARGO_YA_REVERTIDO', 'Este cargo ya fue corregido antes');
+    }
+
+    const tarjeta = await obtenerTarjetaPorIdTx(tx, entrada.tenantId, cargo.tarjetaId);
+    if (!tarjeta) {
+      throw new ErrorDominio('TARJETA_NO_ENCONTRADA', 'La tarjeta especificada no existe');
+    }
+
+    const pagos = await tx
+      .select({ id: pagosTarjeta.id, movimientoId: pagosTarjeta.movimientoId })
+      .from(pagosTarjeta)
+      .where(and(eq(pagosTarjeta.tenantId, entrada.tenantId), eq(pagosTarjeta.cargoTarjetaId, cargo.id)));
+
+    const materializados = pagos.filter((p): p is { id: string; movimientoId: string } => p.movimientoId !== null);
+    const pendientes = pagos.filter((p) => p.movimientoId === null);
+
+    if (materializados.length > 0) {
+      const periodoActivo = await obtenerPeriodoActivoTx(tx, entrada.tenantId, fechaReferencia);
+      if (!periodoActivo) {
+        throw new ErrorDominio('SIN_PERIODO_ACTIVO', 'No hay periodo activo para aplicar el ajuste de las mensualidades ya cobradas');
+      }
+      for (const pago of materializados) {
+        await revertirPagoTarjetaTx(
+          tx,
+          entrada.tenantId,
+          pago.movimientoId,
+          tarjeta.cuentaId,
+          periodoActivo.cuentaId,
+          fechaISO(fechaReferencia),
+          'Reversión por corrección de cargo de tarjeta'
+        );
+      }
+    }
+
+    if (pendientes.length > 0) {
+      await tx.delete(pagosTarjeta).where(
+        and(
+          eq(pagosTarjeta.tenantId, entrada.tenantId),
+          inArray(
+            pagosTarjeta.id,
+            pendientes.map((p) => p.id)
+          )
+        )
+      );
+    }
+
+    await revertirMovimientoTx(tx, entrada.tenantId, cargo.movimientoId, tarjeta.cuentaId, fechaISO(fechaReferencia), 'Reversión por corrección de cargo de tarjeta');
+
+    return { mensualidadesRevertidas: materializados.length, mensualidadesEliminadas: pendientes.length };
   });
 }
 

@@ -1,9 +1,10 @@
 import { Download } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
+import { DesglosePeriodo } from '@/components/DesglosePeriodo';
 import { FilaGasto } from '@/components/FilaGasto';
 import { FilaIngreso } from '@/components/FilaIngreso';
 import { FormularioImportar } from '@/components/FormularioImportar';
@@ -37,6 +38,9 @@ export function Historial() {
   const { data: periodoActivo, error: errorPeriodoActivo } = usePeriodoActivo();
   const { data: periodos } = usePeriodos();
   const [filtro, setFiltro] = useState<Filtro>('todo');
+  const [parametros] = useSearchParams();
+  // Home enlaza aquí con `?desglose=1` (ResumenCompactoPeriodo.tsx) para abrirlo directo.
+  const [mostrarDesglose, setMostrarDesglose] = useState(parametros.get('desglose') === '1');
 
   const sinPeriodoActivo =
     !periodoIdDeUrl && errorPeriodoActivo instanceof ApiError && errorPeriodoActivo.codigo === 'PERIODO_NO_ENCONTRADO';
@@ -128,6 +132,15 @@ export function Historial() {
         )}
 
         {sinPeriodoActivo && <p className="text-muted-foreground">No hay periodo activo todavía.</p>}
+
+        {periodoId && (
+          <>
+            <Button variant="outline" size="sm" className="self-start rounded-xl" onClick={() => setMostrarDesglose((v) => !v)}>
+              {mostrarDesglose ? 'Ocultar desglose' : 'Ver desglose del periodo'}
+            </Button>
+            {mostrarDesglose && <DesglosePeriodo periodoId={periodoId} />}
+          </>
+        )}
 
         {periodoId && (
           <div className="flex gap-2">

@@ -1980,6 +1980,80 @@ como stub (`ClienteStripeSuscripciones`) — mismo patrón que
 `resolverCorreo` en recordatorios; nunca se llama a Stripe de verdad en
 `test:local` (`STRIPE_SECRET_KEY: ''`, ver `scripts/test-local.ts`).
 
+## Desglose del periodo
+
+`GET /v1/periodos/:periodoId/desglose` (`modulos/desglose/`) — en qué se
+fue el dinero de un periodo, por rubro y por bloque de 7 días. Se calcula
+al consultar, sin migración ni tabla nueva: la categoría vive en `gastos`
+y la fecha en `movimientos`, ambos inmutables, así que funciona igual para
+periodos cerrados (retroactivo a todos) que para el activo. Frontend:
+`DesglosePeriodo.tsx`, en `Resumen.tsx` y tras un botón en `Historial.tsx`.
+
+**Cuadra con el resumen por construcción.** Recorre los mismos asientos de
+la cuenta del periodo que `calcularTotalesTx` (mismo tipo efectivo, mismo
+`TIPOS_GASTO`, ahora exportado de `generar-resumen.ts`), así que la suma
+de rubros + recurrentes es exactamente `totalGastado`. Los aportes a
+metas y los pagos de tarjeta, que no tienen categoría, son rubros propios.
+
+**Semanas: una quincena son dos semanas más 1-2 días sueltos.** Bloques
+de 7 días desde el inicio, y el remanente se suma al último bloque en vez
+de formar una "semana 3" huérfana (hallazgo real: el 30 de septiembre
+salía como una semana de un solo día): 15 días → 7/8, 16 → 7/9, febrero
+(13) → 7/6; toda quincena da exactamente dos bloques. Criterio tomado de
+cómo funciona la nómina quincenal en México: se paga el 15 y el último día
+del mes (o el día hábil anterior si cae en fin de semana), la LFT (art. 88)
+solo fija un plazo máximo de 15 días para quien no hace trabajo material,
+y el cálculo de nómina (ISR quincenal = tarifa mensual ÷ 2) trata la
+quincena como una unidad de longitud variable, nunca la subdivide en
+semanas (la "catorcena" de 14 días es otro esquema distinto). Como el
+último bloque tiene hasta 9 días, cada bloque trae `dias` y
+`promedioDiario` (truncado, ADR-002), y `semanaMasCara` se decide por
+promedio diario, no por total.
+
+**Los recurrentes van aparte** (pedido del usuario): se materializan
+fechados al inicio del periodo e inflaban siempre la semana 1, y de todos
+modos son compromisos fijos, no algo que se decidió gastar esa semana. No
+entran a `rubros` ni a `semanas`: se listan en `recurrentes` (con su
+descripción y día de cobro), y `totalVariable = totalGastado -
+recurrentes.total` es lo que cubren categorías y semanas. Si el usuario
+edita un recurrente ya materializado, `editarGasto` lo reemplaza por un
+gasto nuevo sin `origenRecurrenteId`, que desde ahí cuenta como variable.
+Las mensualidades de tarjeta, en cambio, se quedan en el análisis, ubicadas
+por su `fechaVencimiento` real (se materializan fechadas al inicio del
+periodo). Toda fecha se acota al rango del periodo (el campo de fecha de un
+gasto es libre).
+
+**Correcciones.** Una reversión cae en el bloque y rubro del original
+cuando este es del mismo periodo (se cancelan; cuenta el gasto corregido).
+Si el original es de un periodo ya cerrado, la reversión entra como
+crédito en su propia fecha — el periodo cerrado conserva el original, tal
+como lo congeló su resumen.
+
+**Periodo activo: el promedio usa solo los días transcurridos.** Cada
+semana trae `diasTranscurridos` (igual a `dias` en un periodo cerrado; en
+el activo, la semana en curso solo ha vivido parte de sus días y las que
+faltan, ninguno) y `promedioDiario` se calcula entre esos, no entre todos
+los del bloque — si no, la semana en curso se vería barata a mitad de
+semana. `semanaMasCara` solo compara semanas con al menos 3 días
+transcurridos y necesita al menos dos así; antes es `null` (comparar el
+promedio de uno o dos días contra el de una semana completa es ruido).
+`obtenerDesglose` recibe `fechaReferencia` (como el resto de los módulos)
+para que las pruebas no dependan del reloj real.
+
+**En Home** (`ResumenCompactoPeriodo.tsx`, debajo de "Actividad
+reciente"): versión de bolsillo — las 3 categorías principales del gasto
+variable, los recurrentes en una línea aparte y una barra por semana (la
+en curso resaltada), con enlace a `/historial?desglose=1`, que abre el
+desglose completo directo. Es un complemento, no un dashboard
+(documento-maestro-v2.md §15.1: "dashboards densos" es Won't): sin
+estados de carga ni de error propios, y no aparece si aún no hay gastos.
+Comparte la consulta `['desglose', periodoId]` con el desglose completo, y
+cada mutación que ya invalidaba `['disponible']` ahora invalida también
+`['desglose']`, así que se actualiza solo al registrar/editar/eliminar.
+
+Sin gate de plan por ahora (§9.2 pone los reportes completos como Pro).
+23 tests nuevos (10 de las fechas en `test/unidad/`, 13 de integración).
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable

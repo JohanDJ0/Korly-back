@@ -26,6 +26,7 @@ export function useEditarIngreso() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
       void queryClient.invalidateQueries({ queryKey: ['ingresos'] });
     },
   });

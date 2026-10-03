@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Calendar } from 'lucide-react';
 import { useState } from 'react';
 import { useForm, useWatch } from 'react-hook-form';
+import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Button } from '@/components/ui/button';
@@ -123,6 +124,20 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
           ? 'Guardando…'
           : `Registrar${Number.isFinite(montoValido) && montoValido > 0 ? ` $${montoValido.toFixed(2)}` : ''}`}
       </Button>
+
+      {/*
+        Hallazgo real: un usuario registró una compra con tarjeta de
+        crédito como gasto normal en vez de "Registrar cargo" en
+        Tarjetas — un gasto normal sale directo del disponible de la
+        quincena, sin ninguna relación con una tarjeta, así que el saldo
+        de la tarjeta y el gasto quedaron como dos cosas sueltas que no
+        cuadraban. Este es el único lugar donde alguien en ese punto
+        podría darse cuenta a tiempo — un link discreto, no un aviso que
+        bloquee o agregue un toque a la captura de todos los días.
+      */}
+      <Link to="/tarjetas" className="text-muted-foreground text-center text-[12.5px] underline-offset-2 hover:underline">
+        ¿Lo pagaste con tarjeta de crédito? Regístralo en Tarjetas
+      </Link>
     </form>
   );
 }

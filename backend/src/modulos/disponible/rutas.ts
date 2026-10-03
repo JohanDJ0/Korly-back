@@ -38,6 +38,10 @@ export async function rutasDisponible(app: FastifyInstance): Promise<void> {
       // porque te pasaste hoy" de "negativa porque el periodo entero va
       // mal", ni mostrar cuánto llevas gastado hoy en específico.
       gastadoHoy: montoADto(disponible.gastadoHoyValorMinimo, MONEDA_DEFAULT),
+      // Extensión propia: `gastadoHoy === 0` no distingue "no pasó nada"
+      // de "pasó algo pero se canceló" (un retiro de meta que cubre un
+      // gasto el mismo día) — ver el comentario en consultar-disponible.ts.
+      huboActividadHoy: disponible.huboActividadHoy,
       calculadoEn: disponible.calculadoEn,
     });
   });

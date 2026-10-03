@@ -7,7 +7,7 @@ import { editarGasto, eliminarGasto, registrarGasto } from '../../src/modulos/ga
 import { crearCuentaTx } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo, obtenerPeriodoActivo } from '../../src/modulos/periodos/crear-periodo.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
-import { aportarAMeta, crearMeta } from '../../src/modulos/metas/metas.js';
+import { aportarAMeta, crearMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.js';
 import { crearTarjeta } from '../../src/modulos/tarjetas/tarjetas.js';
 import { registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
@@ -404,6 +404,106 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     expect(resultado.disponibleValorMinimo).toBe(4700n); // 5000 - 300
     expect(resultado.gastadoHoyValorMinimo).toBe(300n);
     expect(resultado.cifraDiariaValorMinimo).toBe(33n); // objetivoHoy = piso(5000/15) = 333; 333 - 300 = 33
+  });
+
+  it('hallazgo real (cuenta de producción): un retiro de meta que cubre un gasto el mismo día no cuenta como excedido — se cancelan entre sí', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+    // Sin aporte previo a propósito: retirarDeMeta no exige saldo
+    // acumulado (mismo criterio que el sobregiro permitido en gastos,
+    // ver su comentario en metas.ts) — lo que importa aquí es el efecto
+    // en disponible, no el saldo de la meta.
+    const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+
+    // Retira 300 de la meta y los gasta de inmediato, mismo día — el
+    // caso real reportado: antes de este fix, el retiro se repartía
+    // entre los 15 días restantes mientras el gasto se descontaba
+    // completo solo de hoy, dejando cifraDiaria negativa.
+    await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'Pago urgente', fechaReferencia: hoy });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 300n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(5000n); // 5000 - 300 (retiro) + 300 (gasto que cubre) = 5000, sin cambio neto.
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n); // el retiro y el gasto se cancelan entre sí.
+    expect(resultado.cifraDiariaValorMinimo).toBe(333n); // objetivoHoy = piso(5000/15) = 333, intacto — como si hoy no hubiera pasado nada.
+    // Segundo hallazgo real, mismo caso: `gastadoHoy === 0` NO debe
+    // leerse como "no hiciste nada hoy" — sí hiciste algo, solo que se
+    // canceló. RecordatorioContextual.tsx usaba gastadoHoy como proxy y
+    // mostraba el aviso de "sin actividad" encima de una actividad real.
+    expect(resultado.huboActividadHoy).toBe(true);
+  });
+
+  it('un retiro de meta sin ningún gasto el mismo día sigue subiendo el disponible de inmediato, igual que un ingreso', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+    const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+
+    await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'Ahorré de más', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(5300n); // 5000 + 300 retirado.
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n);
+    expect(resultado.cifraDiariaValorMinimo).toBe(353n); // objetivoHoy = piso(5300/15) = 353, ya con el retiro repartido.
+    expect(resultado.huboActividadHoy).toBe(true); // el retiro mismo es actividad, aunque no haya gasto que lo acompañe.
+  });
+
+  describe('huboActividadHoy', () => {
+    it('sin ningún movimiento hoy, es false', async () => {
+      const tenantId = await tenantNuevo();
+      const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+      const hoy = new Date('2026-08-01T00:00:00Z');
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+
+      // Un día después, sin registrar nada más: nada pasó específicamente HOY.
+      const manana = new Date('2026-08-02T00:00:00Z');
+      const resultado = await consultarDisponible(tenantId, manana);
+      if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+      expect(resultado.huboActividadHoy).toBe(false);
+    });
+
+    it('un gasto manual normal sí cuenta como actividad', async () => {
+      const tenantId = await tenantNuevo();
+      const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+      const hoy = new Date('2026-08-01T00:00:00Z');
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+      await registrarGasto({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+
+      const resultado = await consultarDisponible(tenantId, hoy);
+      if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+      expect(resultado.huboActividadHoy).toBe(true);
+    });
+
+    it('un recurrente materializado el mismo día en que se crea NO cuenta como actividad del usuario (mismo criterio que gastadoHoy)', async () => {
+      const tenantId = await tenantNuevo();
+      const hoy = new Date('2026-08-16T00:00:00Z'); // quincena 16-31 de agosto
+      const periodo = await crearPeriodo(tenantId, 'quincenal', hoy);
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 7300n, moneda: 'MXN', fechaEfectiva: '2026-08-16', fechaReferencia: hoy });
+      await crearGastoRecurrente({
+        tenantId,
+        descripcion: 'Netflix',
+        montoValorMinimo: 219n,
+        moneda: 'MXN',
+        frecuencia: 'mensual',
+        diaMes: 16,
+        fechaReferencia: hoy,
+      });
+
+      const resultado = await consultarDisponible(tenantId, hoy);
+      if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+      expect(resultado.gastadoHoyValorMinimo).toBe(0n);
+      expect(resultado.huboActividadHoy).toBe(false);
+    });
   });
 
   // --- 6. Bug real (cuenta de producción): un compromiso automático

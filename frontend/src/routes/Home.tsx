@@ -12,6 +12,7 @@ import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
 import { HojaInferior } from '@/components/HojaInferior';
 import { RecordatorioContextual } from '@/components/RecordatorioContextual';
+import { ResumenCompactoPeriodo } from '@/components/ResumenCompactoPeriodo';
 import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
@@ -177,8 +178,11 @@ export function Home() {
         </div>
 
         {periodoId && (
-          <div className="lg:border-border lg:bg-card lg:rounded-2xl lg:border lg:p-4">
-            <ActividadReciente periodoId={periodoId} />
+          <div className="flex flex-col gap-3.5">
+            <div className="lg:border-border lg:bg-card lg:rounded-2xl lg:border lg:p-4">
+              <ActividadReciente periodoId={periodoId} />
+            </div>
+            {data?.estado === 'ok' && <ResumenCompactoPeriodo periodoId={periodoId} />}
           </div>
         )}
       </div>

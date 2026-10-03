@@ -5,6 +5,7 @@ import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { FormularioCargo } from '@/components/FormularioCargo';
 import { HojaInferior } from '@/components/HojaInferior';
 import { useCargosTarjeta } from '@/hooks/use-cargos-tarjeta';
+import { useEliminarCargo } from '@/hooks/use-eliminar-cargo';
 import { useEliminarTarjeta } from '@/hooks/use-eliminar-tarjeta';
 import type { Tarjeta } from '@/hooks/use-tarjetas';
 import { formatearMonto } from '@/lib/dinero';
@@ -30,8 +31,14 @@ interface FilaTarjetaProps {
 export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
   const [mostrarFormularioCargo, setMostrarFormularioCargo] = useState(false);
   const [mostrarCargos, setMostrarCargos] = useState(false);
-  const { data: cargos, isLoading: cargandoCargos } = useCargosTarjeta(mostrarCargos ? tarjeta.id : undefined);
+  const { data: cargosSinFiltrar, isLoading: cargandoCargos } = useCargosTarjeta(mostrarCargos ? tarjeta.id : undefined);
+  // Mismo criterio que Historial.tsx con gastos/ingresos revertidos: un
+  // cargo ya corregido (useEliminarCargo) se oculta de la vista normal
+  // en vez de mostrarse atenuado — el ledger lo conserva para siempre
+  // (ADR-001), pero al usuario ya no le sirve verlo aquí.
+  const cargos = cargosSinFiltrar?.filter((c) => !c.revertido);
   const eliminarTarjeta = useEliminarTarjeta();
+  const eliminarCargo = useEliminarCargo();
 
   const porcentajeUsado = tarjeta.limiteCredito.valorMinimo > 0 ? Math.min(100, (tarjeta.deuda.valorMinimo / tarjeta.limiteCredito.valorMinimo) * 100) : 0;
 
@@ -100,11 +107,29 @@ export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
           {cargos?.length === 0 && <p className="text-muted-foreground text-sm">Todavía no hay compras registradas.</p>}
           {cargos?.map((cargo) => (
             <div key={cargo.id} className="border-border bg-card rounded-2xl border p-4">
-              <p className="text-[14px] font-semibold">
-                {cargo.descripcion} — {formatearMonto(cargo.montoTotal)}
-                {cargo.numeroPlazos > 1 && ` a ${cargo.numeroPlazos} MSI`}
-              </p>
-              <p className="text-muted-foreground text-xs">{cargo.fechaCompra}</p>
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-[14px] font-semibold">
+                    {cargo.descripcion} — {formatearMonto(cargo.montoTotal)}
+                    {cargo.numeroPlazos > 1 && ` a ${cargo.numeroPlazos} MSI`}
+                  </p>
+                  <p className="text-muted-foreground text-xs">{cargo.fechaCompra}</p>
+                </div>
+                {eliminarCargo.isError && eliminarCargo.variables?.cargoId === cargo.id ? (
+                  <p className="text-destructive shrink-0 text-xs">{eliminarCargo.error.message}</p>
+                ) : (
+                  <BotonConfirmar
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive shrink-0 text-xs"
+                    pregunta="¿Corregir este cargo?"
+                    onConfirmar={() => eliminarCargo.mutate({ tarjetaId: tarjeta.id, cargoId: cargo.id })}
+                    disabled={eliminarCargo.isPending}
+                  >
+                    Corregir
+                  </BotonConfirmar>
+                )}
+              </div>
               <ul className="mt-2.5 flex flex-col gap-1.5">
                 {cargo.mensualidades.map((m) => (
                   <li key={m.numeroPago} className="flex items-center justify-between text-[13px]">

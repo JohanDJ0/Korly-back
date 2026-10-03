@@ -19,6 +19,8 @@ export function useCrearRecurrente() {
     mutationFn: (body: CrearRecurrenteInput) => apiFetch<GastoRecurrente>('/gastos-recurrentes', { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['gastos-recurrentes'] });
+      // Crear un recurrente cuyo día toca al periodo activo genera el gasto de inmediato.
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
     },
   });
 }

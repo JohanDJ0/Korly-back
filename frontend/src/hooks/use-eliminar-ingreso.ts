@@ -9,6 +9,7 @@ export function useEliminarIngreso() {
     mutationFn: (ingresoId: string) => apiFetch<void>(`/ingresos/${ingresoId}`, { method: 'DELETE' }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
       void queryClient.invalidateQueries({ queryKey: ['ingresos'] });
     },
   });

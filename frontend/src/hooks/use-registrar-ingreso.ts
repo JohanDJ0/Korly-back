@@ -27,6 +27,7 @@ export function useRegistrarIngreso() {
       }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
     },
   });
 }

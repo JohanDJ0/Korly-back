@@ -17,6 +17,8 @@ export interface CargoTarjeta {
   numeroPlazos: number;
   categoriaId: string | null;
   fechaCompra: string;
+  /** true si `useEliminarCargo` ya lo corrigió — mismo criterio que `revertido` en gastos/ingresos. */
+  revertido: boolean;
   mensualidades: MensualidadCargo[];
 }
 

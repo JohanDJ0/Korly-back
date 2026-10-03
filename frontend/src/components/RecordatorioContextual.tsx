@@ -18,8 +18,14 @@ interface RecordatorioContextualProps {
  * **Regla 1 ("cada notificación entrega valor por sí sola"):** siempre
  * trae la cifra accionable, nunca solo el hecho de "no has registrado".
  * **Regla 2 ("se silencia sola si ya hubo actividad"):** solo se
- * muestra si `gastadoHoy` es 0 — en cuanto se registra un gasto hoy,
- * desaparece sin que nadie la cierre a mano.
+ * muestra si `huboActividadHoy` es `false` — en cuanto se registra algo
+ * hoy, desaparece sin que nadie la cierre a mano. No usa `gastadoHoy`
+ * para esto (hallazgo real, cuenta de producción): un retiro de meta
+ * que cubre un gasto el mismo día deja `gastadoHoy` en 0 porque se
+ * cancelan entre sí, pero sí hubo actividad real — con `gastadoHoy`
+ * como proxy, esta tarjeta aparecía encima de esa actividad como si no
+ * hubiera pasado nada. `huboActividadHoy` (consultar-disponible.ts)
+ * distingue justo eso.
  * **Regla 4 (alertas de ritmo):** deliberadamente NO duplica el caso
  * "ya te excediste hoy" — `CifraDisponible.tsx` ya lo muestra como el
  * titular principal en rojo; repetirlo aquí sería "regañar" dos veces
@@ -35,8 +41,7 @@ interface RecordatorioContextualProps {
  */
 export function RecordatorioContextual({ disponible }: RecordatorioContextualProps) {
   const yaSeExcedioHoy = disponible.cifraDiaria.valorMinimo < 0;
-  const sinActividadHoy = disponible.gastadoHoy.valorMinimo === 0;
-  if (!sinActividadHoy || yaSeExcedioHoy) return null;
+  if (disponible.huboActividadHoy || yaSeExcedioHoy) return null;
 
   return (
     <Card className="w-full max-w-sm border-primary/40 bg-primary/5 dark:bg-primary/10">

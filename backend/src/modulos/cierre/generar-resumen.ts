@@ -147,7 +147,7 @@ const TIPOS_INGRESO: ReadonlySet<TipoMovimiento> = new Set(['ingreso', 'retiro_m
 // 'cargo_tarjeta' NO aparece aquí a propósito: nunca postea un asiento
 // contra `periodo.cuentaId` (solo contra la cuenta de la tarjeta), así
 // que el resumen de un periodo nunca se entera de que existió.
-const TIPOS_GASTO: ReadonlySet<TipoMovimiento> = new Set(['gasto', 'aporte_meta', 'pago_tarjeta']);
+export const TIPOS_GASTO: ReadonlySet<TipoMovimiento> = new Set(['gasto', 'aporte_meta', 'pago_tarjeta']);
 
 /**
  * **Bug real, encontrado antes de construir Metas — no hipotético.**

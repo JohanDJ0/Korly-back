@@ -18,6 +18,7 @@ export function useCrearPeriodo() {
     mutationFn: () => apiFetch<Periodo>('/periodos', { method: 'POST', body: JSON.stringify({ tipo: 'quincenal' }) }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
     },
   });
 }

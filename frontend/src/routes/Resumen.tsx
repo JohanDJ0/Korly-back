@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
+import { DesglosePeriodo } from '@/components/DesglosePeriodo';
 import { PageHeader } from '@/components/PageHeader';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDecidirSobrante } from '@/hooks/use-decidir-sobrante';
@@ -59,6 +60,8 @@ export function Resumen() {
                 </div>
               </div>
             </div>
+
+            <DesglosePeriodo periodoId={resumen.periodoId} />
 
             {resumen.decisionSobrante === 'pendiente' && (
               <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-4.5">

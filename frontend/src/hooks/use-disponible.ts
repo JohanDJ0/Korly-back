@@ -17,6 +17,13 @@ export interface DisponibleOk {
   cifraDiaria: MontoDto;
   /** Extensión sobre openapi.yaml (ver backend/README.md, "Disponible") — cuánto se ha gastado hoy específicamente. */
   gastadoHoy: MontoDto;
+  /**
+   * `gastadoHoy === 0` no significa "no pasó nada hoy" — un retiro de
+   * meta que cubre un gasto el mismo día también da neto cero. Usar
+   * este campo (no `gastadoHoy`) para decidir si el usuario ya hizo
+   * algo hoy (ver RecordatorioContextual.tsx).
+   */
+  huboActividadHoy: boolean;
   calculadoEn: string;
 }
 

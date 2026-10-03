@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import {
   type CargoDetallado,
+  eliminarCargoTarjeta,
   listarCargosTarjeta,
   listarPagosTarjetaDePeriodo,
   type PagoTarjetaAplicado,
@@ -33,6 +34,7 @@ function cargoADto(cargo: CargoDetallado) {
     numeroPlazos: cargo.numeroPlazos,
     categoriaId: cargo.categoriaId,
     fechaCompra: cargo.fechaCompra,
+    revertido: cargo.revertido,
     mensualidades: cargo.mensualidades.map((m) => ({
       numeroPago: m.numeroPago,
       monto: montoADto(m.montoValorMinimo, cargo.moneda),
@@ -143,6 +145,20 @@ export async function rutasTarjetas(app: FastifyInstance): Promise<void> {
         fechaVencimiento: m.fechaVencimiento,
       })),
     });
+  });
+
+  /**
+   * Extensión propia (backend/README.md, "Corregir un cargo de
+   * tarjeta"): corrige un cargo mal registrado vía reversión, nunca
+   * hard delete — ver `eliminarCargoTarjeta`.
+   */
+  app.delete<{ Params: { tarjetaId: string; cargoId: string } }>('/tarjetas/:tarjetaId/cargos/:cargoId', async (request, reply) => {
+    const resultado = await eliminarCargoTarjeta({
+      tenantId: request.identidad.tenantId,
+      tarjetaId: request.params.tarjetaId,
+      cargoId: request.params.cargoId,
+    });
+    reply.send(resultado);
   });
 
   /**

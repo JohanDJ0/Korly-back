@@ -233,6 +233,48 @@ export async function obtenerNetoCuentaEnFecha(
 }
 
 /**
+ * "¿Hubo actividad de verdad hoy?" — mismos tipos/condiciones que
+ * `obtenerNetoCuentaEnFecha`, pero cuenta filas en vez de sumar montos.
+ * Hace falta como función aparte (no derivarlo del neto) porque un neto
+ * de cero no significa "no pasó nada": un retiro de meta que cubre un
+ * gasto el mismo día (consultar-disponible.ts) también da neto cero, y
+ * ahí sí hubo actividad real que no debe verse como un día en blanco
+ * (hallazgo real: `RecordatorioContextual.tsx` usaba `gastadoHoy === 0`
+ * como proxy de "sin actividad hoy", y ese retiro+gasto lo encendía
+ * igual que un día sin ningún movimiento).
+ */
+export async function existeActividadCuentaEnFecha(
+  tenantId: string,
+  cuentaId: string,
+  fechaEfectiva: string,
+  tipos?: TipoMovimiento[],
+  opciones?: { excluirGastosRecurrentes?: boolean }
+): Promise<boolean> {
+  return conTenant(tenantId, async (tx) => {
+    const tipoEfectivo = sql`coalesce(${movimientoRevertido.tipo}, ${movimientos.tipo})`;
+    const movimientoEfectivoId = sql`coalesce(${movimientoRevertido.id}, ${movimientos.id})`;
+    const condiciones = [eq(asientos.cuentaId, cuentaId), eq(movimientos.fechaEfectiva, fechaEfectiva)];
+    if (tipos && tipos.length > 0) {
+      condiciones.push(inArray(tipoEfectivo, tipos));
+    }
+    if (opciones?.excluirGastosRecurrentes) {
+      condiciones.push(isNull(gastos.origenRecurrenteId));
+    }
+
+    const [fila] = await tx
+      .select({ id: asientos.id })
+      .from(asientos)
+      .innerJoin(movimientos, eq(movimientos.id, asientos.movimientoId))
+      .leftJoin(movimientoRevertido, eq(movimientoRevertido.id, movimientos.movimientoRevertidoId))
+      .leftJoin(gastos, eq(gastos.movimientoId, movimientoEfectivoId))
+      .where(and(...condiciones))
+      .limit(1);
+
+    return fila !== undefined;
+  });
+}
+
+/**
  * Neto de una cuenta agrupado por "tipo efectivo" — mismo concepto que
  * `obtenerNetoCuentaEnFecha` (una reversión cuenta como el tipo de lo
  * que revierte, nunca como `'reversion'` en sí), pero sobre toda la

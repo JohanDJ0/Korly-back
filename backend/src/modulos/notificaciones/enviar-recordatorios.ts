@@ -99,7 +99,12 @@ export async function procesarRecordatorioDiarioDeTenant(
   if (!disponible || disponible.estado !== 'ok') {
     return { tenantId, enviado: false, motivo: 'sin_periodo_activo_o_ingreso' };
   }
-  if (disponible.gastadoHoyValorMinimo > 0n) {
+  // `huboActividadHoy`, no `gastadoHoyValorMinimo > 0n` (hallazgo real,
+  // mismo caso que RecordatorioContextual.tsx): un retiro de meta que
+  // cubre un gasto el mismo día deja gastadoHoy en 0 porque se cancelan
+  // entre sí, pero sí hubo actividad real — con el criterio viejo, el
+  // recordatorio igual se habría mandado ese día.
+  if (disponible.huboActividadHoy) {
     return { tenantId, enviado: false, motivo: 'ya_registro_hoy' };
   }
 

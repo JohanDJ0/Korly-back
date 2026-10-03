@@ -10,7 +10,7 @@ import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.j
 import { obtenerResumen } from '../../src/modulos/cierre/generar-resumen.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { crearTarjeta, eliminarTarjeta, listarTarjetas } from '../../src/modulos/tarjetas/tarjetas.js';
-import { listarCargosTarjeta, listarPagosTarjetaDePeriodo, registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
+import { eliminarCargoTarjeta, listarCargosTarjeta, listarPagosTarjetaDePeriodo, registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
 import { conTenant } from '../../src/shared/db.js';
 
 // Toda la quincena de prueba vive en esta ventana.
@@ -91,6 +91,160 @@ describe('tarjetas de crédito y MSI', () => {
 
       await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({ codigo: 'TARJETA_CON_HISTORIAL' });
       expect(await listarTarjetas(tenantId)).toHaveLength(1);
+    });
+
+    it('sigue bloqueada aunque el único cargo ya se haya corregido — asientos/movimientos son inmutables a nivel de base de datos', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      const cargo = await registrarCargoTarjeta({
+        tenantId,
+        tarjetaId: tarjeta.id,
+        descripcion: 'Laptop',
+        montoTotalValorMinimo: 100000n,
+        moneda: 'MXN',
+        numeroPlazos: 1,
+      });
+
+      await eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: cargo.id, fechaReferencia: HOY_DE_PRUEBA });
+
+      // Corregido (deuda en cero, oculto de "ver compras"), pero la fila
+      // de cargos_tarjeta sigue ahí — su movimiento nunca se puede borrar
+      // (trigger de Postgres, ADR-001), así que eliminarTarjeta sigue
+      // bloqueada para siempre en cuanto existió un primer cargo.
+      await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({ codigo: 'TARJETA_CON_HISTORIAL' });
+      expect(await listarTarjetas(tenantId)).toHaveLength(1);
+    });
+  });
+
+  describe('eliminarCargoTarjeta', () => {
+    it('rechaza un cargo que no existe (BOLA)', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      await expect(eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: randomUUID() })).rejects.toMatchObject({
+        codigo: 'CARGO_NO_ENCONTRADO',
+      });
+    });
+
+    it('rechaza un cargo de otro tenant (BOLA)', async () => {
+      const tenantId = await tenantNuevo();
+      const otroTenantId = await tenantNuevo();
+      const tarjetaAjena = await tarjetaDePrueba(otroTenantId);
+      const cargoAjeno = await registrarCargoTarjeta({
+        tenantId: otroTenantId,
+        tarjetaId: tarjetaAjena.id,
+        descripcion: 'Laptop',
+        montoTotalValorMinimo: 100000n,
+        moneda: 'MXN',
+        numeroPlazos: 1,
+      });
+
+      await expect(eliminarCargoTarjeta({ tenantId, tarjetaId: tarjetaAjena.id, cargoId: cargoAjeno.id })).rejects.toMatchObject({
+        codigo: 'CARGO_NO_ENCONTRADO',
+      });
+    });
+
+    it('corrige un cargo sin ninguna mensualidad pagada: la deuda vuelve a cero y las mensualidades pendientes desaparecen', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      const cargo = await registrarCargoTarjeta({
+        tenantId,
+        tarjetaId: tarjeta.id,
+        descripcion: 'Laptop',
+        montoTotalValorMinimo: 900000n,
+        moneda: 'MXN',
+        numeroPlazos: 3,
+        fechaCompra: '2026-08-05',
+      });
+
+      const resultado = await eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: cargo.id, fechaReferencia: HOY_DE_PRUEBA });
+
+      expect(resultado).toEqual({ mensualidadesRevertidas: 0, mensualidadesEliminadas: 3 });
+      expect(await obtenerSaldoCuenta(tenantId, tarjeta.cuentaId)).toBe(0n);
+
+      // El movimiento del cargo es inmutable (trigger de Postgres) — la
+      // fila permanece, marcada como corregida, con sus mensualidades
+      // pendientes ya borradas (esas sí, nunca generaron ningún asiento).
+      const cargos = await listarCargosTarjeta(tenantId, tarjeta.id);
+      expect(cargos[0]?.revertido).toBe(true);
+      expect(cargos[0]?.mensualidades).toHaveLength(0);
+    });
+
+    it('corrige un cargo con una mensualidad ya cobrada: la devuelve al disponible del periodo activo de hoy, sin borrar el cargo', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      const cargo = await registrarCargoTarjeta({
+        tenantId,
+        tarjetaId: tarjeta.id,
+        descripcion: 'Refrigerador',
+        montoTotalValorMinimo: 900000n,
+        moneda: 'MXN',
+        numeroPlazos: 3,
+        fechaCompra: '2026-07-20', // primera mensualidad vence 2026-09-04
+      });
+
+      // Activa el periodo de septiembre, donde vence y se materializa la primera mensualidad.
+      const periodoSeptiembre = await insertarBorrador(tenantId, '2026-09-01', '2026-09-15');
+      const fechaEnSeptiembre = new Date('2026-09-05T00:00:00Z');
+      await obtenerPeriodoActivo(tenantId, fechaEnSeptiembre);
+      expect(await obtenerSaldoCuenta(tenantId, periodoSeptiembre.cuentaId)).toBe(-300000n);
+      expect(await obtenerSaldoCuenta(tenantId, tarjeta.cuentaId)).toBe(-600000n); // 900000 - 300000 ya pagada.
+
+      const resultado = await eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: cargo.id, fechaReferencia: fechaEnSeptiembre });
+
+      expect(resultado).toEqual({ mensualidadesRevertidas: 1, mensualidadesEliminadas: 2 });
+      // La mensualidad ya cobrada se le devuelve al periodo activo (septiembre).
+      expect(await obtenerSaldoCuenta(tenantId, periodoSeptiembre.cuentaId)).toBe(0n);
+      // La deuda de la tarjeta vuelve a cero: se revierte el cargo completo (900000) y ya no queda nada pendiente.
+      expect(await obtenerSaldoCuenta(tenantId, tarjeta.cuentaId)).toBe(0n);
+
+      // Sí tocó un periodo real: la fila del cargo permanece, marcada como corregida — no se borra (ADR-001).
+      const cargos = await listarCargosTarjeta(tenantId, tarjeta.id);
+      expect(cargos[0]?.revertido).toBe(true);
+      // Sigue teniendo un cargo real (aunque corregido) — eliminarTarjeta debe seguir bloqueada.
+      await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({ codigo: 'TARJETA_CON_HISTORIAL' });
+    });
+
+    it('rechaza corregir dos veces el mismo cargo', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      const cargo = await registrarCargoTarjeta({
+        tenantId,
+        tarjetaId: tarjeta.id,
+        descripcion: 'Laptop',
+        montoTotalValorMinimo: 100000n,
+        moneda: 'MXN',
+        numeroPlazos: 1,
+        fechaCompra: '2026-08-05',
+      });
+
+      await eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: cargo.id, fechaReferencia: HOY_DE_PRUEBA });
+
+      await expect(eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: cargo.id, fechaReferencia: HOY_DE_PRUEBA })).rejects.toMatchObject({
+        codigo: 'CARGO_YA_REVERTIDO',
+      });
+    });
+
+    it('rechaza corregir un cargo con mensualidad ya cobrada si no hay periodo activo', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      const cargo = await registrarCargoTarjeta({
+        tenantId,
+        tarjetaId: tarjeta.id,
+        descripcion: 'Refrigerador',
+        montoTotalValorMinimo: 900000n,
+        moneda: 'MXN',
+        numeroPlazos: 3,
+        fechaCompra: '2026-07-20',
+      });
+
+      const periodoSeptiembre = await insertarBorrador(tenantId, '2026-09-01', '2026-09-15');
+      const fechaEnSeptiembre = new Date('2026-09-05T00:00:00Z');
+      await obtenerPeriodoActivo(tenantId, fechaEnSeptiembre); // materializa la primera mensualidad
+      await cerrarPeriodoManualmente(tenantId, periodoSeptiembre.id, new Date('2026-09-16T00:00:00Z')); // y lo cierra, sin abrir uno nuevo
+
+      await expect(
+        eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: cargo.id, fechaReferencia: new Date('2026-09-20T00:00:00Z') })
+      ).rejects.toMatchObject({ codigo: 'SIN_PERIODO_ACTIVO' });
     });
   });
 

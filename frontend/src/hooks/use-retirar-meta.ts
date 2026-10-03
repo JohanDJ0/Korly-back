@@ -26,6 +26,7 @@ export function useRetirarMeta() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['metas'] });
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
     },
   });
 }

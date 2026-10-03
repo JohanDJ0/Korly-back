@@ -120,6 +120,16 @@ export async function obtenerSaldoTarjetaTx(tx: Ejecutor, cuentaId: string): Pro
  * nada del ledger que preservar, así que sí se borra de verdad (fila
  * de `tarjetas` + su `cuenta`), a diferencia de gastos/ingresos, que
  * nunca se borran de verdad por la misma inmutabilidad.
+ *
+ * Nota: `eliminarCargoTarjeta` (registrar-cargo.ts) puede corregir un
+ * cargo mal registrado. Si ninguna de sus mensualidades había cobrado
+ * todavía, esa corrección **borra la fila del cargo de verdad** (nunca
+ * tocó ningún periodo, no hay nada que ADR-001 proteja ahí) — una
+ * tarjeta cuyo único cargo se corrigió así vuelve a tener cero cargos
+ * reales, y este chequeo la deja pasar sin ningún caso especial. Si
+ * alguna mensualidad ya se había cobrado, la fila del cargo permanece
+ * (con su reversión) y esta función sigue bloqueando el borrado, tal
+ * como debe ser: sí hay un hecho financiero real que preservar.
  */
 export async function eliminarTarjeta(tenantId: string, tarjetaId: string): Promise<void> {
   return conTenant(tenantId, async (tx) => {
