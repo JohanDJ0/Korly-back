@@ -1289,8 +1289,10 @@ aportar desde la quincena, no está limitado por el disponible: ese dinero no sa
 ella. `motivo` es opcional ("Ahorro que ya tenía"). `deshacerDepositoMeta`
 (`DELETE /metas/:id/depositos/:movimientoId`) lo revierte solo si la meta todavía
 conserva ese dinero; si ya se pagó o se pasó a la quincena, `SALDO_META_INSUFICIENTE`.
-En el frontend es una opción dentro de "Aportar" ("De mi quincena" / "Ya lo tenía
-ahorrado"), no un botón más.
+En el frontend la tarjeta de cada meta tiene dos botones, **Agregar dinero** ("De mi
+quincena" / "Ya lo tenía ahorrado") y **Usar dinero** ("Pagar algo" / "Pasar a mi
+quincena"), cada uno con un selector dentro en vez de un botón por operación;
+Editar y Eliminar van al pie como texto pequeño, junto a "Ver movimientos".
 
 ### Tope en los aportes a metas
 

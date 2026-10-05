@@ -40,15 +40,15 @@ function etiquetaMovimiento(movimiento: MovimientoMeta): string {
 }
 
 /**
- * Tres formas de mover una meta, y cada una cuenta distinto en la quincena
- * (ver backend/README.md, "Metas de ahorro"):
- * - Aportar reduce el disponible del periodo activo (como un gasto).
- * - Pagar con la meta sale directo de ella: no toca la quincena, no exige
- *   periodo activo, y el backend rechaza si la meta no alcanza.
- * - Pasar a la quincena (retirar) aumenta el disponible (como un ingreso).
- * Aportar y pasar a la quincena requieren periodo activo: si no hay uno, el
- * error del backend (`SIN_PERIODO_ACTIVO`) se muestra tal cual, no se
- * duplica la validación aquí.
+ * Dos botones principales, cada uno con una elección dentro (en vez de un botón por operación):
+ * - **Agregar dinero**: "De mi quincena" (aportar: reduce el disponible, y el backend lo limita a lo
+ *   que hay) o "Ya lo tenía ahorrado" (aporte externo: entra directo a la meta, sin tocar la quincena).
+ * - **Usar dinero**: "Pagar algo" (sale directo de la meta, no toca la quincena) o "Pasar a mi
+ *   quincena" (retirar: aumenta el disponible como un ingreso). Ambas se limitan al saldo de la meta.
+ * Editar y Eliminar son poco frecuentes, así que van al pie como texto pequeño.
+ * Aportar y pasar a la quincena requieren periodo activo: si no hay uno, el error del backend
+ * (`SIN_PERIODO_ACTIVO`) se muestra tal cual, no se duplica la validación aquí.
+ * Ver backend/README.md, "Metas de ahorro".
  */
 export function FilaMeta({ meta }: FilaMetaProps) {
   const [modo, setModo] = useState<Modo>(null);
@@ -182,29 +182,13 @@ export function FilaMeta({ meta }: FilaMetaProps) {
       </div>
 
       {modo === null && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" className="flex-auto rounded-xl" onClick={() => setModo('aportar')}>
-            <Plus size={14} /> Aportar
+            <Plus size={14} /> Agregar dinero
           </Button>
           <Button variant="outline" size="sm" className="flex-auto rounded-xl" onClick={() => setModo('pagar')}>
-            Pagar con la meta
+            Usar dinero
           </Button>
-          <Button variant="outline" size="sm" className="flex-auto rounded-xl" onClick={() => setModo('retirar')}>
-            Pasar a mi quincena
-          </Button>
-          <Button variant="ghost" size="sm" className="text-muted-foreground ml-auto" onClick={abrirEdicion}>
-            Editar
-          </Button>
-          <BotonConfirmar
-            variant="ghost"
-            size="sm"
-            className="text-destructive"
-            pregunta={`¿Eliminar la meta "${meta.nombre}"?`}
-            onConfirmar={() => eliminarMeta.mutate(meta.id)}
-            disabled={eliminarMeta.isPending}
-          >
-            Eliminar
-          </BotonConfirmar>
         </div>
       )}
 
@@ -256,31 +240,32 @@ export function FilaMeta({ meta }: FilaMetaProps) {
       {(modo === 'aportar' || modo === 'pagar' || modo === 'retirar') && (
         <div className="flex flex-col gap-2">
           {modo === 'aportar' && (
-            <div role="radiogroup" aria-label="¿De dónde sale el dinero?" className="bg-muted flex gap-1 rounded-xl p-1">
-              {(
-                [
-                  ['quincena', 'De mi quincena'],
-                  ['externo', 'Ya lo tenía ahorrado'],
-                ] as const
-              ).map(([valor, etiqueta]) => (
-                <button
-                  key={valor}
-                  type="button"
-                  role="radio"
-                  aria-checked={origen === valor}
-                  onClick={() => {
-                    setOrigen(valor);
-                    setErrorValidacion(null);
-                  }}
-                  className={cn(
-                    'flex-1 rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition-colors',
-                    origen === valor ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
-                  )}
-                >
-                  {etiqueta}
-                </button>
-              ))}
-            </div>
+            <Segmentado
+              etiqueta="¿De dónde sale el dinero?"
+              valor={origen}
+              opciones={[
+                { valor: 'quincena', etiqueta: 'De mi quincena' },
+                { valor: 'externo', etiqueta: 'Ya lo tenía ahorrado' },
+              ]}
+              onCambiar={(valor) => {
+                setOrigen(valor);
+                setErrorValidacion(null);
+              }}
+            />
+          )}
+          {(modo === 'pagar' || modo === 'retirar') && (
+            <Segmentado
+              etiqueta="¿Qué haces con el dinero?"
+              valor={modo}
+              opciones={[
+                { valor: 'pagar', etiqueta: 'Pagar algo' },
+                { valor: 'retirar', etiqueta: 'Pasar a mi quincena' },
+              ]}
+              onCambiar={(valor) => {
+                setModo(valor);
+                setErrorValidacion(null);
+              }}
+            />
           )}
           <div className="flex flex-wrap items-center gap-2">
             <Input
@@ -323,14 +308,33 @@ export function FilaMeta({ meta }: FilaMetaProps) {
       )}
       {mensajeError && <p className="text-destructive text-sm">{mensajeError}</p>}
 
-      <button
-        type="button"
-        onClick={() => setMostrarMovimientos((v) => !v)}
-        className="text-muted-foreground flex items-center gap-1 self-start text-[12.5px] font-medium"
-      >
-        {mostrarMovimientos ? 'Ocultar movimientos' : 'Ver movimientos'}
-        {mostrarMovimientos ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-x-2">
+        <button
+          type="button"
+          onClick={() => setMostrarMovimientos((v) => !v)}
+          className="text-muted-foreground flex items-center gap-1 py-1 text-[12.5px] font-medium"
+        >
+          {mostrarMovimientos ? 'Ocultar movimientos' : 'Ver movimientos'}
+          {mostrarMovimientos ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        {modo === null && (
+          <div className="-mr-2 flex flex-wrap items-center justify-end">
+            <Button variant="ghost" size="sm" className="text-muted-foreground h-8 text-[12.5px]" onClick={abrirEdicion}>
+              Editar
+            </Button>
+            <BotonConfirmar
+              variant="ghost"
+              size="sm"
+              className="text-destructive h-8 text-[12.5px]"
+              pregunta={`¿Eliminar la meta "${meta.nombre}"?`}
+              onConfirmar={() => eliminarMeta.mutate(meta.id)}
+              disabled={eliminarMeta.isPending}
+            >
+              Eliminar
+            </BotonConfirmar>
+          </div>
+        )}
+      </div>
 
       {mostrarMovimientos && (
         <div className="flex flex-col">
@@ -377,5 +381,35 @@ export function FilaMeta({ meta }: FilaMetaProps) {
         </div>
       )}
     </li>
+  );
+}
+
+interface SegmentadoProps<T extends string> {
+  etiqueta: string;
+  valor: T;
+  opciones: { valor: T; etiqueta: string }[];
+  onCambiar: (valor: T) => void;
+}
+
+/** Dos o tres opciones excluyentes en una sola fila; el texto se ajusta en vez de salirse del contenedor. */
+function Segmentado<T extends string>({ etiqueta, valor, opciones, onCambiar }: SegmentadoProps<T>) {
+  return (
+    <div role="radiogroup" aria-label={etiqueta} className="bg-muted flex gap-1 rounded-xl p-1">
+      {opciones.map((opcion) => (
+        <button
+          key={opcion.valor}
+          type="button"
+          role="radio"
+          aria-checked={valor === opcion.valor}
+          onClick={() => onCambiar(opcion.valor)}
+          className={cn(
+            'flex-1 rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition-colors',
+            valor === opcion.valor ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+          )}
+        >
+          {opcion.etiqueta}
+        </button>
+      ))}
+    </div>
   );
 }
