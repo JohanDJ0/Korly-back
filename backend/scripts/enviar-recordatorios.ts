@@ -12,42 +12,27 @@
  * `modulos/notificaciones/enviar-recordatorios.ts`); no correrlo un día
  * simplemente significa que ese día nadie recibió el recordatorio —
  * aceptable para un aviso informativo, no para un movimiento del ledger.
+ *
+ * Sentry manda sus eventos de forma asíncrona: salir con `process.exit`
+ * sin esperar los dejaba morir con el proceso, justo el caso en que más
+ * importan. Por eso siempre se vacía (`vaciarObservabilidad`) antes de salir.
  */
 import 'dotenv/config';
-import {
-  listarTenantIdsConRecordatoriosActivos,
-  procesarRecordatorioDiarioDeTenant,
-  resumirCorrida,
-  type ResultadoRecordatorioDiario,
-} from '../src/modulos/notificaciones/enviar-recordatorios.js';
-import { inicializarObservabilidad, reportarErrorInesperado } from '../src/shared/observabilidad.js';
-import { ahoraEnMexico } from '../src/shared/fechas.js';
+import { correrRecordatorios } from '../src/modulos/notificaciones/correr-recordatorios.js';
+import { inicializarObservabilidad, reportarErrorInesperado, vaciarObservabilidad } from '../src/shared/observabilidad.js';
 
 inicializarObservabilidad();
 
-async function main() {
-  const fechaReferencia = ahoraEnMexico();
-  const tenantIds = await listarTenantIdsConRecordatoriosActivos();
-
-  const resultados: ResultadoRecordatorioDiario[] = [];
-  let fallidos = 0;
-
-  for (const tenantId of tenantIds) {
-    try {
-      resultados.push(await procesarRecordatorioDiarioDeTenant(tenantId, fechaReferencia));
-    } catch (error) {
-      fallidos++;
-      console.error(`[recordatorios] tenant ${tenantId} falló:`, error);
-      reportarErrorInesperado(error);
-    }
-  }
-
-  console.log(`[recordatorios] ${resumirCorrida(resultados, fallidos)}`);
-}
-
-main()
-  .then(() => process.exit(0))
+const codigoDeSalida = await correrRecordatorios()
+  .then(({ resumen }) => {
+    console.log(`[recordatorios] ${resumen}`);
+    return 0;
+  })
   .catch((error) => {
     console.error('[recordatorios] fallo general del job:', error);
-    process.exit(1);
+    reportarErrorInesperado(error);
+    return 1;
   });
+
+await vaciarObservabilidad();
+process.exit(codigoDeSalida);

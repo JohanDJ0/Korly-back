@@ -49,6 +49,16 @@ export function inicializarObservabilidad(): void {
 }
 
 /**
+ * Espera a que Sentry termine de mandar lo pendiente. El SDK envía en segundo plano: un proceso
+ * que termina enseguida (el job de recordatorios, `scripts/enviar-recordatorios.ts`) perdería los
+ * eventos que acaba de reportar. Sin Sentry inicializado no hay nada que esperar y responde de inmediato.
+ * Devuelve `false` si venció el tiempo con eventos todavía sin entregar.
+ */
+export async function vaciarObservabilidad(tiempoMaximoMs = 2000): Promise<boolean> {
+  return Sentry.flush(tiempoMaximoMs);
+}
+
+/**
  * Único punto de llamada: el 500 genuino en `registrarManejadorErroresDominio`
  * (shared/http.ts) — nunca para un `ErrorDominio` (esos son respuestas
  * de negocio esperadas, no bugs) ni para los 4xx que ya reenvía Fastify.
