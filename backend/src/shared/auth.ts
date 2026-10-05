@@ -39,6 +39,15 @@ export const authPlugin: FastifyPluginAsync = fp(async (fastify) => {
     const token = encabezado.slice('Bearer '.length);
     const { data, error } = await supabaseAdmin.auth.getUser(token);
 
+    // Un fallo transitorio de Supabase Auth (red, 5xx) NO es un token inválido: responder 401
+    // haría que el frontend cierre la sesión de un usuario con una sesión perfectamente buena.
+    if (error && (error.name === 'AuthRetryableFetchError' || (error.status ?? 0) >= 500)) {
+      return reply.code(503).send({
+        codigo: 'AUTENTICACION_NO_DISPONIBLE',
+        mensaje: 'No se pudo verificar tu sesión en este momento. Intenta de nuevo en unos segundos.',
+      });
+    }
+
     if (error || !data.user) {
       return reply.code(401).send({
         codigo: 'TOKEN_INVALIDO',

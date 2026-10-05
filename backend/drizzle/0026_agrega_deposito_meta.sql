@@ -1,0 +1,2 @@
+ALTER TABLE "movimientos" DROP CONSTRAINT "movimientos_tipo_valido";--> statement-breakpoint
+ALTER TABLE "movimientos" ADD CONSTRAINT "movimientos_tipo_valido" CHECK ("movimientos"."tipo" in ('ingreso','gasto','arrastre_sobrante','aporte_meta','retiro_meta','pago_meta','deposito_meta','reversion','cargo_tarjeta','pago_tarjeta'));

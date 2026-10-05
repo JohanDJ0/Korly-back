@@ -1278,6 +1278,20 @@ pago contra la propia meta — el dinero vuelve a ella, no a la quincena.
 reversiones no salen como filas propias. La migración 0022 solo agrega
 `'pago_meta'` al CHECK de `movimientos.tipo`.
 
+### Aporte externo a una meta
+
+Para quien ya traía ahorros antes de usar la app ("tengo $50,000 ahorrados"), o recibe
+un regalo que quiere ahorrar completo: `depositarEnMeta` (`POST /metas/:id/depositos`,
+movimiento `deposito_meta`, migración 0026) postea `[meta +X, externo −X]`. Es el espejo
+de `pagarConMeta`: nunca toca la cuenta de un periodo, así que no cambia el disponible,
+la cifra diaria, el resumen ni el desglose, y no exige periodo activo. A diferencia de
+aportar desde la quincena, no está limitado por el disponible: ese dinero no sale de
+ella. `motivo` es opcional ("Ahorro que ya tenía"). `deshacerDepositoMeta`
+(`DELETE /metas/:id/depositos/:movimientoId`) lo revierte solo si la meta todavía
+conserva ese dinero; si ya se pagó o se pasó a la quincena, `SALDO_META_INSUFICIENTE`.
+En el frontend es una opción dentro de "Aportar" ("De mi quincena" / "Ya lo tenía
+ahorrado"), no un botón más.
+
 ### Tope en los aportes a metas
 
 Hallazgo real del usuario (cuenta de prueba): aportó $10,000 a una meta con una
@@ -2713,6 +2727,17 @@ limpia las que ya existían: las sin uso se borran; las que ya tienen gastos,
 recurrentes o cargos pasan a ser personalizadas (una llave foránea impide
 borrarlas) para que su dueño las renombre o elimine cuando deje de usarlas.
 El ícono "ahorro" sigue disponible para categorías personalizadas.
+
+## Sesión expirada
+
+El backend responde 401 con `TOKEN_INVALIDO` (token vencido o rechazado por Supabase) o
+`NO_AUTENTICADO` (sin token). Antes, cada pantalla mostraba ese mensaje como un error más.
+Ahora el cliente (`lib/api.ts`, en `apiFetch`, `descargarArchivo` e `importarCsv`) cierra la sesión
+(`lib/sesion-expirada.ts`: `signOut({ scope: 'local' })`, que no depende de que Auth conteste) y
+recarga en `/login` con el aviso "Tu sesión expiró". La petición se deja sin resolver mientras
+tanto, para que la pantalla no alcance a pintar el error. Un fallo transitorio de Supabase Auth
+(red o 5xx) ya NO se confunde con un token inválido: el backend responde 503
+`AUTENTICACION_NO_DISPONIBLE` y el usuario conserva su sesión.
 
 ## Seguridad
 

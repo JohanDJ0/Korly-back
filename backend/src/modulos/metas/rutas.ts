@@ -2,7 +2,9 @@ import type { FastifyInstance } from 'fastify';
 import {
   aportarAMeta,
   crearMeta,
+  deshacerDepositoMeta,
   deshacerPagoMeta,
+  depositarEnMeta,
   editarMeta,
   eliminarMeta,
   listarMetas,
@@ -44,6 +46,11 @@ interface CrearRetiroBody {
 }
 
 interface CrearPagoBody {
+  monto?: MontoDto;
+  motivo?: string;
+}
+
+interface CrearDepositoBody {
   monto?: MontoDto;
   motivo?: string;
 }
@@ -178,6 +185,30 @@ export async function rutasMetas(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: { metaId: string; movimientoId: string } }>('/metas/:metaId/pagos/:movimientoId', async (request, reply) => {
     await deshacerPagoMeta(request.identidad.tenantId, request.params.metaId, request.params.movimientoId);
+    reply.code(204).send();
+  });
+
+  /** Dinero que ya existía fuera de la app, directo a la meta, sin pasar por la quincena (ver `depositarEnMeta`). */
+  app.post<{ Params: { metaId: string } }>('/metas/:metaId/depositos', async (request, reply) => {
+    const body = request.body as CrearDepositoBody | undefined;
+    if (!body?.monto) {
+      throw new ErrorDominio('VALIDACION', "El campo 'monto' es obligatorio");
+    }
+    const { valorMinimo, moneda } = montoDesdeDto(body.monto);
+
+    const resultado = await depositarEnMeta({
+      tenantId: request.identidad.tenantId,
+      metaId: request.params.metaId,
+      monto: valorMinimo,
+      moneda,
+      motivo: body.motivo,
+    });
+
+    reply.code(201).send({ id: resultado.id, metaId: resultado.metaId, monto: montoADto(valorMinimo, moneda), motivo: body.motivo?.trim() || null });
+  });
+
+  app.delete<{ Params: { metaId: string; movimientoId: string } }>('/metas/:metaId/depositos/:movimientoId', async (request, reply) => {
+    await deshacerDepositoMeta(request.identidad.tenantId, request.params.metaId, request.params.movimientoId);
     reply.code(204).send();
   });
 

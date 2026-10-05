@@ -1,3 +1,4 @@
+import { cerrarSesionExpirada, esErrorDeSesion } from '@/lib/sesion-expirada';
 import { supabase } from '@/lib/supabase';
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -53,10 +54,23 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const cuerpo = await respuesta.json().catch(() => null);
 
   if (!respuesta.ok) {
+    if (sesionInvalida(respuesta.status, cuerpo?.codigo)) return new Promise<never>(() => undefined);
     throw new ApiError(respuesta.status, cuerpo?.codigo ?? 'ERROR_DESCONOCIDO', cuerpo?.mensaje ?? respuesta.statusText);
   }
 
   return cuerpo as T;
+}
+
+/**
+ * Un 401 de sesión inválida cierra la sesión en cualquier pantalla y petición, en vez de mostrarse
+ * como un error más. Devuelve true si la sesión se está cerrando: quien llama deja la promesa sin
+ * resolver (la página se recarga en /login enseguida), para que la pantalla no alcance a mostrar
+ * un "token no válido" a medias.
+ */
+function sesionInvalida(status: number, codigo: string | undefined): boolean {
+  if (!esErrorDeSesion(status, codigo)) return false;
+  cerrarSesionExpirada();
+  return true;
 }
 
 /**
@@ -82,6 +96,7 @@ export async function descargarArchivo(path: string, nombreArchivo: string): Pro
 
   if (!respuesta.ok) {
     const cuerpo = await respuesta.json().catch(() => null);
+    if (sesionInvalida(respuesta.status, cuerpo?.codigo)) return new Promise<never>(() => undefined);
     throw new ApiError(respuesta.status, cuerpo?.codigo ?? 'ERROR_DESCONOCIDO', cuerpo?.mensaje ?? respuesta.statusText);
   }
 
@@ -115,6 +130,7 @@ export async function importarCsv<T>(path: string, csvTexto: string): Promise<T>
   const cuerpo = await respuesta.json().catch(() => null);
 
   if (!respuesta.ok) {
+    if (sesionInvalida(respuesta.status, cuerpo?.codigo)) return new Promise<never>(() => undefined);
     throw new ApiError(respuesta.status, cuerpo?.codigo ?? 'ERROR_DESCONOCIDO', cuerpo?.mensaje ?? respuesta.statusText);
   }
 

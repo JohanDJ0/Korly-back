@@ -5,12 +5,12 @@ import type { MontoDto } from '@/lib/dinero';
 
 export interface MovimientoMeta {
   id: string;
-  tipo: 'aporte' | 'retiro' | 'pago';
+  tipo: 'aporte' | 'retiro' | 'pago' | 'deposito';
   /** Con signo desde el punto de vista de la meta: positivo entra a la meta, negativo sale. */
   monto: MontoDto;
   fechaEfectiva: string;
   nota: string | null;
-  /** true si ya se deshizo (solo los pagos se pueden deshacer). */
+  /** true si ya se deshizo (solo los pagos y los aportes externos se pueden deshacer). */
   revertido: boolean;
 }
 

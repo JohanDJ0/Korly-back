@@ -472,7 +472,90 @@ export async function deshacerPagoMeta(tenantId: string, metaId: string, movimie
   });
 }
 
-export type TipoMovimientoDeMeta = 'aporte' | 'retiro' | 'pago';
+export interface DepositarEnMetaEntrada {
+  tenantId: string;
+  metaId: string;
+  monto: bigint;
+  moneda: string;
+  /** Opcional: de dónde venía ("ahorro que ya tenía", "regalo"). */
+  motivo?: string;
+  fechaReferencia?: Date;
+}
+
+/**
+ * Mete a una meta dinero que YA existía fuera de la app (externo → meta): el
+ * ahorro que alguien tenía antes de empezar a usar Korly, un regalo, un bono que
+ * decide ahorrar completo. Es el espejo de `pagarConMeta`: el movimiento nunca
+ * toca la cuenta de ningún periodo, así que no cambia el disponible, la cifra
+ * diaria ni el resumen del periodo — a diferencia de `aportarAMeta`, que mueve
+ * dinero de la quincena y por eso queda limitado a lo disponible. Tampoco exige
+ * periodo activo.
+ */
+export async function depositarEnMeta(entrada: DepositarEnMetaEntrada): Promise<PagoMetaResultado> {
+  if (entrada.monto <= 0n) {
+    throw new ErrorDominio('VALIDACION', 'El monto de un aporte externo debe ser positivo');
+  }
+  const motivo = entrada.motivo?.trim();
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
+
+  return conTenant(entrada.tenantId, async (tx) => {
+    const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);
+    if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    await bloquearMetaTx(tx, meta.id);
+
+    const { movimientoId } = await registrarMovimientoTx(tx, {
+      tenantId: entrada.tenantId,
+      tipo: 'deposito_meta',
+      moneda: entrada.moneda,
+      fechaEfectiva: fechaISO(fechaReferencia),
+      nota: motivo && motivo.length > 0 ? motivo : undefined,
+      partidas: [
+        { cuentaId: meta.cuentaId, montoValorMinimo: entrada.monto },
+        { cuentaId: null, montoValorMinimo: -entrada.monto },
+      ],
+    });
+
+    return { id: movimientoId, metaId: meta.id };
+  });
+}
+
+/**
+ * Corrige un aporte externo: el dinero sale de la meta de vuelta a "fuera". Solo si
+ * la meta todavía lo tiene — si ya se pagó o se pasó a la quincena, deshacerlo
+ * dejaría la meta en negativo (`SALDO_META_INSUFICIENTE`). Siempre por reversión.
+ */
+export async function deshacerDepositoMeta(tenantId: string, metaId: string, movimientoId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<void> {
+  return conTenant(tenantId, async (tx) => {
+    const meta = await obtenerMetaPorIdTx(tx, tenantId, metaId);
+    if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    if (!esUuidValido(movimientoId)) throw new ErrorDominio('DEPOSITO_META_NO_ENCONTRADO', 'El aporte especificado no existe');
+
+    const [deposito] = await tx
+      .select({ id: movimientos.id, monto: asientos.montoValorMinimo })
+      .from(movimientos)
+      .innerJoin(asientos, eq(asientos.movimientoId, movimientos.id))
+      .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.id, movimientoId), eq(movimientos.tipo, 'deposito_meta'), eq(asientos.cuentaId, meta.cuentaId)))
+      .limit(1);
+    if (!deposito) throw new ErrorDominio('DEPOSITO_META_NO_ENCONTRADO', 'El aporte especificado no existe');
+
+    await bloquearMetaTx(tx, meta.id);
+
+    const [reversion] = await tx
+      .select({ id: movimientos.id })
+      .from(movimientos)
+      .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.movimientoRevertidoId, deposito.id)))
+      .limit(1);
+    if (reversion) throw new ErrorDominio('DEPOSITO_META_YA_REVERTIDO', 'Este aporte ya fue deshecho antes');
+
+    if (deposito.monto > (await saldoCuentaTx(tx, meta.cuentaId))) {
+      throw new ErrorDominio('SALDO_META_INSUFICIENTE', 'La meta ya no tiene ese dinero (se pagó o se pasó a la quincena), así que no se puede deshacer');
+    }
+
+    await revertirMovimientoEnSusCuentasTx(tx, tenantId, deposito.id, fechaISO(fechaReferencia), 'Reversión de aporte externo a meta');
+  });
+}
+
+export type TipoMovimientoDeMeta = 'aporte' | 'retiro' | 'pago' | 'deposito';
 
 export interface MovimientoDeMeta {
   id: string;
@@ -492,6 +575,7 @@ const TIPO_DE_MOVIMIENTO_DE_META: Readonly<Record<string, TipoMovimientoDeMeta>>
   aporte_meta: 'aporte',
   retiro_meta: 'retiro',
   pago_meta: 'pago',
+  deposito_meta: 'deposito',
 };
 
 /**

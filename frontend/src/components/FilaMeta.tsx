@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { useAportarMeta } from '@/hooks/use-aportar-meta';
 import { useDeshacerPagoMeta } from '@/hooks/use-deshacer-pago-meta';
+import { useDepositarMeta } from '@/hooks/use-depositar-meta';
 import { useDisponible } from '@/hooks/use-disponible';
 import { useEditarMeta } from '@/hooks/use-editar-meta';
 import { useEliminarMeta } from '@/hooks/use-eliminar-meta';
@@ -22,9 +23,11 @@ interface FilaMetaProps {
 }
 
 type Modo = 'aportar' | 'pagar' | 'retirar' | 'editar' | null;
+type OrigenAporte = 'quincena' | 'externo';
 
 const AYUDA_POR_MODO = {
   aportar: 'Se descuenta de lo que puedes gastar en tu quincena.',
+  aportarExterno: 'Es dinero que ya tenías fuera de Korly. Entra directo a la meta y no cambia lo que puedes gastar en tu quincena.',
   pagar: 'Sale directo de la meta. No cuenta en el presupuesto ni en los gastos de tu quincena.',
   retirar: 'Pasa a tu quincena como ingreso: aumenta lo que puedes gastar y cuenta como ingreso del periodo.',
 } as const;
@@ -32,6 +35,7 @@ const AYUDA_POR_MODO = {
 function etiquetaMovimiento(movimiento: MovimientoMeta): string {
   if (movimiento.tipo === 'pago') return `Pago: ${movimiento.nota ?? 'sin motivo'}`;
   if (movimiento.tipo === 'retiro') return `A la quincena: ${movimiento.nota ?? 'sin motivo'}`;
+  if (movimiento.tipo === 'deposito') return movimiento.nota ? `Aporte externo: ${movimiento.nota}` : 'Aporte externo';
   return 'Aporte';
 }
 
@@ -50,6 +54,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
   const [modo, setModo] = useState<Modo>(null);
   const [monto, setMonto] = useState('');
   const [motivo, setMotivo] = useState('');
+  const [origen, setOrigen] = useState<OrigenAporte>('quincena');
   const [mostrarMovimientos, setMostrarMovimientos] = useState(false);
   const [nombreEdicion, setNombreEdicion] = useState('');
   const [objetivoEdicion, setObjetivoEdicion] = useState('');
@@ -62,6 +67,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
   const aportarMeta = useAportarMeta();
   const retirarMeta = useRetirarMeta();
   const pagarMeta = usePagarMeta();
+  const depositarMeta = useDepositarMeta();
   const deshacerPago = useDeshacerPagoMeta();
   const eliminarMeta = useEliminarMeta();
   const { data: disponible } = useDisponible();
@@ -72,8 +78,10 @@ export function FilaMeta({ meta }: FilaMetaProps) {
     setModo(null);
     setMonto('');
     setMotivo('');
+    setOrigen('quincena');
     setErrorValidacion(null);
     aportarMeta.reset();
+    depositarMeta.reset();
     retirarMeta.reset();
     pagarMeta.reset();
     editarMeta.reset();
@@ -120,7 +128,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
       return;
     }
     // El backend también lo rechaza (APORTE_EXCEDE_DISPONIBLE); aquí solo se evita el viaje y se dice cuánto hay.
-    if (modo === 'aportar' && disponible?.estado === 'ok' && Math.round(valor * 100) > disponible.disponible.valorMinimo) {
+    if (modo === 'aportar' && origen === 'quincena' && disponible?.estado === 'ok' && Math.round(valor * 100) > disponible.disponible.valorMinimo) {
       setErrorValidacion(`Tu quincena solo tiene ${formatearMonto(disponible.disponible)} disponible`);
       return;
     }
@@ -137,7 +145,9 @@ export function FilaMeta({ meta }: FilaMetaProps) {
     setErrorValidacion(null);
     const montoDto = { valorMinimo: Math.round(valor * 100), moneda: meta.montoObjetivo.moneda };
 
-    if (modo === 'aportar') {
+    if (modo === 'aportar' && origen === 'externo') {
+      depositarMeta.mutate({ metaId: meta.id, monto: montoDto, motivo: motivo.trim() || undefined }, { onSuccess: cerrar });
+    } else if (modo === 'aportar') {
       aportarMeta.mutate({ metaId: meta.id, monto: montoDto }, { onSuccess: cerrar });
     } else if (modo === 'retirar') {
       retirarMeta.mutate({ metaId: meta.id, monto: montoDto, motivo }, { onSuccess: cerrar });
@@ -146,10 +156,11 @@ export function FilaMeta({ meta }: FilaMetaProps) {
     }
   }
 
-  const pendiente = aportarMeta.isPending || retirarMeta.isPending || pagarMeta.isPending || editarMeta.isPending;
-  const mensajeError = errorValidacion ?? (aportarMeta.error ?? retirarMeta.error ?? pagarMeta.error ?? editarMeta.error ?? eliminarMeta.error)?.message;
+  const pendiente = aportarMeta.isPending || retirarMeta.isPending || pagarMeta.isPending || depositarMeta.isPending || editarMeta.isPending;
+  const mensajeError = errorValidacion ?? (aportarMeta.error ?? depositarMeta.error ?? retirarMeta.error ?? pagarMeta.error ?? editarMeta.error ?? eliminarMeta.error)?.message;
   const porcentaje = Math.min(100, meta.porcentajeAvance);
-  const pideMotivo = modo === 'retirar' || modo === 'pagar';
+  const aportaExterno = modo === 'aportar' && origen === 'externo';
+  const pideMotivo = modo === 'retirar' || modo === 'pagar' || aportaExterno;
 
   return (
     <li className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-4.5">
@@ -244,6 +255,33 @@ export function FilaMeta({ meta }: FilaMetaProps) {
 
       {(modo === 'aportar' || modo === 'pagar' || modo === 'retirar') && (
         <div className="flex flex-col gap-2">
+          {modo === 'aportar' && (
+            <div role="radiogroup" aria-label="¿De dónde sale el dinero?" className="bg-muted flex gap-1 rounded-xl p-1">
+              {(
+                [
+                  ['quincena', 'De mi quincena'],
+                  ['externo', 'Ya lo tenía ahorrado'],
+                ] as const
+              ).map(([valor, etiqueta]) => (
+                <button
+                  key={valor}
+                  type="button"
+                  role="radio"
+                  aria-checked={origen === valor}
+                  onClick={() => {
+                    setOrigen(valor);
+                    setErrorValidacion(null);
+                  }}
+                  className={cn(
+                    'flex-1 rounded-lg px-2 py-1.5 text-[12.5px] font-medium transition-colors',
+                    origen === valor ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'
+                  )}
+                >
+                  {etiqueta}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             <Input
               value={monto}
@@ -265,7 +303,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
                   setMotivo(evento.target.value);
                   setErrorValidacion(null);
                 }}
-                placeholder={modo === 'pagar' ? '¿En qué lo usas?' : 'Motivo'}
+                placeholder={modo === 'pagar' ? '¿En qué lo usas?' : aportaExterno ? 'Origen (opcional)' : 'Motivo'}
                 className="w-40 min-w-36 flex-1"
               />
             )}
@@ -277,8 +315,8 @@ export function FilaMeta({ meta }: FilaMetaProps) {
             </Button>
           </div>
           <p className="text-muted-foreground text-[12px]">
-            {AYUDA_POR_MODO[modo]}
-            {modo === 'aportar' && disponible?.estado === 'ok' && ` Tienes ${formatearMonto(disponible.disponible)} disponible.`}
+            {AYUDA_POR_MODO[aportaExterno ? 'aportarExterno' : modo]}
+            {modo === 'aportar' && origen === 'quincena' && disponible?.estado === 'ok' && ` Tienes ${formatearMonto(disponible.disponible)} disponible.`}
             {(modo === 'pagar' || modo === 'retirar') && ` La meta tiene ${formatearMonto(meta.montoAcumulado)}.`}
           </p>
         </div>
@@ -312,13 +350,13 @@ export function FilaMeta({ meta }: FilaMetaProps) {
                       {formatearFechaActividad(movimiento.fechaEfectiva)}
                       {movimiento.revertido ? ' · deshecho' : ''}
                     </p>
-                    {movimiento.tipo === 'pago' && !movimiento.revertido && (
+                    {(movimiento.tipo === 'pago' || movimiento.tipo === 'deposito') && !movimiento.revertido && (
                       <BotonConfirmar
                         variant="ghost"
                         size="sm"
                         className="text-destructive -ml-2.5 h-7 text-xs"
-                        pregunta="¿Deshacer este pago? El dinero vuelve a la meta."
-                        onConfirmar={() => deshacerPago.mutate({ metaId: meta.id, movimientoId: movimiento.id })}
+                        pregunta={movimiento.tipo === 'pago' ? '¿Deshacer este pago? El dinero vuelve a la meta.' : '¿Deshacer este aporte? El dinero sale de la meta.'}
+                        onConfirmar={() => deshacerPago.mutate({ metaId: meta.id, movimientoId: movimiento.id, tipo: movimiento.tipo === 'pago' ? 'pago' : 'deposito' })}
                         disabled={deshacerPago.isPending}
                       >
                         Deshacer

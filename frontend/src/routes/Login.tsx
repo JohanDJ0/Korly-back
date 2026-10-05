@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
+import { hayAvisoSesionExpirada, limpiarAvisoSesionExpirada } from '@/lib/sesion-expirada';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -22,6 +23,7 @@ export function Login() {
   const session = useAuthStore((s) => s.session);
   const navigate = useNavigate();
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
+  const [sesionExpirada] = useState(hayAvisoSesionExpirada);
 
   const {
     register,
@@ -38,6 +40,7 @@ export function Login() {
       setErrorGeneral(error.message);
       return;
     }
+    limpiarAvisoSesionExpirada();
     navigate('/', { replace: true });
   }
 
@@ -57,6 +60,11 @@ export function Login() {
             ¿Olvidaste tu contraseña?
           </Link>
         </div>
+        {sesionExpirada && !errorGeneral && (
+          <p role="status" className="text-muted-foreground bg-muted rounded-xl px-3 py-2 text-sm">
+            Tu sesión expiró. Inicia sesión de nuevo para continuar.
+          </p>
+        )}
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
         <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">
           {isSubmitting ? 'Entrando…' : 'Entrar'}

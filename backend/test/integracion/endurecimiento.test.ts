@@ -150,6 +150,18 @@ describe('endurecimiento de la API', () => {
       expect(respuesta.json()).toMatchObject({ codigo: 'TOKEN_INVALIDO' });
     });
 
+    it('si Supabase Auth no responde (fallo transitorio), 503 y NO 401: no es un token inválido', async () => {
+      vi.spyOn(supabaseAdmin.auth, 'getUser').mockResolvedValue({
+        data: { user: null },
+        error: { name: 'AuthRetryableFetchError', message: 'fetch failed', status: 0 },
+      } as never);
+
+      const respuesta = await nuevaApp().inject({ method: 'GET', url: '/v1/me', headers: { authorization: 'Bearer token-bueno' } });
+
+      expect(respuesta.statusCode).toBe(503);
+      expect(respuesta.json()).toMatchObject({ codigo: 'AUTENTICACION_NO_DISPONIBLE' });
+    });
+
     it('sin token, 401 sin llamar nunca a Supabase', async () => {
       const espia = vi.spyOn(supabaseAdmin.auth, 'getUser');
 

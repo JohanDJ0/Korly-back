@@ -35,6 +35,9 @@ export const TIPOS_MOVIMIENTO = [
   // Pago hecho directo desde una meta (meta -> externo): nunca toca la cuenta
   // de un periodo, así que no afecta el disponible, el resumen ni el desglose.
   'pago_meta',
+  // Dinero que ya existía fuera de la app y se mete directo a una meta (externo -> meta):
+  // el espejo de 'pago_meta'. Nunca toca la cuenta de un periodo.
+  'deposito_meta',
   'reversion',
   // Tarjetas de crédito y MSI (ver modulos/tarjetas/) — dos movimientos
   // separados a propósito, nunca uno solo: 'cargo_tarjeta' es la compra
@@ -108,7 +111,7 @@ export const movimientos = pgTable(
   (t) => [
     check(
       'movimientos_tipo_valido',
-      sql`${t.tipo} in ('ingreso','gasto','arrastre_sobrante','aporte_meta','retiro_meta','pago_meta','reversion','cargo_tarjeta','pago_tarjeta')`
+      sql`${t.tipo} in ('ingreso','gasto','arrastre_sobrante','aporte_meta','retiro_meta','pago_meta','deposito_meta','reversion','cargo_tarjeta','pago_tarjeta')`
     ),
     pgPolicy('movimientos_aislamiento_tenant', {
       for: 'all',

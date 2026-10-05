@@ -183,6 +183,13 @@
       "when": 1791168402416,
       "tag": "0025_meta_sin_saldo_negativo",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1791169467615,
+      "tag": "0026_agrega_deposito_meta",
+      "breakpoints": true
     }
   ]
 }
