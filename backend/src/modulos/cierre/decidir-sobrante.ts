@@ -100,7 +100,7 @@ async function obtenerMetaParaReclamoTx(tx: Ejecutor, tenantId: string, metaId: 
   const [fila] = await tx
     .select({ id: metas.id, cuentaId: metas.cuentaId })
     .from(metas)
-    .where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId)))
+    .where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId), isNull(metas.archivadaEn)))
     .limit(1);
   return fila ?? null;
 }

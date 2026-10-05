@@ -1278,6 +1278,60 @@ pago contra la propia meta — el dinero vuelve a ella, no a la quincena.
 reversiones no salen como filas propias. La migración 0022 solo agrega
 `'pago_meta'` al CHECK de `movimientos.tipo`.
 
+### Tope en los aportes a metas
+
+Hallazgo real del usuario (cuenta de prueba): aportó $10,000 a una meta con una
+quincena que tenía unos $5,700, y la app lo dejó pasar — `aportarAMeta` restaba
+del periodo sin comprobar nada y lo dejaba en negativo ("te excediste por
+$4,300"), moviendo a la meta dinero que nunca existió.
+
+Ahora `aportarAMeta` rechaza con `APORTE_EXCEDE_DISPONIBLE` (409) un monto mayor
+al saldo del periodo activo (sin ingreso registrado el saldo es 0, así que
+tampoco deja). A diferencia de un gasto — que ya ocurrió en la vida real y por
+eso se registra aunque sobregire (modelo-dominio.md §5) — un aporte es una
+transferencia voluntaria. La fila del periodo se bloquea (`FOR UPDATE`) para que
+dos aportes simultáneos no se pasen entre sí. El frontend lo comprueba antes
+con el disponible y muestra cuánto hay.
+
+Ver también "Auditoría de saldos" abajo: el mismo hueco existía al revés
+(`retirarDeMeta`) y se cerró junto con otros.
+
+### Auditoría de saldos: dónde puede faltar dinero y dónde no
+
+Tras el hallazgo de los aportes se revisaron TODAS las operaciones que escriben
+asientos, con una pregunta: ¿puede crear dinero que no existe? La regla que
+salió: **un gasto puede sobregirar la quincena; una transferencia voluntaria no.**
+Un gasto ya ocurrió en la vida real (la app lo registra y la cifra de mañana
+baja, modelo-dominio.md §5); mover dinero entre cuentas es una decisión de ahora.
+
+| Operación | ¿Puede dejar la cuenta en negativo? | Cómo se protege |
+| --- | --- | --- |
+| Gasto, recurrente, importación, mensualidad de tarjeta | Sí, la quincena — a propósito | Diseño: refleja la realidad ("te excediste") |
+| Editar/eliminar un ingreso o gasto | Sí, la quincena — a propósito | Corrección de un registro equivocado |
+| Aportar a una meta | **No** | `APORTE_EXCEDE_DISPONIBLE` (≤ saldo del periodo) |
+| Pasar a mi quincena (retirar) | **No** | `SALDO_META_INSUFICIENTE` (≤ saldo de la meta) |
+| Pagar con una meta | **No** | `SALDO_META_INSUFICIENTE` |
+| Cargo a una tarjeta | **No** (límite de crédito) | `LIMITE_CREDITO_EXCEDIDO`, con la fila de la tarjeta bloqueada (`FOR UPDATE`): antes dos cargos simultáneos podían pasar el límite juntos |
+| Sobrante ahorrado / arrastrado | **No** (un déficit nunca se "ahorra") | Un déficit se decide solo como `arrastrado` |
+| Reabrir un periodo | **No** | Bloquea si el sobrante ya salió de donde lo dejó el cierre |
+
+**Red de seguridad en la base de datos** (migración 0025, trigger
+`asientos_meta_no_negativa`): ningún asiento que RESTE dinero de una cuenta de
+meta puede dejarla en negativo, aunque la validación de la aplicación falle o
+se olvide en un movimiento futuro. Solo mira asientos negativos: meter dinero
+nunca se rechaza, así una meta que ya estuviera en negativo por un dato
+anterior puede recuperarse aportándole.
+
+**Entradas absurdas** (mismo espíritu — datos que no deberían existir):
+`montoDesdeDto` rechaza NaN, infinito y números por encima de
+`Number.MAX_SAFE_INTEGER` (antes eran un 500 genérico); los plazos de un cargo
+van de 1 a 60 (antes `numeroPlazos: 1e9` ponía a la API a insertar filas por
+minutos) y los días para pagar de 1 a 90.
+
+**Sin resolver, a la vista:** la importación de CSV no limita el número de filas
+(lo acota el tamaño del cuerpo de la petición, 1 MB); y un ingreso o gasto puede
+llevar una fecha fuera de la quincena a la que pertenece.
+
 ### Aportes que vuelven a la quincena
 
 Hallazgo real del usuario (cuenta de prueba): aportó $500 a una meta y los
@@ -1759,12 +1813,24 @@ está.
   no lo bloquearía con una FK — se comprueban las tres a mano
   (`CATEGORIA_EN_USO`, 409) para no dejar un gasto ya registrado
   apuntando a una categoría que ya no existe.
-- **Metas** (`eliminarMeta`, `metas.ts`): solo si su cuenta nunca
-  recibió ningún asiento — no "saldo en cero", que un aporte seguido de
-  un retiro idéntico también deja en cero pero con historial real
-  detrás (`aportarAMeta`, `retirarDeMeta`, y `decidirSobrante` cuando
-  el usuario elige "ahorrar" también escriben contra esta cuenta).
-  `META_CON_HISTORIAL` (409) si ya tiene algo.
+- **Metas** (`eliminarMeta`, `metas.ts`): según su historial. Sin ningún
+  asiento nunca (ni aportes, retiros, pagos ni sobrante ahorrado) se borra de
+  verdad. Con historial y **saldo exactamente en cero** se **archiva**
+  (`metas.archivada_en`, migración 0024): sus movimientos son inmutables
+  (ADR-001) pero la meta ya no guarda dinero, así que sale del listado, deja de
+  contar para el límite de 2 metas del plan gratuito y se trata como
+  inexistente en todo (aportar, retirar, pagar, editar, elegirla como destino
+  del sobrante). Con saldo distinto de cero (a favor o en contra) se rechaza:
+  `META_CON_HISTORIAL` (409), con el mensaje de que hay que dejarla en cero
+  primero. Antes, una meta con aportes y retiros idénticos quedaba imposible de
+  eliminar aunque estuviera en cero. Toda escritura contra una meta bloquea su
+  fila (`FOR UPDATE`, `bloquearMetaTx`) y confirma que no esté archivada, para
+  que archivarla no compita con un movimiento en camino.
+
+  **Editar** (`editarMeta`, `PATCH /metas/:id`): cambia `nombre` y/o
+  `montoObjetivo`. Son datos de configuración, no del ledger: el avance se
+  deriva siempre del saldo real, así que cambiar el objetivo solo recalcula el
+  porcentaje. La moneda no se edita.
 
 Extensión sobre `docs/openapi.yaml` (que no define `DELETE` para
 ninguno de los tres todavía), mismo criterio que el resto de

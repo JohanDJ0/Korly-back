@@ -1,0 +1,1 @@
+ALTER TABLE "metas" ADD COLUMN "archivada_en" timestamp with time zone;

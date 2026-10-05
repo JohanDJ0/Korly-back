@@ -32,6 +32,8 @@ const CODIGO_A_STATUS: Record<string, number> = {
   META_NO_ENCONTRADA: 404,
   // Pagar con una meta (modulos/metas/metas.ts): a diferencia del retiro hacia la quincena, no se permite sobregirar la meta.
   SALDO_META_INSUFICIENTE: 409,
+  // Aportar a una meta desde la quincena: el monto no puede pasar de lo disponible.
+  APORTE_EXCEDE_DISPONIBLE: 409,
   PAGO_META_NO_ENCONTRADO: 404,
   PAGO_META_YA_REVERTIDO: 409,
   CATEGORIA_NO_ENCONTRADA: 404,
@@ -129,6 +131,16 @@ export function montoADto(valorMinimo: bigint, moneda: string): MontoDto {
   return { valorMinimo: Number(valorMinimo), moneda };
 }
 
+/**
+ * Rechaza lo que no es un monto razonable ANTES de convertirlo: `BigInt(NaN)` o
+ * `BigInt(Infinity)` lanzaban un `RangeError` (un 500 genérico), y un número
+ * por encima de `Number.MAX_SAFE_INTEGER` ya perdió precisión al llegar como
+ * JSON (el contrato eligió `integer`, ver `montoADto`). Los montos negativos o
+ * en cero los rechaza cada operación de dominio con su propio mensaje.
+ */
 export function montoDesdeDto(dto: MontoDto): { valorMinimo: bigint; moneda: string } {
+  if (typeof dto.valorMinimo !== 'number' || !Number.isFinite(dto.valorMinimo) || Math.abs(dto.valorMinimo) > Number.MAX_SAFE_INTEGER) {
+    throw new ErrorDominio('VALIDACION', "El campo 'valorMinimo' debe ser un número entero dentro de un rango válido");
+  }
   return { valorMinimo: BigInt(Math.trunc(dto.valorMinimo)), moneda: dto.moneda };
 }

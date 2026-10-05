@@ -31,6 +31,13 @@ export const metas = pgTable(
     montoObjetivoValorMinimo: bigint('monto_objetivo_valor_minimo', { mode: 'bigint' }).notNull(),
     moneda: text('moneda').notNull(),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * "Eliminar" una meta con historial que ya quedó en cero la archiva en vez
+     * de borrarla: sus movimientos son inmutables (ADR-001). Una meta archivada
+     * se trata como inexistente en todo (listado, aportes, retiros, pagos) y no
+     * cuenta para el límite del plan gratuito.
+     */
+    archivadaEn: timestamp('archivada_en', { withTimezone: true }),
   },
   (t) => [
     // `montoObjetivoValorMinimo` sí se guarda tal cual (a diferencia de

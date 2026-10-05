@@ -4,7 +4,7 @@ import { periodos } from '../../src/db/schema/periodos.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { editarIngreso, eliminarIngreso, registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { editarGasto, eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
-import { crearCuentaTx } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { crearCuentaTx, registrarMovimientoTx } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { crearPeriodo, obtenerPeriodoActivo } from '../../src/modulos/periodos/crear-periodo.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
 import { aportarAMeta, crearMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
@@ -12,6 +12,26 @@ import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.
 import { crearTarjeta } from '../../src/modulos/tarjetas/tarjetas.js';
 import { registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
 import { conTenant } from '../../src/shared/db.js';
+
+/**
+ * Deja dinero ya ahorrado en una meta SIN pasar por la quincena (externo → meta),
+ * como el ahorro que alguien tenía antes de usar la app. Retirar ya no puede
+ * sobregirar la meta, así que las pruebas que retiran necesitan saldo previo.
+ */
+async function sembrarAhorro(tenantId: string, cuentaMetaId: string, monto: bigint) {
+  await conTenant(tenantId, (tx) =>
+    registrarMovimientoTx(tx, {
+      tenantId,
+      tipo: 'aporte_meta',
+      moneda: 'MXN',
+      fechaEfectiva: '2026-08-01',
+      partidas: [
+        { cuentaId: cuentaMetaId, montoValorMinimo: monto },
+        { cuentaId: null, montoValorMinimo: -monto },
+      ],
+    })
+  );
+}
 
 describe('consultarDisponible (motor de flujo de caja)', () => {
   async function tenantNuevo() {
@@ -427,11 +447,10 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
     const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
     await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
-    // Sin aporte previo a propósito: retirarDeMeta no exige saldo
-    // acumulado (mismo criterio que el sobregiro permitido en gastos,
-    // ver su comentario en metas.ts) — lo que importa aquí es el efecto
-    // en disponible, no el saldo de la meta.
+    // El ahorro llega de fuera (no de esta quincena): lo que importa aquí es el
+    // efecto del retiro en el disponible, así que no debe alterarlo el aporte previo.
     const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+    await sembrarAhorro(tenantId, meta.cuentaId, 300n);
 
     // Retira 300 de la meta y los gasta de inmediato, mismo día — el
     // caso real reportado: antes de este fix, el retiro se repartía
@@ -459,6 +478,7 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
     await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
     const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+    await sembrarAhorro(tenantId, meta.cuentaId, 300n);
 
     await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'Ahorré de más', fechaReferencia: hoy });
 

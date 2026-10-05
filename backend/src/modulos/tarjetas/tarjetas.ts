@@ -51,8 +51,8 @@ export async function crearTarjeta(
   if (!Number.isInteger(diaCorte) || diaCorte < 1 || diaCorte > 31) {
     throw new ErrorDominio('VALIDACION', "El campo 'diaCorte' debe ser un entero entre 1 y 31");
   }
-  if (!Number.isInteger(diasParaPago) || diasParaPago <= 0) {
-    throw new ErrorDominio('VALIDACION', "El campo 'diasParaPago' debe ser un entero positivo");
+  if (!Number.isInteger(diasParaPago) || diasParaPago <= 0 || diasParaPago > 90) {
+    throw new ErrorDominio('VALIDACION', "El campo 'diasParaPago' debe ser un entero entre 1 y 90");
   }
 
   return conTenant(tenantId, async (tx) => {

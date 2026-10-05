@@ -169,6 +169,20 @@
       "when": 1791166392926,
       "tag": "0023_quita_categoria_ahorro",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1791167333078,
+      "tag": "0024_archiva_metas",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1791168402416,
+      "tag": "0025_meta_sin_saldo_negativo",
+      "breakpoints": true
     }
   ]
 }

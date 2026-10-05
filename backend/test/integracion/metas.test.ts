@@ -7,9 +7,10 @@ import { obtenerSaldoCuenta } from '../../src/modulos/ledger/registrar-movimient
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
+import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
-import { aportarAMeta, crearMeta, deshacerPagoMeta, eliminarMeta, listarMetas, listarMovimientosDeMeta, pagarConMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
+import { aportarAMeta, crearMeta, deshacerPagoMeta, editarMeta, eliminarMeta, listarMetas, listarMovimientosDeMeta, pagarConMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 import { conTenant } from '../../src/shared/db.js';
 
 describe('metas de ahorro', () => {
@@ -98,7 +99,7 @@ describe('metas de ahorro', () => {
       await expect(eliminarMeta(tenantId, meta.id)).rejects.toMatchObject({ codigo: 'META_CON_HISTORIAL' });
     });
 
-    it('rechaza eliminar una meta incluso si un aporte y un retiro idénticos la dejaron de vuelta en saldo 0', async () => {
+    it('con historial pero saldo en 0 (un aporte y un retiro idénticos) se archiva: sale del listado, conserva su historial', async () => {
       const { tenantId, periodo } = await tenantConPeriodoActivo();
       await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
       const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
@@ -106,7 +107,101 @@ describe('metas de ahorro', () => {
       await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'Ya no la necesito', fechaReferencia: HOY });
 
       expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(0n);
-      await expect(eliminarMeta(tenantId, meta.id)).rejects.toMatchObject({ codigo: 'META_CON_HISTORIAL' });
+      await eliminarMeta(tenantId, meta.id);
+
+      expect(await listarMetas(tenantId)).toHaveLength(0);
+      // El ledger sigue intacto: el aporte y el retiro se conservan y la quincena queda como estaba (5000 - 300 + 300).
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(5000n);
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(0n);
+    });
+
+    it('una meta archivada se trata como inexistente: no admite aportes, retiros, pagos, ediciones ni otra eliminación', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', fechaReferencia: HOY });
+      await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY });
+      await eliminarMeta(tenantId, meta.id);
+
+      const noExiste = { codigo: 'META_NO_ENCONTRADA' };
+      await expect(aportarAMeta({ tenantId, metaId: meta.id, monto: 10n, moneda: 'MXN', fechaReferencia: HOY })).rejects.toMatchObject(noExiste);
+      await expect(retirarDeMeta({ tenantId, metaId: meta.id, monto: 10n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY })).rejects.toMatchObject(noExiste);
+      await expect(pagarConMeta({ tenantId, metaId: meta.id, monto: 10n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY })).rejects.toMatchObject(noExiste);
+      await expect(editarMeta({ tenantId, metaId: meta.id, nombre: 'Otro' })).rejects.toMatchObject(noExiste);
+      await expect(eliminarMeta(tenantId, meta.id)).rejects.toMatchObject(noExiste);
+    });
+
+    it('con saldo a favor se rechaza, con un mensaje que dice cómo dejarla en cero', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', fechaReferencia: HOY });
+      await retirarDeMeta({ tenantId, metaId: meta.id, monto: 100n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY });
+
+      await expect(eliminarMeta(tenantId, meta.id)).rejects.toMatchObject({
+        codigo: 'META_CON_HISTORIAL',
+        message: expect.stringContaining('Déjala en cero'),
+      });
+      expect(await listarMetas(tenantId)).toHaveLength(1);
+    });
+
+    it('plan free: una meta archivada no cuenta para el límite de 2', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const primera = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await crearMeta(tenantId, 'Fondo de emergencia', 2000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: primera.id, monto: 300n, moneda: 'MXN', fechaReferencia: HOY });
+      await retirarDeMeta({ tenantId, metaId: primera.id, monto: 300n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY });
+      await eliminarMeta(tenantId, primera.id);
+
+      await expect(crearMeta(tenantId, 'Una nueva', 500n, 'MXN')).resolves.toBeDefined();
+      expect(await listarMetas(tenantId)).toHaveLength(2);
+    });
+  });
+
+  describe('editarMeta', () => {
+    it('cambia el nombre y el objetivo, y el avance se recalcula sobre el saldo real', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 500n, moneda: 'MXN', fechaReferencia: HOY });
+      expect((await listarMetas(tenantId))[0]?.porcentajeAvance).toBe(50);
+
+      await editarMeta({ tenantId, metaId: meta.id, nombre: '  Viaje a Quintana ', montoObjetivo: 2000n });
+
+      const [editada] = await listarMetas(tenantId);
+      expect(editada).toMatchObject({ nombre: 'Viaje a Quintana', montoObjetivoValorMinimo: 2000n, montoAcumuladoValorMinimo: 500n, porcentajeAvance: 25 });
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(500n); // el ledger no se tocó
+    });
+
+    it('permite cambiar solo uno de los dos campos', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+
+      await editarMeta({ tenantId, metaId: meta.id, montoObjetivo: 3000n });
+      await editarMeta({ tenantId, metaId: meta.id, nombre: 'Otro nombre' });
+
+      expect((await listarMetas(tenantId))[0]).toMatchObject({ nombre: 'Otro nombre', montoObjetivoValorMinimo: 3000n });
+    });
+
+    it('rechaza no indicar nada, un nombre vacío y un objetivo no positivo', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+
+      await expect(editarMeta({ tenantId, metaId: meta.id })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+      await expect(editarMeta({ tenantId, metaId: meta.id, nombre: '   ' })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+      await expect(editarMeta({ tenantId, metaId: meta.id, montoObjetivo: 0n })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+      expect((await listarMetas(tenantId))[0]).toMatchObject({ nombre: 'Vacaciones', montoObjetivoValorMinimo: 1000n });
+    });
+
+    it('rechaza una meta que no existe o de otro tenant (BOLA)', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const { tenantId: otroTenantId } = await tenantConPeriodoActivo();
+      const metaAjena = await crearMeta(otroTenantId, 'Ajena', 1000n, 'MXN');
+
+      await expect(editarMeta({ tenantId, metaId: randomUUID(), nombre: 'x' })).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+      await expect(editarMeta({ tenantId, metaId: metaAjena.id, nombre: 'x' })).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+      expect((await listarMetas(otroTenantId))[0]?.nombre).toBe('Ajena');
     });
   });
 
@@ -118,6 +213,7 @@ describe('metas de ahorro', () => {
 
     it('calcula montoAcumulado y porcentajeAvance a partir del saldo real, más reciente primero', async () => {
       const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
       const primera = await crearMeta(tenantId, 'Primera', 1000n, 'MXN');
       const segunda = await crearMeta(tenantId, 'Segunda', 2000n, 'MXN');
       await aportarAMeta({ tenantId, metaId: segunda.id, monto: 500n, moneda: 'MXN', fechaReferencia: HOY });
@@ -141,6 +237,64 @@ describe('metas de ahorro', () => {
       expect(resultado.periodoOrigenId).toBe(periodo.id);
       expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(4700n);
       expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(300n);
+    });
+
+    it('no deja aportar más de lo que hay disponible en la quincena, sin tocar nada', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
+
+      await expect(aportarAMeta({ tenantId, metaId: meta.id, monto: 5001n, moneda: 'MXN', fechaReferencia: HOY })).rejects.toMatchObject({
+        codigo: 'APORTE_EXCEDE_DISPONIBLE',
+      });
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(5000n);
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(0n);
+    });
+
+    it('permite aportar exactamente todo lo disponible, y el disponible baja a cero', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
+
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 5000n, moneda: 'MXN', fechaReferencia: HOY });
+
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(0n);
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(5000n);
+    });
+
+    it('sin ingreso registrado no hay disponible: no se puede aportar', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+
+      await expect(aportarAMeta({ tenantId, metaId: meta.id, monto: 100n, moneda: 'MXN', fechaReferencia: HOY })).rejects.toMatchObject({
+        codigo: 'APORTE_EXCEDE_DISPONIBLE',
+      });
+    });
+
+    it('descuenta también lo ya gastado: con $5,000 de ingreso y $4,000 gastados, aportar $1,500 se rechaza', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      await registrarGasto({ tenantId, periodoId: periodo.id, monto: 4000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
+
+      await expect(aportarAMeta({ tenantId, metaId: meta.id, monto: 1500n, moneda: 'MXN', fechaReferencia: HOY })).rejects.toMatchObject({
+        codigo: 'APORTE_EXCEDE_DISPONIBLE',
+      });
+      await expect(aportarAMeta({ tenantId, metaId: meta.id, monto: 1000n, moneda: 'MXN', fechaReferencia: HOY })).resolves.toBeDefined();
+    });
+
+    it('dos aportes simultáneos no pueden pasarse entre sí del disponible', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
+
+      const resultados = await Promise.allSettled([
+        aportarAMeta({ tenantId, metaId: meta.id, monto: 3000n, moneda: 'MXN', fechaReferencia: HOY }),
+        aportarAMeta({ tenantId, metaId: meta.id, monto: 3000n, moneda: 'MXN', fechaReferencia: HOY }),
+      ]);
+
+      expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(2000n);
     });
 
     it('rechaza un monto no positivo', async () => {
@@ -209,15 +363,45 @@ describe('metas de ahorro', () => {
       ).rejects.toMatchObject({ codigo: 'SIN_PERIODO_ACTIVO' });
     });
 
-    it('permite retirar más de lo acumulado (sin guardarraíles artificiales, mismo criterio que el sobregiro de gastos)', async () => {
+    it('no deja retirar más de lo que tiene la meta, sin tocar la quincena ni la meta', async () => {
       const { tenantId, periodo } = await tenantConPeriodoActivo();
       await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
       const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
       await aportarAMeta({ tenantId, metaId: meta.id, monto: 100n, moneda: 'MXN', fechaReferencia: HOY });
 
-      await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'Emergencia', fechaReferencia: HOY });
+      await expect(
+        retirarDeMeta({ tenantId, metaId: meta.id, monto: 101n, moneda: 'MXN', motivo: 'Emergencia', fechaReferencia: HOY })
+      ).rejects.toMatchObject({ codigo: 'SALDO_META_INSUFICIENTE' });
 
-      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(-200n);
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(100n);
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(4900n);
+    });
+
+    it('permite retirar exactamente todo lo que tiene la meta', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 100n, moneda: 'MXN', fechaReferencia: HOY });
+
+      await retirarDeMeta({ tenantId, metaId: meta.id, monto: 100n, moneda: 'MXN', motivo: 'Todo', fechaReferencia: HOY });
+
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(0n);
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(5000n);
+    });
+
+    it('dos retiros simultáneos no pueden sobregirar la meta', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 500n, moneda: 'MXN', fechaReferencia: HOY });
+
+      const resultados = await Promise.allSettled([
+        retirarDeMeta({ tenantId, metaId: meta.id, monto: 400n, moneda: 'MXN', motivo: 'A', fechaReferencia: HOY }),
+        retirarDeMeta({ tenantId, metaId: meta.id, monto: 400n, moneda: 'MXN', motivo: 'B', fechaReferencia: HOY }),
+      ]);
+
+      expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(100n);
     });
   });
 

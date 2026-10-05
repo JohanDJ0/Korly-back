@@ -6,6 +6,8 @@ import { obtenerResumen } from '../../src/modulos/cierre/generar-resumen.js';
 import { obtenerDesglose } from '../../src/modulos/desglose/desglose.js';
 import { editarGasto, eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
+import { registrarMovimientoTx } from '../../src/modulos/ledger/registrar-movimiento.js';
+import { conTenant } from '../../src/shared/db.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { aportarAMeta, crearMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
@@ -188,9 +190,24 @@ describe('desglose del periodo', () => {
     expect(desglose.semanaMasCara).toBeNull();
   });
   describe('aportes a metas que vuelven a la quincena (retiro)', () => {
-    async function conAporteYRetiro(aporte: bigint, retiro: bigint, fechaRetiro = HOY) {
+    async function conAporteYRetiro(aporte: bigint, retiro: bigint, fechaRetiro = HOY, ahorroPrevio = 0n) {
       const { tenantId, periodo } = await tenantConPeriodo();
       const meta = await crearMeta(tenantId, 'Viaje', 1000000n, 'MXN');
+      if (ahorroPrevio > 0n) {
+        // Ahorro que ya tenía antes de usar la app: llega de fuera, sin tocar la quincena.
+        await conTenant(tenantId, (tx) =>
+          registrarMovimientoTx(tx, {
+            tenantId,
+            tipo: 'aporte_meta',
+            moneda: 'MXN',
+            fechaEfectiva: '2026-10-01',
+            partidas: [
+              { cuentaId: meta.cuentaId, montoValorMinimo: ahorroPrevio },
+              { cuentaId: null, montoValorMinimo: -ahorroPrevio },
+            ],
+          })
+        );
+      }
       await aportarAMeta({ tenantId, metaId: meta.id, monto: aporte, moneda: 'MXN', fechaReferencia: HOY });
       await retirarDeMeta({ tenantId, metaId: meta.id, monto: retiro, moneda: 'MXN', motivo: 'Se necesitó', fechaReferencia: fechaRetiro });
       return { tenantId, periodo };
@@ -224,7 +241,7 @@ describe('desglose del periodo', () => {
     });
 
     it('un retiro mayor al aporte conserva el excedente como ingreso (dinero de ahorros anteriores)', async () => {
-      const { tenantId, periodo } = await conAporteYRetiro(20000n, 50000n);
+      const { tenantId, periodo } = await conAporteYRetiro(20000n, 50000n, HOY, 30000n);
 
       const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
       expect(desglose.totalGastadoValorMinimo).toBe(0n);

@@ -3,6 +3,7 @@ import {
   aportarAMeta,
   crearMeta,
   deshacerPagoMeta,
+  editarMeta,
   eliminarMeta,
   listarMetas,
   listarMovimientosDeMeta,
@@ -24,6 +25,11 @@ function metaADto(meta: MetaConProgreso) {
 }
 
 interface CrearMetaBody {
+  nombre?: string;
+  montoObjetivo?: MontoDto;
+}
+
+interface EditarMetaBody {
   nombre?: string;
   montoObjetivo?: MontoDto;
 }
@@ -70,6 +76,24 @@ export async function rutasMetas(app: FastifyInstance): Promise<void> {
   app.get('/metas', async (request, reply) => {
     const metas = await listarMetas(request.identidad.tenantId);
     reply.send(metas.map(metaADto));
+  });
+
+  /** Cambia el nombre y/o el objetivo; el avance se recalcula solo (ver `editarMeta`). */
+  app.patch<{ Params: { metaId: string } }>('/metas/:metaId', async (request, reply) => {
+    const body = request.body as EditarMetaBody | undefined;
+    const montoObjetivo = body?.montoObjetivo ? montoDesdeDto(body.montoObjetivo) : undefined;
+
+    await editarMeta({
+      tenantId: request.identidad.tenantId,
+      metaId: request.params.metaId,
+      nombre: body?.nombre,
+      montoObjetivo: montoObjetivo?.valorMinimo,
+    });
+
+    const metas = await listarMetas(request.identidad.tenantId);
+    const meta = metas.find((m) => m.id === request.params.metaId);
+    if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    reply.send(metaADto(meta));
   });
 
   app.delete<{ Params: { metaId: string } }>('/metas/:metaId', async (request, reply) => {

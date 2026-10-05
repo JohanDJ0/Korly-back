@@ -38,6 +38,9 @@ export function repartirEnMensualidades(montoTotal: bigint, numeroPlazos: number
   return mensualidades;
 }
 
+/** Más allá de los 24 MSI más largos que ofrecen los bancos, con holgura. */
+export const MAX_PLAZOS = 60;
+
 export interface RegistrarCargoEntrada {
   tenantId: string;
   tarjetaId: string;
@@ -78,8 +81,10 @@ export async function registrarCargoTarjeta(entrada: RegistrarCargoEntrada): Pro
   if (entrada.montoTotalValorMinimo <= 0n) {
     throw new ErrorDominio('VALIDACION', 'El monto del cargo debe ser positivo');
   }
-  if (!Number.isInteger(entrada.numeroPlazos) || entrada.numeroPlazos < 1) {
-    throw new ErrorDominio('VALIDACION', "El campo 'numeroPlazos' debe ser un entero mayor o igual a 1");
+  // Tope: cada plazo es una fila y una fecha calculada. Sin él, un `numeroPlazos` absurdo
+  // (1e9) ponía a la API a insertar filas durante minutos. Los MSI reales llegan a 24.
+  if (!Number.isInteger(entrada.numeroPlazos) || entrada.numeroPlazos < 1 || entrada.numeroPlazos > MAX_PLAZOS) {
+    throw new ErrorDominio('VALIDACION', `El campo 'numeroPlazos' debe ser un entero entre 1 y ${MAX_PLAZOS}`);
   }
   const fechaEfectiva = entrada.fechaCompra ?? fechaISO(ahoraEnMexico());
 
@@ -88,6 +93,10 @@ export async function registrarCargoTarjeta(entrada: RegistrarCargoEntrada): Pro
     if (!tarjeta) {
       throw new ErrorDominio('TARJETA_NO_ENCONTRADA', 'La tarjeta especificada no existe');
     }
+
+    // Bloquea la fila de la tarjeta: sin esto, dos cargos simultáneos leían el
+    // mismo saldo, pasaban el límite cada uno por separado y juntos lo excedían.
+    await tx.select({ id: tarjetas.id }).from(tarjetas).where(eq(tarjetas.id, tarjeta.id)).for('update');
 
     const saldoActual = await obtenerSaldoTarjetaTx(tx, tarjeta.cuentaId);
     const creditoDisponible = tarjeta.limiteCreditoValorMinimo + saldoActual;

@@ -1,6 +1,7 @@
-import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { asientos, cuentas, movimientos } from '../../db/schema/ledger.js';
 import { metas } from '../../db/schema/metas.js';
+import { periodos } from '../../db/schema/periodos.js';
 import { crearCuentaTx, registrarMovimientoTx, revertirMovimientoEnSusCuentasTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
 import { obtenerPlanTenantTx } from '../planes/planes.js';
@@ -43,7 +44,10 @@ export async function crearMeta(tenantId: string, nombre: string, monto: bigint,
   return conTenant(tenantId, async (tx) => {
     const plan = await obtenerPlanTenantTx(tx, tenantId);
     if (plan === 'free') {
-      const [fila] = await tx.select({ total: sql<number>`count(*)::int` }).from(metas).where(eq(metas.tenantId, tenantId));
+      const [fila] = await tx
+        .select({ total: sql<number>`count(*)::int` })
+        .from(metas)
+        .where(and(eq(metas.tenantId, tenantId), isNull(metas.archivadaEn)));
       if ((fila?.total ?? 0) >= LIMITE_METAS_FREE) {
         throw new ErrorDominio('LIMITE_METAS_ALCANZADO', `Alcanzaste el límite de ${LIMITE_METAS_FREE} metas del plan gratuito — Korly Pro las tiene ilimitadas`);
       }
@@ -86,7 +90,7 @@ export async function listarMetas(tenantId: string): Promise<MetaConProgreso[]> 
       })
       .from(metas)
       .leftJoin(asientos, eq(asientos.cuentaId, metas.cuentaId))
-      .where(eq(metas.tenantId, tenantId))
+      .where(and(eq(metas.tenantId, tenantId), isNull(metas.archivadaEn)))
       .groupBy(metas.id)
       .orderBy(desc(metas.creadoEn));
 
@@ -118,7 +122,7 @@ export async function obtenerMetaPorIdTx(tx: Ejecutor, tenantId: string, metaId:
   const [fila] = await tx
     .select()
     .from(metas)
-    .where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId)))
+    .where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId), isNull(metas.archivadaEn)))
     .limit(1);
   if (!fila) return null;
 
@@ -126,14 +130,78 @@ export async function obtenerMetaPorIdTx(tx: Ejecutor, tenantId: string, metaId:
 }
 
 /**
- * Solo si la cuenta de la meta nunca recibió ningún asiento — no solo
- * "saldo en cero", que un aporte seguido de un retiro idéntico también
- * deja en cero pero sí con historial real detrás (aportarAMeta,
- * retirarDeMeta, y decidirSobrante cuando el usuario elige "ahorrar",
- * ver cierre/decidir-sobrante.ts, todos escriben contra esta misma
- * cuenta). Sin aportes ni retiros de por medio, no hay nada del ledger
- * que preservar, así que sí se borra de verdad (fila de `metas` + su
- * `cuenta`) — mismo criterio que `eliminarTarjeta`.
+ * Bloquea la fila de la meta (`FOR UPDATE`) y confirma que sigue viva. Se usa
+ * en todo lo que escribe contra la meta (aportar, retirar, pagar, deshacer,
+ * editar, eliminar) para que archivarla no compita con un movimiento que va
+ * en camino: sin el bloqueo, un aporte que empezó antes de archivar podía
+ * caer en una meta ya archivada.
+ */
+async function bloquearMetaTx(tx: Ejecutor, metaId: string): Promise<void> {
+  const [fila] = await tx.select({ archivadaEn: metas.archivadaEn }).from(metas).where(eq(metas.id, metaId)).for('update');
+  if (!fila || fila.archivadaEn !== null) {
+    throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+  }
+}
+
+export interface EditarMetaEntrada {
+  tenantId: string;
+  metaId: string;
+  nombre?: string;
+  montoObjetivo?: bigint;
+}
+
+/**
+ * Cambia el nombre y/o el objetivo de una meta. Son datos de configuración,
+ * no del ledger: `montoAcumulado` y `porcentajeAvance` se derivan siempre del
+ * saldo real de la cuenta, así que cambiar el objetivo solo recalcula el
+ * avance sin tocar ningún movimiento. Nada más lee el objetivo, de modo que
+ * no hay nada congelado que corregir.
+ */
+export async function editarMeta(entrada: EditarMetaEntrada): Promise<Meta> {
+  if (entrada.nombre === undefined && entrada.montoObjetivo === undefined) {
+    throw new ErrorDominio('VALIDACION', 'Indica al menos un campo para editar: nombre o montoObjetivo');
+  }
+  const nombre = entrada.nombre?.trim();
+  if (nombre !== undefined && nombre.length === 0) {
+    throw new ErrorDominio('VALIDACION', 'El nombre de la meta no puede estar vacío');
+  }
+  if (entrada.montoObjetivo !== undefined && entrada.montoObjetivo <= 0n) {
+    throw new ErrorDominio('VALIDACION', 'El monto objetivo de una meta debe ser positivo');
+  }
+
+  return conTenant(entrada.tenantId, async (tx) => {
+    const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);
+    if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    await bloquearMetaTx(tx, meta.id);
+
+    const [fila] = await tx
+      .update(metas)
+      .set({
+        ...(nombre !== undefined ? { nombre } : {}),
+        ...(entrada.montoObjetivo !== undefined ? { montoObjetivoValorMinimo: entrada.montoObjetivo } : {}),
+      })
+      .where(and(eq(metas.tenantId, entrada.tenantId), eq(metas.id, meta.id)))
+      .returning();
+    if (!fila) throw new Error('No se pudo editar la meta');
+
+    return { id: fila.id, cuentaId: fila.cuentaId, nombre: fila.nombre, montoObjetivoValorMinimo: fila.montoObjetivoValorMinimo, moneda: fila.moneda };
+  });
+}
+
+/**
+ * Elimina una meta según su historial:
+ *
+ * - **Sin ningún asiento nunca** (ni aportes ni retiros ni pagos): se borra de
+ *   verdad (fila de `metas` + su `cuenta`) — no hay nada del ledger que
+ *   preservar. Mismo criterio que `eliminarTarjeta`.
+ * - **Con historial y saldo exactamente en cero:** se **archiva**
+ *   (`archivada_en`). Sus movimientos son inmutables (ADR-001), pero la meta
+ *   ya no guarda dinero, así que sale del listado, deja de contar para el
+ *   límite del plan gratuito y se trata como inexistente.
+ * - **Con saldo distinto de cero:** se rechaza (`META_CON_HISTORIAL`). No se
+ *   puede esconder dinero: hay que dejarla en cero primero (pagar con ella o
+ *   pasarlo a la quincena). Un saldo negativo (retiro que superó lo ahorrado)
+ *   también se rechaza.
  */
 export async function eliminarMeta(tenantId: string, metaId: string): Promise<void> {
   return conTenant(tenantId, async (tx) => {
@@ -141,14 +209,23 @@ export async function eliminarMeta(tenantId: string, metaId: string): Promise<vo
     if (!meta) {
       throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
     }
+    await bloquearMetaTx(tx, meta.id);
 
     const [fila] = await tx.select({ total: sql<number>`count(*)::int` }).from(asientos).where(eq(asientos.cuentaId, meta.cuentaId));
-    if ((fila?.total ?? 0) > 0) {
-      throw new ErrorDominio('META_CON_HISTORIAL', 'No se puede eliminar una meta que ya tiene aportes o retiros registrados');
+    if ((fila?.total ?? 0) === 0) {
+      await tx.delete(metas).where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId)));
+      await tx.delete(cuentas).where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.id, meta.cuentaId)));
+      return;
     }
 
-    await tx.delete(metas).where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId)));
-    await tx.delete(cuentas).where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.id, meta.cuentaId)));
+    if ((await saldoCuentaTx(tx, meta.cuentaId)) !== 0n) {
+      throw new ErrorDominio(
+        'META_CON_HISTORIAL',
+        'Esta meta todavía tiene saldo. Déjala en cero (paga con ella o pásalo a tu quincena) y después podrás eliminarla.'
+      );
+    }
+
+    await tx.update(metas).set({ archivadaEn: new Date() }).where(and(eq(metas.tenantId, tenantId), eq(metas.id, metaId)));
   });
 }
 
@@ -181,6 +258,13 @@ export interface AporteResultado {
  * aporte se trata como un gasto más para efectos del motor de flujo de
  * caja". Mismas partidas que un gasto (negativa contra el periodo),
  * solo que la contraparte es una cuenta real (la meta), no externa.
+ *
+ * **No se puede aportar más de lo que hay disponible** (`APORTE_EXCEDE_DISPONIBLE`).
+ * A diferencia de un gasto — que ya ocurrió en la vida real y por eso se
+ * registra aunque sobregire (modelo-dominio.md §5) — un aporte es una
+ * transferencia voluntaria: dejaba la quincena en negativo moviendo a la meta
+ * dinero que nunca existió. La fila del periodo se bloquea para que dos
+ * aportes simultáneos no se pasen entre sí.
  */
 export async function aportarAMeta(entrada: AportarAMetaEntrada): Promise<AporteResultado> {
   if (entrada.monto <= 0n) {
@@ -191,8 +275,14 @@ export async function aportarAMeta(entrada: AportarAMetaEntrada): Promise<Aporte
   return conTenant(entrada.tenantId, async (tx) => {
     const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);
     if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    await bloquearMetaTx(tx, meta.id);
 
     const periodo = await periodoActivoObligatorioTx(tx, entrada.tenantId, fechaReferencia, 'No hay periodo activo del cual descontar el aporte');
+
+    await tx.select({ id: periodos.id }).from(periodos).where(eq(periodos.id, periodo.id)).for('update');
+    if (entrada.monto > (await saldoCuentaTx(tx, periodo.cuentaId))) {
+      throw new ErrorDominio('APORTE_EXCEDE_DISPONIBLE', 'El aporte supera lo que tienes disponible en tu quincena');
+    }
 
     const { movimientoId } = await registrarMovimientoTx(tx, {
       tenantId: entrada.tenantId,
@@ -233,10 +323,13 @@ export interface RetiroResultado {
  * exista, y la única cuenta "tuya" que hay hoy es la del periodo activo
  * (ver README, "Metas de ahorro", para la justificación completa).
  *
- * Sin validar que `monto <= montoAcumulado`: mismo criterio que el
- * sobregiro permitido en gastos (modelo-dominio.md §5) — no hay
- * guardarraíles artificiales sobre saldos, ninguna otra cuenta del
- * sistema los tiene tampoco.
+ * **No se puede retirar más de lo que tiene la meta** (`SALDO_META_INSUFICIENTE`).
+ * Antes se permitía "por el criterio del sobregiro de gastos", pero eso era un
+ * error de analogía: un gasto ya ocurrió en la vida real y por eso se registra
+ * aunque sobregire; un retiro es una transferencia voluntaria, y dejaba la meta
+ * en negativo creando en la quincena dinero que nunca existió. Hay además un
+ * trigger en la base de datos (`asientos_meta_no_negativa`, migración 0025)
+ * como red de seguridad.
  */
 export async function retirarDeMeta(entrada: RetirarDeMetaEntrada): Promise<RetiroResultado> {
   if (entrada.monto <= 0n) {
@@ -250,8 +343,13 @@ export async function retirarDeMeta(entrada: RetirarDeMetaEntrada): Promise<Reti
   return conTenant(entrada.tenantId, async (tx) => {
     const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);
     if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    await bloquearMetaTx(tx, meta.id);
 
     const periodo = await periodoActivoObligatorioTx(tx, entrada.tenantId, fechaReferencia, 'No hay periodo activo en el cual depositar el retiro');
+
+    if (entrada.monto > (await saldoCuentaTx(tx, meta.cuentaId))) {
+      throw new ErrorDominio('SALDO_META_INSUFICIENTE', 'La meta no tiene saldo suficiente para este retiro');
+    }
 
     const { movimientoId } = await registrarMovimientoTx(tx, {
       tenantId: entrada.tenantId,
@@ -320,7 +418,7 @@ export async function pagarConMeta(entrada: PagarConMetaEntrada): Promise<PagoMe
     const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);
     if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
 
-    await tx.select({ id: metas.id }).from(metas).where(eq(metas.id, meta.id)).for('update');
+    await bloquearMetaTx(tx, meta.id);
 
     if (entrada.monto > (await saldoCuentaTx(tx, meta.cuentaId))) {
       throw new ErrorDominio('SALDO_META_INSUFICIENTE', 'La meta no tiene saldo suficiente para este pago');
@@ -361,7 +459,7 @@ export async function deshacerPagoMeta(tenantId: string, metaId: string, movimie
       .limit(1);
     if (!pago) throw new ErrorDominio('PAGO_META_NO_ENCONTRADO', 'El pago especificado no existe');
 
-    await tx.select({ id: metas.id }).from(metas).where(eq(metas.id, meta.id)).for('update');
+    await bloquearMetaTx(tx, meta.id);
 
     const [reversion] = await tx
       .select({ id: movimientos.id })
