@@ -588,3 +588,31 @@ nada.
   por **email** ya están resueltos (ver backend/README.md). Falta VAPID
   + service worker para push, y la lógica de la alerta de ritmo (un
   disparador distinto: comportamiento, no inactividad).
+
+## Pruebas automáticas
+
+`npm test` (Vitest + Testing Library + jsdom; `npm test -- --watch` para desarrollo). Corren
+también en el CI del frontend antes del build. No hablan con ningún servidor: el cliente de la
+API se sustituye con `vi.mock('@/lib/api')` y cada prueba arma su propia caché de TanStack Query
+(`src/test/utilidades.tsx`). Las variables de entorno que necesitan `lib/api.ts` y
+`lib/supabase.ts` para poder importarse se definen en `vite.config.ts` (`test.env`).
+
+Qué cubren hoy, y por qué esas:
+
+- **`FilaMeta`** — la tarjeta de metas, donde han salido los errores de pantalla y de dinero:
+  Agregar dinero (de la quincena, con el tope de lo disponible, y aporte externo), Usar dinero
+  (pagar, pasar a la quincena, con el tope del saldo de la meta), Editar, Eliminar con
+  confirmación y el historial con Deshacer.
+- **`FormularioGasto`** — que un gasto que alcanza se registre con un toque, y que uno mayor al
+  disponible pida confirmación (y solo uno).
+- **`lib/api`** y **`lib/sesion-expirada`** — que un 401 por token vencido cierre la sesión y
+  deje la petición pendiente, que un 503 de autenticación **no** la cierre, y que se cierre una
+  sola vez aunque fallen varias peticiones a la vez.
+- **`Login`** — el aviso "Tu sesión expiró" y que sobreviva al redireccionamiento.
+- **`lib/fechas`** y **`lib/dinero`** — la quincena de hoy (misma regla que el backend, con la
+  fecha local), el formato de pesos y el de rangos de fechas.
+
+Para comprobar que una prueba no es vacía, rompe a propósito la regla que verifica y mira que
+falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: pruebas de las demás
+pantallas (Home, Historial, Tarjetas, Ajustes, Resumen) ni del flujo de punta a punta en un
+navegador real.

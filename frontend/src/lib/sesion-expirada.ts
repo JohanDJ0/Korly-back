@@ -13,10 +13,11 @@ export function esErrorDeSesion(status: number, codigo: string | undefined): boo
  * completa de la página, en vez de dejar pantallas con "token no válido" a medias.
  * La navegación completa (no un `navigate`) también descarta cualquier estado en
  * memoria de la sesión anterior. `cerrando` evita repetirlo cuando varias peticiones
- * fallan a la vez. El cierre es local (`scope: 'local'`): no depende de que el
+ * fallan a la vez. `irA` existe para poder probarlo (en jsdom `location.replace` no navega).
+ * El cierre es local (`scope: 'local'`): no depende de que el
  * servidor de Auth conteste, justo cuando la sesión ya no es válida.
  */
-export function cerrarSesionExpirada(): void {
+export function cerrarSesionExpirada(irA: (url: string) => void = (url) => window.location.replace(url)): void {
   if (cerrando) return;
   cerrando = true;
   try {
@@ -27,7 +28,7 @@ export function cerrarSesionExpirada(): void {
   void supabase.auth
     .signOut({ scope: 'local' })
     .catch(() => undefined)
-    .finally(() => window.location.replace('/login'));
+    .finally(() => irA('/login'));
 }
 
 /** Para que /login explique por qué se cerró la sesión. Solo lee: es idempotente (React puede llamarlo dos veces al montar). */
