@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useRegistrarIngreso } from '@/hooks/use-registrar-ingreso';
-import { hoyISO } from '@/lib/fechas';
+import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
+import { formatearRangoFechas, hoyISO } from '@/lib/fechas';
 
 const esquemaIngreso = z.object({
   monto: z.coerce.number().positive('El monto debe ser mayor a cero'),
@@ -32,6 +33,7 @@ interface FormularioIngresoProps {
  */
 export function FormularioIngreso({ periodoId }: FormularioIngresoProps) {
   const registrarIngreso = useRegistrarIngreso();
+  const { data: periodo } = usePeriodoActivo();
 
   const {
     register,
@@ -58,8 +60,13 @@ export function FormularioIngreso({ periodoId }: FormularioIngresoProps) {
         {errors.monto && <p className="text-sm text-destructive">{errors.monto.message}</p>}
       </div>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="fechaEfectiva">Fecha</Label>
+        <Label htmlFor="fechaEfectiva">¿Cuándo te pagaron?</Label>
         <Input id="fechaEfectiva" type="date" {...register('fechaEfectiva')} />
+        {periodo && (
+          <p className="text-muted-foreground text-[12.5px]">
+            Es solo la fecha en que te llegó el dinero. Tu quincena es del {formatearRangoFechas(periodo.fechaInicio, periodo.fechaFin)} y no cambia por esta fecha.
+          </p>
+        )}
         {errors.fechaEfectiva && <p className="text-sm text-destructive">{errors.fechaEfectiva.message}</p>}
       </div>
       {registrarIngreso.isError && <p className="text-sm text-destructive">{registrarIngreso.error.message}</p>}

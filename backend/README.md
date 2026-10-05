@@ -1278,6 +1278,26 @@ pago contra la propia meta — el dinero vuelve a ella, no a la quincena.
 reversiones no salen como filas propias. La migración 0022 solo agrega
 `'pago_meta'` al CHECK de `movimientos.tipo`.
 
+### Aportes que vuelven a la quincena
+
+Hallazgo real del usuario (cuenta de prueba): aportó $500 a una meta y los
+pasó de vuelta a la quincena con "Pasar a mi quincena"; el disponible quedó
+bien, pero el resumen semanal seguía diciendo "gasté $1,000" — el aporte
+contaba como gasto y el retiro no lo descontaba (solo entraba como ingreso).
+
+Ahora, lo que un periodo aportó a metas y luego retiró en el mismo periodo
+se **compensa por los dos lados**: `compensacionAportesYRetiros`
+(`cierre/generar-resumen.ts`) devuelve `min(aportado, retirado)` y se resta
+tanto de `totalIngresos` como de `totalGastado`. Así `totalIngresos −
+totalGastado` sigue siendo exactamente el saldo de la cuenta (el sobrante y
+el drenado no cambian) y el desglose sigue cuadrando con el resumen. Un
+retiro mayor a lo aportado en el periodo (dinero de ahorros anteriores)
+conserva el excedente como ingreso; un aporte mayor al retirado conserva el
+excedente como gasto. El desglose descuenta de las semanas donde se aportó,
+de la más reciente hacia atrás, y quita el rubro "Aportes a metas" si queda
+en cero. Los resúmenes de periodos ya cerrados no se recalculan (están
+congelados).
+
 ## Gastos recurrentes
 
 Extensión sobre `docs/openapi.yaml` (documento-maestro-v2.md §12,
@@ -2617,6 +2637,16 @@ borradores'`): reutilización cuando sigue vigente, borrado y reemplazo
 al llegar la siguiente quincena, y el aborto si el borrador tuviera
 asientos (forzado a mano contra el ledger, ya que la API pública no
 puede producir esa condición).
+
+## Categoría "Ahorro" eliminada de las predeterminadas
+
+Un gasto con la categoría "Ahorro" solo se gastaba: no llegaba a ninguna meta
+(aportar es otra operación), y el usuario creía que estaba ahorrando. Se quitó
+de `NOMBRES_CATEGORIAS_PREDETERMINADAS` (ahora son 9) y la migración 0023
+limpia las que ya existían: las sin uso se borran; las que ya tienen gastos,
+recurrentes o cargos pasan a ser personalizadas (una llave foránea impide
+borrarlas) para que su dueño las renombre o elimine cuando deje de usarlas.
+El ícono "ahorro" sigue disponible para categorías personalizadas.
 
 ## Seguridad
 

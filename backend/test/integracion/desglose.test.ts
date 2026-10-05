@@ -7,7 +7,7 @@ import { obtenerDesglose } from '../../src/modulos/desglose/desglose.js';
 import { editarGasto, eliminarGasto, registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
-import { aportarAMeta, crearMeta } from '../../src/modulos/metas/metas.js';
+import { aportarAMeta, crearMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.js';
 import { registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
@@ -187,6 +187,76 @@ describe('desglose del periodo', () => {
     expect(desglose.totalVariableValorMinimo).toBe(0n);
     expect(desglose.semanaMasCara).toBeNull();
   });
+  describe('aportes a metas que vuelven a la quincena (retiro)', () => {
+    async function conAporteYRetiro(aporte: bigint, retiro: bigint, fechaRetiro = HOY) {
+      const { tenantId, periodo } = await tenantConPeriodo();
+      const meta = await crearMeta(tenantId, 'Viaje', 1000000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: aporte, moneda: 'MXN', fechaReferencia: HOY });
+      await retirarDeMeta({ tenantId, metaId: meta.id, monto: retiro, moneda: 'MXN', motivo: 'Se necesitó', fechaReferencia: fechaRetiro });
+      return { tenantId, periodo };
+    }
+
+    it('lo aportado y retirado completo no cuenta como gasto ni como ingreso', async () => {
+      const { tenantId, periodo } = await conAporteYRetiro(50000n, 50000n);
+
+      const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
+      expect(desglose.totalGastadoValorMinimo).toBe(0n);
+      expect(desglose.rubros).toEqual([]);
+      expect(desglose.semanas.every((semana) => semana.totalValorMinimo === 0n && semana.rubros.length === 0)).toBe(true);
+
+      const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, FIN_PERIODO);
+      expect(resumen.totalIngresosValorMinimo).toBe(100000n); // solo el ingreso real
+      expect(resumen.totalGastadoValorMinimo).toBe(0n);
+      expect(resumen.sobranteValorMinimo).toBe(100000n);
+    });
+
+    it('un retiro menor al aporte deja como gasto solo la diferencia, y el desglose cuadra con el resumen', async () => {
+      const { tenantId, periodo } = await conAporteYRetiro(50000n, 20000n);
+
+      const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
+      expect(desglose.totalGastadoValorMinimo).toBe(30000n);
+      expect(desglose.rubros.map((r) => [r.tipo, r.montoValorMinimo])).toEqual([['aportes_meta', 30000n]]);
+
+      const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, FIN_PERIODO);
+      expect(resumen.totalGastadoValorMinimo).toBe(desglose.totalGastadoValorMinimo);
+      expect(resumen.totalIngresosValorMinimo).toBe(100000n);
+      expect(resumen.sobranteValorMinimo).toBe(70000n);
+    });
+
+    it('un retiro mayor al aporte conserva el excedente como ingreso (dinero de ahorros anteriores)', async () => {
+      const { tenantId, periodo } = await conAporteYRetiro(20000n, 50000n);
+
+      const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
+      expect(desglose.totalGastadoValorMinimo).toBe(0n);
+
+      const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, FIN_PERIODO);
+      expect(resumen.totalIngresosValorMinimo).toBe(130000n); // 100000 + (50000 - 20000)
+      expect(resumen.totalGastadoValorMinimo).toBe(0n);
+      expect(resumen.sobranteValorMinimo).toBe(130000n);
+    });
+
+    it('los gastos normales no se tocan: solo se compensa lo que fue a una meta y volvió', async () => {
+      const { tenantId, periodo } = await conAporteYRetiro(50000n, 50000n);
+      await gastar(tenantId, periodo.id, 40000n, '2026-10-02');
+
+      const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
+      expect(desglose.totalGastadoValorMinimo).toBe(40000n);
+
+      const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, FIN_PERIODO);
+      expect(resumen.totalGastadoValorMinimo).toBe(40000n);
+      expect(resumen.sobranteValorMinimo).toBe(60000n);
+    });
+
+    it('el aporte de una semana se compensa con un retiro de otra, sin dejar semanas en negativo', async () => {
+      const { tenantId, periodo } = await conAporteYRetiro(50000n, 50000n, new Date('2026-10-10T00:00:00Z'));
+
+      const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
+
+      expect(desglose.totalGastadoValorMinimo).toBe(0n);
+      expect(desglose.semanas.every((semana) => semana.totalValorMinimo >= 0n)).toBe(true);
+    });
+  });
+
   describe('periodo activo: el promedio usa solo los días transcurridos', () => {
     it('la semana en curso se promedia entre los días que ya pasaron, no entre todos los de su bloque', async () => {
       const { tenantId, periodo } = await tenantConPeriodo();

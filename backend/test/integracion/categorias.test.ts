@@ -20,10 +20,16 @@ describe('categorías', () => {
 
       const categorias = await listarCategorias(tenantId);
 
-      expect(categorias.length).toBe(10);
+      expect(categorias.length).toBe(9);
       expect(categorias.every((c) => c.esPredeterminada)).toBe(true);
       expect(categorias.map((c) => c.nombre)).toContain('Comida');
       expect(categorias.map((c) => c.nombre)).toContain('Otros');
+    });
+
+    it('no siembra una categoría "Ahorro": un gasto con ese nombre no llega a ninguna meta, engañaba', async () => {
+      const tenantId = await tenantDePrueba();
+
+      expect((await listarCategorias(tenantId)).map((c) => c.nombre)).not.toContain('Ahorro');
     });
 
     it('las predeterminadas ya traen un ícono razonable, no null', async () => {

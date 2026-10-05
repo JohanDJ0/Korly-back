@@ -49,7 +49,7 @@ function validarIcono(icono: string | null | undefined): void {
   }
 }
 
-/** Íconos razonables para las 10 predeterminadas (resolver-identidad.ts) — el usuario puede cambiarlos después, esto solo evita que nazcan todas con el genérico "otros". */
+/** Íconos razonables para las 9 predeterminadas (resolver-identidad.ts) — el usuario puede cambiarlos después, esto solo evita que nazcan todas con el genérico "otros". */
 export const ICONO_POR_NOMBRE_PREDETERMINADA: Record<string, IconoCategoria> = {
   Comida: 'comida',
   Transporte: 'transporte',
@@ -59,7 +59,6 @@ export const ICONO_POR_NOMBRE_PREDETERMINADA: Record<string, IconoCategoria> = {
   Entretenimiento: 'entretenimiento',
   Ropa: 'ropa',
   Educación: 'educacion',
-  Ahorro: 'ahorro',
   Otros: 'otros',
 };
 

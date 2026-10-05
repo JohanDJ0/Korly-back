@@ -43,6 +43,20 @@ export function hoyISO(): string {
   return `${anio}-${mes}-${dia}`;
 }
 
+/**
+ * La quincena de calendario en la que cae hoy (ADR-004): del 1 al 15, o del 16 al
+ * último día del mes. Es la misma regla del backend (`calcularQuincenaDeCalendario`),
+ * solo para decirle al usuario, antes de crear su periodo, cuál va a ser.
+ */
+export function quincenaDeHoy(): { fechaInicio: string; fechaFin: string } {
+  const ahora = new Date();
+  const anio = ahora.getFullYear();
+  const mes = ahora.getMonth();
+  const aISO = (dia: number) => `${anio}-${String(mes + 1).padStart(2, '0')}-${String(dia).padStart(2, '0')}`;
+  if (ahora.getDate() <= 15) return { fechaInicio: aISO(1), fechaFin: aISO(15) };
+  return { fechaInicio: aISO(16), fechaFin: aISO(new Date(anio, mes + 1, 0).getDate()) };
+}
+
 /** 'YYYY-MM-DD' (fecha pura, como fechaEfectiva) → "Hoy" o "16 sept", en la zona local — para listas de actividad, nunca para columnas `date` de un periodo (ver formatearRangoFechas). */
 export function formatearFechaActividad(fechaIso: string): string {
   if (fechaIso === hoyISO()) return 'Hoy';

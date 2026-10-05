@@ -5,7 +5,7 @@ import { categorias } from '../../db/schema/categorias.js';
 import { gastos } from '../../db/schema/gastos.js';
 import { gastosRecurrentes } from '../../db/schema/gastos-recurrentes.js';
 import { asientos, movimientos, type TipoMovimiento } from '../../db/schema/ledger.js';
-import { TIPOS_GASTO } from '../cierre/generar-resumen.js';
+import { compensacionAportesYRetiros, TIPOS_GASTO } from '../cierre/generar-resumen.js';
 import { obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { conTenant } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
@@ -172,6 +172,7 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
     let totalGastadoValorMinimo = 0n;
     let totalRecurrentesValorMinimo = 0n;
     const monedas = new Set<string>();
+    const aportesPorSemana = bloques.map(() => 0n);
 
     for (const fila of filasDeGasto) {
       const tipoEfectivo = tipoEfectivoDe(fila);
@@ -214,8 +215,10 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
             : fila.fechaEfectiva;
       const fecha = acotarFecha(fechaBase, periodo.fechaInicio, periodo.fechaFin);
 
-      const semana = totalesPorSemana[indiceBloque(periodo.fechaInicio, fecha, bloques.length)];
+      const indiceSemana = indiceBloque(periodo.fechaInicio, fecha, bloques.length);
+      const semana = totalesPorSemana[indiceSemana];
       if (!semana) throw new Error('Fecha fuera de los bloques del periodo');
+      if (tipoEfectivo === 'aporte_meta') aportesPorSemana[indiceSemana] = (aportesPorSemana[indiceSemana] ?? 0n) + importe;
       semana.total += importe;
       semana.porRubro.set(clave, (semana.porRubro.get(clave) ?? 0n) + importe);
 
@@ -226,6 +229,30 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
 
     if (monedas.size > 1) {
       throw new Error(`La cuenta ${periodo.cuentaId} mezcla más de una moneda entre sus movimientos (fuera de alcance del MVP)`);
+    }
+
+    // Lo aportado a metas que ya volvió a la quincena como retiro no es gasto
+    // (ver `compensacionAportesYRetiros`, misma regla que el resumen de cierre).
+    // Se descuenta de las semanas donde se aportó, de la más reciente hacia atrás.
+    const totalAportado = aportesPorSemana.reduce((suma, monto) => suma + monto, 0n);
+    const totalRetirado = filas.filter((fila) => tipoEfectivoDe(fila) === 'retiro_meta').reduce((suma, fila) => suma + fila.monto, 0n);
+    let porCompensar = compensacionAportesYRetiros(totalAportado, totalRetirado);
+    if (porCompensar > 0n) {
+      totalGastadoValorMinimo -= porCompensar;
+      for (let indice = totalesPorSemana.length - 1; indice >= 0 && porCompensar > 0n; indice--) {
+        const aportadoEnSemana = aportesPorSemana[indice] ?? 0n;
+        const descuento = aportadoEnSemana < porCompensar ? aportadoEnSemana : porCompensar;
+        if (descuento <= 0n) continue;
+        const semana = totalesPorSemana[indice]!;
+        semana.total -= descuento;
+        const restante = (semana.porRubro.get('aportes_meta') ?? 0n) - descuento;
+        if (restante === 0n) semana.porRubro.delete('aportes_meta');
+        else semana.porRubro.set('aportes_meta', restante);
+        const rubro = rubros.get('aportes_meta');
+        if (rubro) rubro.monto -= descuento;
+        porCompensar -= descuento;
+      }
+      if (rubros.get('aportes_meta')?.monto === 0n) rubros.delete('aportes_meta');
     }
 
     const idsDeCategoria = [...rubros.values()].map((r) => r.categoriaId).filter((id): id is string => id !== null);

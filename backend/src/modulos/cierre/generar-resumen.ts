@@ -150,6 +150,26 @@ const TIPOS_INGRESO: ReadonlySet<TipoMovimiento> = new Set(['ingreso', 'retiro_m
 export const TIPOS_GASTO: ReadonlySet<TipoMovimiento> = new Set(['gasto', 'aporte_meta', 'pago_tarjeta']);
 
 /**
+ * Lo que un periodo aportó a metas y luego pasó de vuelta a la quincena
+ * (`retiro_meta`) es dinero que fue y volvió: no es gasto ni es ingreso.
+ * Contarlo completo por los dos lados (aporte como gasto, retiro como
+ * ingreso) dejaba el sobrante bien pero inflaba ambos totales, y el
+ * usuario veía "gasté $1,000" aunque ya hubiera recuperado la mitad. Se
+ * compensa lo que coincide, `min(aportado, retirado)`, restándolo de AMBOS
+ * lados — así `totalIngresos − totalGastado` sigue siendo exactamente el
+ * saldo de la cuenta. Un retiro mayor a lo aportado en este periodo (dinero
+ * de ahorros anteriores) conserva el excedente como ingreso; un aporte
+ * mayor al retirado conserva el excedente como gasto.
+ *
+ * Los pagos hechos directo con una meta (`pago_meta`) no pasan por aquí:
+ * nunca tocan la cuenta del periodo.
+ */
+export function compensacionAportesYRetiros(aportadoValorMinimo: bigint, retiradoValorMinimo: bigint): bigint {
+  if (aportadoValorMinimo <= 0n || retiradoValorMinimo <= 0n) return 0n;
+  return aportadoValorMinimo < retiradoValorMinimo ? aportadoValorMinimo : retiradoValorMinimo;
+}
+
+/**
  * **Bug real, encontrado antes de construir Metas — no hipotético.**
  * La versión anterior solo sumaba `tipo = 'ingreso'`/`'gasto'` desde
  * `movimientos`/`asientos` directo. Un periodo que **hereda un
@@ -185,10 +205,14 @@ async function calcularTotalesTx(tx: Ejecutor, cuentaId: string): Promise<Totale
 
   let totalIngresosValorMinimo = 0n;
   let totalGastadoValorMinimo = 0n;
+  let aportadoAMetasValorMinimo = 0n;
+  let retiradoDeMetasValorMinimo = 0n;
   const monedas = new Set<string>();
 
   for (const { tipoEfectivo, moneda, neto } of netosPorTipo) {
     monedas.add(moneda);
+    if (tipoEfectivo === 'aporte_meta') aportadoAMetasValorMinimo += -neto;
+    if (tipoEfectivo === 'retiro_meta') retiradoDeMetasValorMinimo += neto;
     if (TIPOS_INGRESO.has(tipoEfectivo)) {
       totalIngresosValorMinimo += neto;
     } else if (TIPOS_GASTO.has(tipoEfectivo)) {
@@ -203,6 +227,10 @@ async function calcularTotalesTx(tx: Ejecutor, cuentaId: string): Promise<Totale
   if (monedas.size > 1) {
     throw new Error(`La cuenta ${cuentaId} mezcla más de una moneda entre sus movimientos (fuera de alcance del MVP)`);
   }
+
+  const compensado = compensacionAportesYRetiros(aportadoAMetasValorMinimo, retiradoDeMetasValorMinimo);
+  totalIngresosValorMinimo -= compensado;
+  totalGastadoValorMinimo -= compensado;
 
   return { totalIngresosValorMinimo, totalGastadoValorMinimo, moneda: monedas.values().next().value ?? 'MXN' };
 }

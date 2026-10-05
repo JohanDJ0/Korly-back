@@ -19,7 +19,7 @@ import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
 import { formatearMonto } from '@/lib/dinero';
-import { formatearRangoFechas } from '@/lib/fechas';
+import { formatearRangoFechas, quincenaDeHoy } from '@/lib/fechas';
 
 /**
  * El aha moment del producto (documento-maestro-v2.md §13.3): ver la
@@ -43,6 +43,7 @@ export function Home() {
   const { data: periodoActivo } = usePeriodoActivo();
   const { data: resumenPendiente } = useResumenPendiente();
   const crearPeriodo = useCrearPeriodo();
+  const quincena = quincenaDeHoy();
   const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
 
   const sinPeriodoActivo = error instanceof ApiError && error.codigo === 'PERIODO_NO_ENCONTRADO';
@@ -136,11 +137,14 @@ export function Home() {
             <Card className="rounded-2xl">
               <CardHeader>
                 <CardTitle>Empecemos</CardTitle>
-                <CardDescription>Crea tu periodo quincenal para empezar a ver cuánto puedes gastar.</CardDescription>
+                <CardDescription>
+                  Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Hoy estás en la quincena del{' '}
+                  {formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}.
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <Button onClick={() => crearPeriodo.mutate()} disabled={crearPeriodo.isPending} className="w-full">
-                  {crearPeriodo.isPending ? 'Creando…' : 'Crear periodo'}
+                  {crearPeriodo.isPending ? 'Creando…' : 'Empezar esta quincena'}
                 </Button>
                 {crearPeriodo.isError && <p className="text-destructive mt-2 text-sm">{crearPeriodo.error.message}</p>}
               </CardContent>

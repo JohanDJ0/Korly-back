@@ -20,7 +20,6 @@ export const NOMBRES_CATEGORIAS_PREDETERMINADAS = [
   'Entretenimiento',
   'Ropa',
   'Educación',
-  'Ahorro',
   'Otros',
 ] as const;
 
