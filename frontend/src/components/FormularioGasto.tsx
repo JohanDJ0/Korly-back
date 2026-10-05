@@ -9,7 +9,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SelectorCategoriaChips } from '@/components/SelectorCategoriaChips';
+import { useDisponible } from '@/hooks/use-disponible';
 import { useRegistrarGasto } from '@/hooks/use-registrar-gasto';
+import { formatearMonto } from '@/lib/dinero';
 import { hoyISO } from '@/lib/fechas';
 
 const esquemaGasto = z.object({
@@ -37,10 +39,18 @@ interface FormularioGastoProps {
  * (Home.tsx) — ese wrapper ya da una forma de cerrar sin registrar
  * (backdrop, X, Escape), así que este formulario no repite su propio
  * botón "Cancelar".
+ *
+ * **Confirmación solo cuando el gasto supera lo disponible.** El backend registra el gasto
+ * aunque sobregire la quincena (ya ocurrió en la vida real, modelo-dominio.md §5), pero una
+ * cifra de "te quedan $-300" por un dedazo de un cero es una mala sorpresa: en ese caso, y solo
+ * en ese caso, se pide un segundo toque explícito. El flujo normal sigue siendo un solo toque.
  */
 export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProps) {
   const registrarGasto = useRegistrarGasto();
+  const { data: disponible } = useDisponible();
   const [categoriaId, setCategoriaId] = useState('');
+  // El gasto que superó lo disponible y espera que el usuario lo confirme o lo corrija.
+  const [aConfirmar, setAConfirmar] = useState<GastoFormSalida | null>(null);
 
   const {
     register,
@@ -55,7 +65,25 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
   const montoEnVivo = useWatch({ control, name: 'monto' });
   const montoValido = Number(montoEnVivo);
 
+  /** Cuánto le faltaría a la quincena (en centavos, positivo) si se registra este monto; 0 si alcanza o si no se sabe el disponible. */
+  function faltante(monto: number): number {
+    if (disponible?.estado !== 'ok') return 0;
+    return Math.max(0, Math.round(monto * 100) - disponible.disponible.valorMinimo);
+  }
+
+  // El aviso solo vale mientras el monto escrito sea el mismo que lo disparó: si lo corrige, desaparece solo.
+  const mostrandoAviso = aConfirmar !== null && montoValido === aConfirmar.monto && faltante(aConfirmar.monto) > 0;
+
   function onSubmit(datos: GastoFormSalida) {
+    if (faltante(datos.monto) > 0) {
+      setAConfirmar(datos);
+      return;
+    }
+    enviar(datos);
+  }
+
+  function enviar(datos: GastoFormSalida) {
+    setAConfirmar(null);
     registrarGasto.mutate(
       {
         periodoId,
@@ -119,11 +147,31 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
 
       {registrarGasto.isError && <p className="text-destructive text-sm">{registrarGasto.error.message}</p>}
 
-      <Button type="submit" disabled={registrarGasto.isPending} className="h-auto rounded-2xl py-3.5 text-[15.5px] font-semibold">
-        {registrarGasto.isPending
-          ? 'Guardando…'
-          : `Registrar${Number.isFinite(montoValido) && montoValido > 0 ? ` $${montoValido.toFixed(2)}` : ''}`}
-      </Button>
+      {mostrandoAviso && aConfirmar && disponible?.estado === 'ok' ? (
+        <div role="alert" className="border-destructive/40 bg-destructive/5 flex flex-col gap-3 rounded-2xl border p-4">
+          <div>
+            <p className="text-[14.5px] font-semibold">Este gasto es mayor a lo que tienes disponible</p>
+            <p className="text-muted-foreground mt-1 text-[13px]">
+              Tienes {formatearMonto(disponible.disponible)} y este gasto es de {formatearMonto({ valorMinimo: Math.round(aConfirmar.monto * 100), moneda: disponible.disponible.moneda })}: tu quincena quedaría en{' '}
+              <span className="text-destructive font-semibold">-{formatearMonto({ valorMinimo: faltante(aConfirmar.monto), moneda: disponible.disponible.moneda })}</span>.
+            </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Button type="button" variant="destructive" disabled={registrarGasto.isPending} onClick={() => enviar(aConfirmar)} className="h-auto flex-1 rounded-xl py-3 text-[14.5px] font-semibold">
+              {registrarGasto.isPending ? 'Guardando…' : 'Registrar de todos modos'}
+            </Button>
+            <Button type="button" variant="outline" onClick={() => setAConfirmar(null)} className="h-auto flex-1 rounded-xl py-3 text-[14.5px] font-semibold">
+              Corregir el monto
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button type="submit" disabled={registrarGasto.isPending} className="h-auto rounded-2xl py-3.5 text-[15.5px] font-semibold">
+          {registrarGasto.isPending
+            ? 'Guardando…'
+            : `Registrar${Number.isFinite(montoValido) && montoValido > 0 ? ` ${montoValido.toFixed(2)}` : ''}`}
+        </Button>
+      )}
 
       {/*
         Hallazgo real: un usuario registró una compra con tarjeta de

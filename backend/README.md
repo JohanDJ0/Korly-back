@@ -1344,6 +1344,14 @@ anterior puede recuperarse aportándole.
 van de 1 a 60 (antes `numeroPlazos: 1e9` ponía a la API a insertar filas por
 minutos) y los días para pagar de 1 a 90.
 
+**Gasto mayor al disponible: se registra, pero con confirmación.** El backend sigue
+aceptándolo (ya ocurrió en la vida real), pero `FormularioGasto` pide un segundo toque
+explícito — "Este gasto es mayor a lo que tienes disponible… tu quincena quedaría en -$X",
+con "Registrar de todos modos" y "Corregir el monto" — solo cuando el monto supera el
+disponible (el flujo normal sigue siendo un toque). Si el usuario corrige el monto, el aviso
+desaparece solo. Es solo del frontend; no cubre editar un gasto ya registrado ni los gastos
+automáticos (recurrentes, mensualidades de tarjeta, importación).
+
 **Sin resolver, a la vista:** la importación de CSV no limita el número de filas
 (lo acota el tamaño del cuerpo de la petición, 1 MB); y un ingreso o gasto puede
 llevar una fecha fuera de la quincena a la que pertenece.
