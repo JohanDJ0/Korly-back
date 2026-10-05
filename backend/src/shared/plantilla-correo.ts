@@ -32,8 +32,6 @@ export interface ContenidoCorreo {
   boton?: { texto: string; url: string };
   /** Texto pequeño bajo el botón (p. ej. "El enlace caduca en 1 hora"). */
   notaBoton?: string;
-  /** Repite la URL del botón como texto, para clientes que bloquean enlaces. Por defecto sí; no hace falta si el botón solo abre la app. */
-  enlaceAlterno?: boolean;
   /** Líneas pequeñas del pie, además del aviso de privacidad y el soporte. */
   pie?: string[];
 }
@@ -69,11 +67,6 @@ export function renderizarCorreo(contenido: ContenidoCorreo, { urlApp }: Opcione
 
   const notaBoton = contenido.notaBoton ? `<p style="margin:8px 0 0;font-size:13px;line-height:20px;color:${TEXTO_SUAVE};">${esc(contenido.notaBoton)}</p>` : '';
 
-  // Si el botón no se puede pulsar (cliente que bloquea enlaces), el texto lleva la URL completa.
-  const enlaceAlterno = contenido.boton && contenido.enlaceAlterno !== false
-    ? `<p style="margin:24px 0 0;font-size:13px;line-height:20px;color:${TEXTO_SUAVE};">Si el botón no funciona, copia y pega este enlace en tu navegador:<br /><a href="${esc(contenido.boton.url)}" style="color:${VERDE};word-break:break-all;">${esc(contenido.boton.url)}</a></p>`
-    : '';
-
   const lineasPie = (contenido.pie ?? []).map((l) => `<p style="margin:0 0 6px;">${esc(l)}</p>`).join('');
 
   const html = `<!doctype html>
@@ -99,7 +92,6 @@ export function renderizarCorreo(contenido: ContenidoCorreo, { urlApp }: Opcione
       ${cifra}
       ${boton}
       ${notaBoton}
-      ${enlaceAlterno}
     </td></tr>
     <tr><td style="padding:20px 8px 0;font-size:12px;line-height:18px;color:${TEXTO_SUAVE};">
       ${lineasPie}

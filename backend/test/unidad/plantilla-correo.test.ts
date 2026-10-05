@@ -30,11 +30,12 @@ describe('renderizarCorreo', () => {
     expect(textoPlano).toContain('Confirmar: https://app.korly.com.mx/a?b=1&c=2');
   });
 
-  it('repite la URL como texto por defecto y se puede apagar', () => {
-    const boton = { texto: 'Ir', url: 'https://app.korly.com.mx/x' };
+  it('solo el botón: no repite la URL como texto ni pide copiar y pegar el enlace', () => {
+    const { html, textoPlano } = renderizarCorreo({ ...base, boton: { texto: 'Ir', url: 'https://app.korly.com.mx/x' } }, opciones);
 
-    expect(renderizarCorreo({ ...base, boton }, opciones).html).toContain('Si el botón no funciona');
-    expect(renderizarCorreo({ ...base, boton, enlaceAlterno: false }, opciones).html).not.toContain('Si el botón no funciona');
+    expect(html).not.toMatch(/copia y pega|botón no funciona/i);
+    expect(html.split('https://app.korly.com.mx/x')).toHaveLength(2); // aparece una sola vez: el href del botón
+    expect(textoPlano).not.toMatch(/copia y pega|botón no funciona/i);
   });
 
   it('lleva el texto de vista previa oculto, el soporte y el aviso de privacidad', () => {

@@ -182,7 +182,6 @@ export function construirCorreoRecordatorio(disponible: DisponibleOk, urlApp: st
       parrafos: [`Te quedan ${dias} de tu quincena con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible.`],
       cifra: { etiqueta: 'Hoy puedes gastar hasta', valor: cifraDiaria },
       boton: { texto: 'Registrar un gasto', url: urlApp },
-      enlaceAlterno: false,
       pie: ['Recibes este recordatorio porque lo activaste en Korly. Puedes desactivarlo en Ajustes.'],
     },
     { urlApp }
