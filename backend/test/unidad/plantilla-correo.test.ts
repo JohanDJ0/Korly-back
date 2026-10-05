@@ -59,12 +59,12 @@ describe('renderizarCorreo', () => {
 describe('construirCorreoRecordatorio', () => {
   const disponible = { diasRestantes: 13, disponibleValorMinimo: 541605n, cifraDiariaValorMinimo: 33174n } as never;
 
-  it('la cifra accionable va en el asunto y en grande, con el monto en pesos mexicanos', () => {
+  it('la cifra accionable va en el asunto y destacada en el cuerpo, con el monto en pesos mexicanos', () => {
     const { asunto, html, textoPlano } = construirCorreoRecordatorio(disponible, 'https://app.korly.com.mx');
 
     expect(asunto).toBe('Hoy puedes gastar hasta $331.74');
-    expect(html).toContain('$331.74');
-    expect(textoPlano).toContain('Hoy puedes gastar hasta: $331.74');
+    expect(html).toContain('<strong>Hoy puedes gastar hasta $331.74.</strong>');
+    expect(textoPlano).toContain('Hoy puedes gastar hasta $331.74.');
     expect(textoPlano).toContain('13 días');
   });
 
@@ -75,10 +75,26 @@ describe('construirCorreoRecordatorio', () => {
     expect(textoPlano).not.toContain('1 días');
   });
 
-  it('el botón lleva a la app', () => {
-    const { html } = construirCorreoRecordatorio(disponible, 'https://app.korly.com.mx');
+  it('es un mensaje sencillo: la dirección de la app va escrita en el texto, sin botón ni banda con diseño (Gmail lo mandaba a Promociones)', () => {
+    const { html, textoPlano } = construirCorreoRecordatorio(disponible, 'https://app.korly.com.mx');
 
-    expect(html).toContain('href="https://app.korly.com.mx"');
+    expect(html).toContain('regístralo en https://app.korly.com.mx');
+    expect(textoPlano).toContain('regístralo en https://app.korly.com.mx');
+    expect(html).not.toMatch(/<a |<table|border-radius|background:/);
+  });
+
+  it('dice cómo desactivar los recordatorios y a dónde escribir', () => {
+    const { textoPlano } = construirCorreoRecordatorio(disponible, 'https://app.korly.com.mx');
+
+    expect(textoPlano).toContain('Puedes desactivarlo en Ajustes');
+    expect(textoPlano).toContain(CORREO_SOPORTE);
+  });
+
+  it('escapa lo que se interpola en el HTML', () => {
+    const { html } = construirCorreoRecordatorio(disponible, 'https://app.korly.com.mx/?a=1&b=<x>');
+
+    expect(html).toContain('a=1&amp;b=&lt;x&gt;');
+    expect(html).not.toContain('<x>');
   });
 });
 

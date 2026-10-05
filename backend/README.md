@@ -2017,8 +2017,11 @@ configurados.
   rebota en vez de llegar a la bandeja.
 - Los HTML de los correos de Supabase están en `docs/correos-supabase/` y se
   generan con `npx tsx scripts/generar-plantillas-supabase.ts` (no se editan a
-  mano; el texto vive en `src/shared/plantillas-supabase.ts`). El recordatorio usa
-  el mismo molde (`src/shared/plantilla-correo.ts`).
+  mano; el texto vive en `src/shared/plantillas-supabase.ts`). El recordatorio
+  diario NO usa ese molde: es un mensaje casi en texto plano (ver
+  `construirCorreoRecordatorio`), porque con el diseño con banda y botón Gmail lo
+  mandaba a la pestaña Promociones; la versión sencilla, con la cifra en el asunto,
+  llegó a Principal (probado contra una cuenta real de Gmail).
 - `CORS_ORIGIN` acepta una lista separada por comas **sin espacios**.
 
 **Nota del registro `.com.mx`:** no admite privacidad de WHOIS por

@@ -1,6 +1,7 @@
 /**
- * Molde único de los correos de Korly (recordatorios de la app y plantillas
- * de autenticación de Supabase). HTML con tablas y estilos en línea: es lo
+ * Molde de los correos con marca de Korly: las plantillas de autenticación de Supabase.
+ * El recordatorio diario NO lo usa — ver `construirCorreoRecordatorio`
+ * (Gmail mandaba la versión con diseño a Promociones). HTML con tablas y estilos en línea: es lo
  * único que Gmail, Outlook y Apple Mail renderizan igual. Sin imágenes ni
  * fuentes web a propósito — el logo en SVG no se ve en Gmail y las fuentes
  * propias no cargan, así que la marca va como texto con sus colores.
@@ -41,7 +42,7 @@ export interface OpcionesCorreo {
   urlApp: string;
 }
 
-function esc(texto: string): string {
+export function escaparHtml(texto: string): string {
   return texto.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
@@ -49,25 +50,25 @@ export function renderizarCorreo(contenido: ContenidoCorreo, { urlApp }: Opcione
   const urlPrivacidad = `${urlApp.replace(/\/$/, '')}/privacidad`;
 
   const parrafos = contenido.parrafos
-    .map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:${TEXTO};">${esc(p)}</p>`)
+    .map((p) => `<p style="margin:0 0 16px;font-size:16px;line-height:24px;color:${TEXTO};">${escaparHtml(p)}</p>`)
     .join('');
 
   const cifra = contenido.cifra
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:8px 0 24px;"><tr><td style="background:${ACENTO};border:1px solid ${BORDE};border-radius:12px;padding:20px 24px;">
-        <div style="font-size:13px;line-height:18px;color:${TEXTO_SUAVE};letter-spacing:0.04em;text-transform:uppercase;">${esc(contenido.cifra.etiqueta)}</div>
-        <div style="font-size:38px;line-height:46px;font-weight:800;color:${VERDE_OSCURO};">${esc(contenido.cifra.valor)}</div>
+        <div style="font-size:13px;line-height:18px;color:${TEXTO_SUAVE};letter-spacing:0.04em;text-transform:uppercase;">${escaparHtml(contenido.cifra.etiqueta)}</div>
+        <div style="font-size:38px;line-height:46px;font-weight:800;color:${VERDE_OSCURO};">${escaparHtml(contenido.cifra.valor)}</div>
       </td></tr></table>`
     : '';
 
   const boton = contenido.boton
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:8px 0 8px;"><tr><td style="background:${VERDE};border-radius:10px;">
-        <a href="${esc(contenido.boton.url)}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">${esc(contenido.boton.texto)}</a>
+        <a href="${escaparHtml(contenido.boton.url)}" style="display:inline-block;padding:14px 28px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:10px;">${escaparHtml(contenido.boton.texto)}</a>
       </td></tr></table>`
     : '';
 
-  const notaBoton = contenido.notaBoton ? `<p style="margin:8px 0 0;font-size:13px;line-height:20px;color:${TEXTO_SUAVE};">${esc(contenido.notaBoton)}</p>` : '';
+  const notaBoton = contenido.notaBoton ? `<p style="margin:8px 0 0;font-size:13px;line-height:20px;color:${TEXTO_SUAVE};">${escaparHtml(contenido.notaBoton)}</p>` : '';
 
-  const lineasPie = (contenido.pie ?? []).map((l) => `<p style="margin:0 0 6px;">${esc(l)}</p>`).join('');
+  const lineasPie = (contenido.pie ?? []).map((l) => `<p style="margin:0 0 6px;">${escaparHtml(l)}</p>`).join('');
 
   const html = `<!doctype html>
 <html lang="es">
@@ -76,10 +77,10 @@ export function renderizarCorreo(contenido: ContenidoCorreo, { urlApp }: Opcione
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta name="color-scheme" content="light" />
 <meta name="supported-color-schemes" content="light" />
-<title>${esc(contenido.titulo)}</title>
+<title>${escaparHtml(contenido.titulo)}</title>
 </head>
 <body style="margin:0;padding:0;background:${CREMA};">
-<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${esc(contenido.preencabezado)}</div>
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">${escaparHtml(contenido.preencabezado)}</div>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${CREMA};">
 <tr><td align="center" style="padding:32px 16px;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;font-family:${FUENTE};">
@@ -87,7 +88,7 @@ export function renderizarCorreo(contenido: ContenidoCorreo, { urlApp }: Opcione
       <span style="font-size:26px;line-height:30px;font-weight:800;color:#ffffff;letter-spacing:-0.01em;">Korly</span>
     </td></tr>
     <tr><td style="background:#ffffff;border:1px solid ${BORDE};border-top:0;border-radius:0 0 16px 16px;padding:32px;">
-      <h1 style="margin:0 0 16px;font-size:24px;line-height:32px;font-weight:800;color:${VERDE_OSCURO};">${esc(contenido.titulo)}</h1>
+      <h1 style="margin:0 0 16px;font-size:24px;line-height:32px;font-weight:800;color:${VERDE_OSCURO};">${escaparHtml(contenido.titulo)}</h1>
       ${parrafos}
       ${cifra}
       ${boton}
@@ -96,7 +97,7 @@ export function renderizarCorreo(contenido: ContenidoCorreo, { urlApp }: Opcione
     <tr><td style="padding:20px 8px 0;font-size:12px;line-height:18px;color:${TEXTO_SUAVE};">
       ${lineasPie}
       <p style="margin:0 0 6px;">¿Dudas? Escríbenos a <a href="mailto:${CORREO_SOPORTE}" style="color:${VERDE};">${CORREO_SOPORTE}</a>.</p>
-      <p style="margin:0;"><a href="${esc(urlPrivacidad)}" style="color:${TEXTO_SUAVE};">Aviso de privacidad</a></p>
+      <p style="margin:0;"><a href="${escaparHtml(urlPrivacidad)}" style="color:${TEXTO_SUAVE};">Aviso de privacidad</a></p>
     </td></tr>
   </table>
 </td></tr>

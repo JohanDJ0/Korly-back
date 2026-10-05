@@ -4,7 +4,7 @@ import { recordatoriosEnviados } from '../../db/schema/recordatorios.js';
 import { tenants } from '../../db/schema/tenants.js';
 import { consultarDisponible, type DisponibleOk } from '../disponible/consultar-disponible.js';
 import { enviarCorreo } from '../../shared/email.js';
-import { CORREO_SOPORTE, renderizarCorreo } from '../../shared/plantilla-correo.js';
+import { CORREO_SOPORTE, escaparHtml } from '../../shared/plantilla-correo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { dbAdmin } from '../../shared/db-admin.js';
 import { fechaISO } from '../../shared/fechas.js';
@@ -168,24 +168,37 @@ export async function procesarRecordatorioDiarioDeTenant(
 
 /**
  * Asunto, HTML y texto plano del recordatorio diario. La cifra accionable va
- * primero y en grande (regla 1, documento-maestro-v2.md §13.4): lo que se
- * lee en la bandeja sin abrir el correo es "Hoy puedes gastar hasta $X".
+ * en el asunto (regla 1, documento-maestro-v2.md §13.4): lo que se lee en la
+ * bandeja sin abrir el correo es "Hoy puedes gastar hasta $X".
+ *
+ * **Casi texto plano a propósito, sin el molde con marca de `plantilla-correo.ts`.**
+ * Con la banda de color y el botón grande, Gmail mandó el recordatorio a la
+ * pestaña Promociones (probado contra una cuenta real); el mismo contenido como
+ * mensaje sencillo —sin banda, sin botón, un solo enlace escrito en el texto—
+ * llegó a Principal, también con la cifra en el asunto. Un recordatorio que
+ * nadie ve no sirve (regla 3: el backoff ya cuenta los ignorados). Los correos
+ * de autenticación de Supabase sí conservan el diseño: no caen en Promociones.
+ * Sin enlace al aviso de privacidad por la misma razón (menos enlaces); el pie
+ * dice cómo desactivarlo.
  */
 export function construirCorreoRecordatorio(disponible: DisponibleOk, urlApp: string): { asunto: string; html: string; textoPlano: string } {
   const cifraDiaria = formatearMontoMXN(disponible.cifraDiariaValorMinimo);
   const dias = disponible.diasRestantes === 1 ? '1 día' : `${disponible.diasRestantes} días`;
 
-  const { html, textoPlano } = renderizarCorreo(
-    {
-      preencabezado: `Te quedan ${dias} con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible.`,
-      titulo: 'Tu recordatorio de hoy',
-      parrafos: [`Te quedan ${dias} de tu quincena con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible.`],
-      cifra: { etiqueta: 'Hoy puedes gastar hasta', valor: cifraDiaria },
-      boton: { texto: 'Registrar un gasto', url: urlApp },
-      pie: ['Recibes este recordatorio porque lo activaste en Korly. Puedes desactivarlo en Ajustes.'],
-    },
-    { urlApp }
-  );
+  const quedan = `Te quedan ${dias} de tu quincena con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible.`;
+  const hoy = `Hoy puedes gastar hasta ${cifraDiaria}.`;
+  const registra = `Cuando gastes algo, regístralo en ${urlApp}`;
+  const pie = 'Recibes este recordatorio porque lo activaste en Korly. Puedes desactivarlo en Ajustes.';
+
+  const textoPlano = ['Hola,', '', quedan, '', hoy, '', registra, '', '—', pie, `¿Dudas? Responde a este correo o escribe a ${CORREO_SOPORTE}.`].join('\n');
+
+  const html = `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.55;color:#222;max-width:520px">
+<p>Hola,</p>
+<p>${escaparHtml(quedan)}</p>
+<p><strong>${escaparHtml(hoy)}</strong></p>
+<p>${escaparHtml(registra)}</p>
+<p style="color:#666;font-size:13px">${escaparHtml(pie)}<br>¿Dudas? Responde a este correo.</p>
+</div>`;
 
   return { asunto: `Hoy puedes gastar hasta ${cifraDiaria}`, html, textoPlano };
 }
