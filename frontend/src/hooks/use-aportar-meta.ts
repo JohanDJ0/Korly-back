@@ -24,6 +24,7 @@ export function useAportarMeta() {
       apiFetch<AporteResultado>(`/metas/${metaId}/aportes`, { method: 'POST', body: JSON.stringify({ monto }) }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['metas'] });
+      void queryClient.invalidateQueries({ queryKey: ['movimientos-meta'] });
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
       void queryClient.invalidateQueries({ queryKey: ['desglose'] });
     },

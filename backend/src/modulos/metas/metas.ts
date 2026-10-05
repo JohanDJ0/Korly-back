@@ -1,7 +1,7 @@
-import { and, desc, eq, sql } from 'drizzle-orm';
-import { asientos, cuentas } from '../../db/schema/ledger.js';
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm';
+import { asientos, cuentas, movimientos } from '../../db/schema/ledger.js';
 import { metas } from '../../db/schema/metas.js';
-import { crearCuentaTx, registrarMovimientoTx } from '../ledger/registrar-movimiento.js';
+import { crearCuentaTx, registrarMovimientoTx, revertirMovimientoEnSusCuentasTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
 import { obtenerPlanTenantTx } from '../planes/planes.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
@@ -266,5 +266,176 @@ export async function retirarDeMeta(entrada: RetirarDeMetaEntrada): Promise<Reti
     });
 
     return { id: movimientoId, metaId: meta.id, periodoDestinoId: periodo.id };
+  });
+}
+
+async function saldoCuentaTx(tx: Ejecutor, cuentaId: string): Promise<bigint> {
+  const [fila] = await tx
+    .select({ saldo: sql<string>`coalesce(sum(${asientos.montoValorMinimo}), 0)::text` })
+    .from(asientos)
+    .where(eq(asientos.cuentaId, cuentaId));
+  return BigInt(fila?.saldo ?? '0');
+}
+
+export interface PagarConMetaEntrada {
+  tenantId: string;
+  metaId: string;
+  monto: bigint;
+  moneda: string;
+  motivo: string;
+  fechaReferencia?: Date;
+}
+
+export interface PagoMetaResultado {
+  /** Id del movimiento del ledger (no existe una tabla `pagos_meta`, igual que aportes/retiros). */
+  id: string;
+  metaId: string;
+}
+
+/**
+ * Paga algo directamente con el dinero de una meta (meta → externo), sin
+ * pasar por la quincena. A diferencia de `retirarDeMeta` (que mueve el
+ * dinero al disponible del periodo como si fuera un ingreso, y luego el
+ * gasto lo vuelve a restar), aquí el movimiento nunca toca la cuenta de
+ * ningún periodo: el disponible, la cifra diaria, el resumen del periodo y
+ * el desglose semanal lo ignoran por construcción, porque todos leen solo
+ * los asientos de la cuenta del periodo. Por eso tampoco exige un periodo
+ * activo.
+ *
+ * Sí valida que la meta alcance: es dinero apartado, no un presupuesto
+ * flexible. La fila de la meta se bloquea (`FOR UPDATE`) para que dos pagos
+ * simultáneos no la sobregiren.
+ */
+export async function pagarConMeta(entrada: PagarConMetaEntrada): Promise<PagoMetaResultado> {
+  if (entrada.monto <= 0n) {
+    throw new ErrorDominio('VALIDACION', 'El monto de un pago debe ser positivo');
+  }
+  const motivo = entrada.motivo.trim();
+  if (motivo.length === 0) {
+    throw new ErrorDominio('VALIDACION', 'El motivo del pago es obligatorio');
+  }
+  const fechaReferencia = entrada.fechaReferencia ?? ahoraEnMexico();
+
+  return conTenant(entrada.tenantId, async (tx) => {
+    const meta = await obtenerMetaPorIdTx(tx, entrada.tenantId, entrada.metaId);
+    if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+
+    await tx.select({ id: metas.id }).from(metas).where(eq(metas.id, meta.id)).for('update');
+
+    if (entrada.monto > (await saldoCuentaTx(tx, meta.cuentaId))) {
+      throw new ErrorDominio('SALDO_META_INSUFICIENTE', 'La meta no tiene saldo suficiente para este pago');
+    }
+
+    const { movimientoId } = await registrarMovimientoTx(tx, {
+      tenantId: entrada.tenantId,
+      tipo: 'pago_meta',
+      moneda: entrada.moneda,
+      fechaEfectiva: fechaISO(fechaReferencia),
+      nota: motivo,
+      partidas: [
+        { cuentaId: meta.cuentaId, montoValorMinimo: -entrada.monto },
+        { cuentaId: null, montoValorMinimo: entrada.monto },
+      ],
+    });
+
+    return { id: movimientoId, metaId: meta.id };
+  });
+}
+
+/**
+ * Corrige un pago hecho con la meta: el dinero vuelve a la meta (no a la
+ * quincena — el pago nunca salió de ahí). Siempre por reversión, nunca por
+ * borrado (ADR-001).
+ */
+export async function deshacerPagoMeta(tenantId: string, metaId: string, movimientoId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<void> {
+  return conTenant(tenantId, async (tx) => {
+    const meta = await obtenerMetaPorIdTx(tx, tenantId, metaId);
+    if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+    if (!esUuidValido(movimientoId)) throw new ErrorDominio('PAGO_META_NO_ENCONTRADO', 'El pago especificado no existe');
+
+    const [pago] = await tx
+      .select({ id: movimientos.id })
+      .from(movimientos)
+      .innerJoin(asientos, eq(asientos.movimientoId, movimientos.id))
+      .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.id, movimientoId), eq(movimientos.tipo, 'pago_meta'), eq(asientos.cuentaId, meta.cuentaId)))
+      .limit(1);
+    if (!pago) throw new ErrorDominio('PAGO_META_NO_ENCONTRADO', 'El pago especificado no existe');
+
+    await tx.select({ id: metas.id }).from(metas).where(eq(metas.id, meta.id)).for('update');
+
+    const [reversion] = await tx
+      .select({ id: movimientos.id })
+      .from(movimientos)
+      .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.movimientoRevertidoId, pago.id)))
+      .limit(1);
+    if (reversion) throw new ErrorDominio('PAGO_META_YA_REVERTIDO', 'Este pago ya fue deshecho antes');
+
+    await revertirMovimientoEnSusCuentasTx(tx, tenantId, pago.id, fechaISO(fechaReferencia), 'Reversión de pago con meta');
+  });
+}
+
+export type TipoMovimientoDeMeta = 'aporte' | 'retiro' | 'pago';
+
+export interface MovimientoDeMeta {
+  id: string;
+  tipo: TipoMovimientoDeMeta;
+  /** Con signo desde el punto de vista de la meta: positivo entra a la meta, negativo sale. */
+  montoValorMinimo: bigint;
+  moneda: string;
+  fechaEfectiva: string;
+  nota: string | null;
+  /** true si ya se deshizo (solo los pagos se pueden deshacer desde aquí). */
+  revertido: boolean;
+}
+
+const LIMITE_MOVIMIENTOS_DE_META = 50;
+
+const TIPO_DE_MOVIMIENTO_DE_META: Readonly<Record<string, TipoMovimientoDeMeta>> = {
+  aporte_meta: 'aporte',
+  retiro_meta: 'retiro',
+  pago_meta: 'pago',
+};
+
+/**
+ * Historial de una meta: aportes (incluido el sobrante que se decidió
+ * ahorrar), retiros hacia la quincena y pagos hechos con ella, el más
+ * reciente primero. Las reversiones no se listan como filas propias: su
+ * original aparece marcado `revertido`.
+ */
+export async function listarMovimientosDeMeta(tenantId: string, metaId: string): Promise<MovimientoDeMeta[]> {
+  return conTenant(tenantId, async (tx) => {
+    const meta = await obtenerMetaPorIdTx(tx, tenantId, metaId);
+    if (!meta) throw new ErrorDominio('META_NO_ENCONTRADA', 'La meta especificada no existe');
+
+    const filas = await tx
+      .select({
+        id: movimientos.id,
+        tipo: movimientos.tipo,
+        moneda: movimientos.moneda,
+        fechaEfectiva: movimientos.fechaEfectiva,
+        nota: movimientos.nota,
+        monto: asientos.montoValorMinimo,
+      })
+      .from(asientos)
+      .innerJoin(movimientos, eq(movimientos.id, asientos.movimientoId))
+      .where(and(eq(asientos.tenantId, tenantId), eq(asientos.cuentaId, meta.cuentaId), ne(movimientos.tipo, 'reversion')))
+      .orderBy(desc(movimientos.fechaRegistro))
+      .limit(LIMITE_MOVIMIENTOS_DE_META);
+
+    const ids = filas.map((fila) => fila.id);
+    const revertidos =
+      ids.length === 0
+        ? []
+        : await tx
+            .select({ movimientoRevertidoId: movimientos.movimientoRevertidoId })
+            .from(movimientos)
+            .where(and(eq(movimientos.tenantId, tenantId), inArray(movimientos.movimientoRevertidoId, ids)));
+    const idsRevertidos = new Set(revertidos.map((fila) => fila.movimientoRevertidoId));
+
+    return filas.flatMap((fila) => {
+      const tipo = TIPO_DE_MOVIMIENTO_DE_META[fila.tipo];
+      if (!tipo) return [];
+      return [{ id: fila.id, tipo, montoValorMinimo: fila.monto, moneda: fila.moneda, fechaEfectiva: fila.fechaEfectiva, nota: fila.nota, revertido: idsRevertidos.has(fila.id) }];
+    });
   });
 }

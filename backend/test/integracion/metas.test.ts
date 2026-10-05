@@ -8,7 +8,8 @@ import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
-import { aportarAMeta, crearMeta, eliminarMeta, listarMetas, retirarDeMeta } from '../../src/modulos/metas/metas.js';
+import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
+import { aportarAMeta, crearMeta, deshacerPagoMeta, eliminarMeta, listarMetas, listarMovimientosDeMeta, pagarConMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 import { conTenant } from '../../src/shared/db.js';
 
 describe('metas de ahorro', () => {
@@ -217,6 +218,157 @@ describe('metas de ahorro', () => {
       await retirarDeMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', motivo: 'Emergencia', fechaReferencia: HOY });
 
       expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(-200n);
+    });
+  });
+
+  describe('pagarConMeta', () => {
+    /** Periodo con ingreso de 5000 y una meta con 600 ahorrados. */
+    async function escenario() {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Quintana', 100000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 600n, moneda: 'MXN', fechaReferencia: HOY });
+      return { tenantId, periodo, meta };
+    }
+
+    it('descuenta de la meta y NO toca la quincena: ni el saldo del periodo, ni el disponible, ni su resumen', async () => {
+      const { tenantId, periodo, meta } = await escenario();
+      const antes = await consultarDisponible(tenantId, HOY);
+
+      await pagarConMeta({ tenantId, metaId: meta.id, monto: 250n, moneda: 'MXN', motivo: 'Pago de la renta', fechaReferencia: HOY });
+
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(350n); // 600 - 250
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(4400n); // 5000 - 600 (solo el aporte)
+      expect(await consultarDisponible(tenantId, HOY)).toEqual(antes);
+
+      const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-10T00:00:00Z'));
+      expect(resumen.totalIngresosValorMinimo).toBe(5000n); // el pago no aparece como ingreso...
+      expect(resumen.totalGastadoValorMinimo).toBe(600n); // ...ni como gasto: solo el aporte
+    });
+
+    it('a diferencia de retirar, no exige periodo activo', async () => {
+      const { tenantId, periodo, meta } = await escenario();
+      await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-16T00:00:00Z'));
+
+      await pagarConMeta({ tenantId, metaId: meta.id, monto: 100n, moneda: 'MXN', motivo: 'Pago', fechaReferencia: new Date('2026-08-17T00:00:00Z') });
+
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(500n);
+    });
+
+    it('rechaza pagar más de lo que tiene la meta, sin tocar nada', async () => {
+      const { tenantId, meta } = await escenario();
+
+      await expect(
+        pagarConMeta({ tenantId, metaId: meta.id, monto: 601n, moneda: 'MXN', motivo: 'Demasiado', fechaReferencia: HOY })
+      ).rejects.toMatchObject({ codigo: 'SALDO_META_INSUFICIENTE' });
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(600n);
+    });
+
+    it('permite pagar exactamente todo el saldo de la meta', async () => {
+      const { tenantId, meta } = await escenario();
+
+      await pagarConMeta({ tenantId, metaId: meta.id, monto: 600n, moneda: 'MXN', motivo: 'Todo', fechaReferencia: HOY });
+
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(0n);
+    });
+
+    it('rechaza un monto no positivo y un motivo vacío', async () => {
+      const { tenantId, meta } = await escenario();
+
+      await expect(pagarConMeta({ tenantId, metaId: meta.id, monto: 0n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+      await expect(pagarConMeta({ tenantId, metaId: meta.id, monto: 10n, moneda: 'MXN', motivo: '  ', fechaReferencia: HOY })).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+
+    it('rechaza una meta que no existe o de otro tenant (BOLA)', async () => {
+      const { tenantId } = await escenario();
+      const otro = await escenario();
+
+      await expect(pagarConMeta({ tenantId, metaId: randomUUID(), monto: 10n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY })).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+      await expect(pagarConMeta({ tenantId, metaId: otro.meta.id, monto: 10n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY })).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+    });
+
+    it('dos pagos simultáneos no pueden sobregirar la meta', async () => {
+      const { tenantId, meta } = await escenario();
+
+      const resultados = await Promise.allSettled([
+        pagarConMeta({ tenantId, metaId: meta.id, monto: 400n, moneda: 'MXN', motivo: 'A', fechaReferencia: HOY }),
+        pagarConMeta({ tenantId, metaId: meta.id, monto: 400n, moneda: 'MXN', motivo: 'B', fechaReferencia: HOY }),
+      ]);
+
+      expect(resultados.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(200n);
+    });
+  });
+
+  describe('deshacerPagoMeta', () => {
+    async function conUnPago() {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Quintana', 100000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 600n, moneda: 'MXN', fechaReferencia: HOY });
+      const pago = await pagarConMeta({ tenantId, metaId: meta.id, monto: 250n, moneda: 'MXN', motivo: 'Renta', fechaReferencia: HOY });
+      return { tenantId, periodo, meta, pago };
+    }
+
+    it('devuelve el dinero a la meta, no a la quincena', async () => {
+      const { tenantId, periodo, meta, pago } = await conUnPago();
+
+      await deshacerPagoMeta(tenantId, meta.id, pago.id, HOY);
+
+      expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(600n);
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(4400n); // sin cambios
+    });
+
+    it('rechaza deshacer dos veces el mismo pago', async () => {
+      const { tenantId, meta, pago } = await conUnPago();
+      await deshacerPagoMeta(tenantId, meta.id, pago.id, HOY);
+
+      await expect(deshacerPagoMeta(tenantId, meta.id, pago.id, HOY)).rejects.toMatchObject({ codigo: 'PAGO_META_YA_REVERTIDO' });
+    });
+
+    it('solo deshace pagos: un retiro o un aporte de la misma meta se rechaza', async () => {
+      const { tenantId, periodo, meta } = await conUnPago();
+      const retiro = await retirarDeMeta({ tenantId, metaId: meta.id, monto: 50n, moneda: 'MXN', motivo: 'x', fechaReferencia: HOY });
+
+      await expect(deshacerPagoMeta(tenantId, meta.id, retiro.id, HOY)).rejects.toMatchObject({ codigo: 'PAGO_META_NO_ENCONTRADO' });
+      await expect(deshacerPagoMeta(tenantId, meta.id, randomUUID(), HOY)).rejects.toMatchObject({ codigo: 'PAGO_META_NO_ENCONTRADO' });
+      expect(periodo.id).toBeDefined();
+    });
+
+    it('rechaza el pago de una meta ajena (BOLA)', async () => {
+      const { tenantId } = await conUnPago();
+      const otro = await conUnPago();
+
+      await expect(deshacerPagoMeta(tenantId, otro.meta.id, otro.pago.id, HOY)).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+    });
+  });
+
+  describe('listarMovimientosDeMeta', () => {
+    it('lista aportes, retiros y pagos con su signo; las reversiones no salen como filas y marcan a su original', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Quintana', 100000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 600n, moneda: 'MXN', fechaReferencia: HOY });
+      await retirarDeMeta({ tenantId, metaId: meta.id, monto: 50n, moneda: 'MXN', motivo: 'Pasa a la quincena', fechaReferencia: HOY });
+      const pago = await pagarConMeta({ tenantId, metaId: meta.id, monto: 250n, moneda: 'MXN', motivo: 'Renta', fechaReferencia: HOY });
+      await deshacerPagoMeta(tenantId, meta.id, pago.id, HOY);
+
+      const lista = await listarMovimientosDeMeta(tenantId, meta.id);
+
+      expect(lista.map((m) => [m.tipo, m.montoValorMinimo, m.revertido])).toEqual([
+        ['pago', -250n, true],
+        ['retiro', -50n, false],
+        ['aporte', 600n, false],
+      ]);
+      expect(lista[0]?.nota).toBe('Renta');
+    });
+
+    it('rechaza una meta ajena (BOLA)', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const { tenantId: otroTenant } = await tenantConPeriodoActivo();
+      const metaAjena = await crearMeta(otroTenant, 'Ajena', 1000n, 'MXN');
+
+      await expect(listarMovimientosDeMeta(tenantId, metaAjena.id)).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
     });
   });
 

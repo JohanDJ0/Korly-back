@@ -25,6 +25,7 @@ export function useRetirarMeta() {
       apiFetch<RetiroResultado>(`/metas/${metaId}/retiros`, { method: 'POST', body: JSON.stringify(body) }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['metas'] });
+      void queryClient.invalidateQueries({ queryKey: ['movimientos-meta'] });
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
       void queryClient.invalidateQueries({ queryKey: ['desglose'] });
     },

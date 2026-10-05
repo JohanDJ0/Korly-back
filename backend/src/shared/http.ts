@@ -30,6 +30,10 @@ const CODIGO_A_STATUS: Record<string, number> = {
   INGRESO_NO_ENCONTRADO: 404,
   INGRESO_YA_REVERTIDO: 409,
   META_NO_ENCONTRADA: 404,
+  // Pagar con una meta (modulos/metas/metas.ts): a diferencia del retiro hacia la quincena, no se permite sobregirar la meta.
+  SALDO_META_INSUFICIENTE: 409,
+  PAGO_META_NO_ENCONTRADO: 404,
+  PAGO_META_YA_REVERTIDO: 409,
   CATEGORIA_NO_ENCONTRADA: 404,
   LIMITE_CATEGORIAS_ALCANZADO: 403,
   RECURRENTE_NO_ENCONTRADO: 404,

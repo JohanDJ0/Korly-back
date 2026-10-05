@@ -1245,6 +1245,39 @@ correctos) → retirar (con y sin motivo) → cerrar periodo → decidir
 "ahorrar" → la meta recibe el sobrante de inmediato, sin crear ningún
 periodo siguiente — ver `http/ciclo-completo.http`, pasos 26-35.
 
+### Pagar con una meta
+
+Hallazgo real del usuario: pagó algo con dinero de una meta usando
+"Retirar", y ese dinero aparecía mezclado con la quincena — el retiro
+contaba como ingreso del periodo y el gasto que lo cubría como gasto, así
+que el resumen del periodo y el desglose semanal salían inflados, y entre
+el retiro y el gasto el disponible (y la cifra diaria) subía de más.
+
+Hay ahora tres movimientos distintos, y cada uno cuenta distinto:
+
+| Acción en la meta | Movimiento | Qué hace |
+| --- | --- | --- |
+| Aportar | `aporte_meta` | Quincena → meta. Cuenta como gasto del periodo. |
+| Pasar a mi quincena (retirar) | `retiro_meta` | Meta → quincena. Cuenta como ingreso del periodo. |
+| **Pagar con la meta** | `pago_meta` | Meta → externo. **No toca la quincena.** |
+
+`pagarConMeta` (`metas.ts`, `POST /metas/:id/pagos`) postea
+`[meta −X, externo +X]`. Como el disponible, el resumen de cierre y el
+desglose leen solo los asientos de la cuenta del periodo, ignoran este
+movimiento por construcción — no se cambió ninguno de esos cálculos. Por
+la misma razón no exige periodo activo. A diferencia del retiro (que
+permite sobregirar, mismo criterio que el sobregiro de gastos), **sí
+valida que la meta alcance** (`SALDO_META_INSUFICIENTE`, 409): es dinero
+apartado. La fila de la meta se bloquea con `FOR UPDATE` para que dos
+pagos simultáneos no la sobregiren (probado con dos pagos en paralelo).
+
+`deshacerPagoMeta` (`DELETE /metas/:id/pagos/:movimientoId`) revierte el
+pago contra la propia meta — el dinero vuelve a ella, no a la quincena.
+`GET /metas/:id/movimientos` lista aportes, retiros y pagos de la meta
+(últimos 50), con `revertido` en los que ya se deshicieron; las
+reversiones no salen como filas propias. La migración 0022 solo agrega
+`'pago_meta'` al CHECK de `movimientos.tipo`.
+
 ## Gastos recurrentes
 
 Extensión sobre `docs/openapi.yaml` (documento-maestro-v2.md §12,
@@ -1684,13 +1717,19 @@ quitarla — los tres módulos solo tenían crear + listar. No es un
 `DELETE` genérico: cada uno se bloquea distinto según qué tan "en uso"
 está.
 
-- **Tarjetas** (`eliminarTarjeta`, `tarjetas.ts`): solo si nunca tuvo
-  ningún cargo. Un cargo ya generó un movimiento `'cargo_tarjeta'` real
-  (inmutable, ADR-001) contra la cuenta de la tarjeta; sin cargos, esa
-  cuenta nunca recibió ni un solo asiento, así que sí se borra de
-  verdad (fila de `tarjetas` + su `cuenta`) — a diferencia de
-  gastos/ingresos, que nunca se borran de verdad. `TARJETA_CON_HISTORIAL`
-  (409) si ya tiene cargos.
+- **Tarjetas** (`eliminarTarjeta`, `tarjetas.ts`): según su historial.
+  Sin cargos nunca, esa cuenta nunca recibió ni un solo asiento, así que
+  sí se borra de verdad (fila de `tarjetas` + su `cuenta`) — a
+  diferencia de gastos/ingresos, que nunca se borran de verdad. Con
+  cargos, un cargo ya generó un movimiento `'cargo_tarjeta'` real
+  (inmutable, ADR-001) y su fila en `cargos_tarjeta` sigue apuntando a
+  la tarjeta, así que no se puede borrar: si **todos** sus cargos ya
+  están corregidos (`eliminarCargoTarjeta`) y la deuda es cero, se
+  **archiva** (`tarjetas.archivada_en`, migración 0021) — desaparece del
+  listado y se trata como inexistente (no admite cargos nuevos). Con
+  algún cargo vigente, `TARJETA_CON_HISTORIAL` (409) con un mensaje que
+  explica que hay que corregirlos primero. Antes, una tarjeta cuyo único
+  cargo se había corregido quedaba imposible de eliminar para siempre.
 - **Categorías** (`eliminarCategoria`, `categorias.ts`): las
   predeterminadas nunca se pueden eliminar (`CATEGORIA_PREDETERMINADA`,
   409) — las siembra `resolverOcrearIdentidad` para todo tenant nuevo,

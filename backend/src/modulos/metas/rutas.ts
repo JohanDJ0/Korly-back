@@ -1,5 +1,15 @@
 import type { FastifyInstance } from 'fastify';
-import { aportarAMeta, crearMeta, eliminarMeta, listarMetas, retirarDeMeta, type MetaConProgreso } from './metas.js';
+import {
+  aportarAMeta,
+  crearMeta,
+  deshacerPagoMeta,
+  eliminarMeta,
+  listarMetas,
+  listarMovimientosDeMeta,
+  pagarConMeta,
+  retirarDeMeta,
+  type MetaConProgreso,
+} from './metas.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { montoADto, montoDesdeDto, type MontoDto } from '../../shared/http.js';
 
@@ -23,6 +33,11 @@ interface CrearAporteBody {
 }
 
 interface CrearRetiroBody {
+  monto?: MontoDto;
+  motivo?: string;
+}
+
+interface CrearPagoBody {
   monto?: MontoDto;
   motivo?: string;
 }
@@ -108,5 +123,51 @@ export async function rutasMetas(app: FastifyInstance): Promise<void> {
       monto: montoADto(valorMinimo, moneda),
       motivo: body.motivo,
     });
+  });
+
+  /** Pago directo desde la meta, sin pasar por la quincena (ver `pagarConMeta`). */
+  app.post<{ Params: { metaId: string } }>('/metas/:metaId/pagos', async (request, reply) => {
+    const body = request.body as CrearPagoBody | undefined;
+    if (!body?.monto) {
+      throw new ErrorDominio('VALIDACION', "El campo 'monto' es obligatorio");
+    }
+    if (!body.motivo) {
+      throw new ErrorDominio('VALIDACION', "El campo 'motivo' es obligatorio");
+    }
+    const { valorMinimo, moneda } = montoDesdeDto(body.monto);
+
+    const resultado = await pagarConMeta({
+      tenantId: request.identidad.tenantId,
+      metaId: request.params.metaId,
+      monto: valorMinimo,
+      moneda,
+      motivo: body.motivo,
+    });
+
+    reply.code(201).send({
+      id: resultado.id,
+      metaId: resultado.metaId,
+      monto: montoADto(valorMinimo, moneda),
+      motivo: body.motivo.trim(),
+    });
+  });
+
+  app.delete<{ Params: { metaId: string; movimientoId: string } }>('/metas/:metaId/pagos/:movimientoId', async (request, reply) => {
+    await deshacerPagoMeta(request.identidad.tenantId, request.params.metaId, request.params.movimientoId);
+    reply.code(204).send();
+  });
+
+  app.get<{ Params: { metaId: string } }>('/metas/:metaId/movimientos', async (request, reply) => {
+    const movimientos = await listarMovimientosDeMeta(request.identidad.tenantId, request.params.metaId);
+    reply.send(
+      movimientos.map((m) => ({
+        id: m.id,
+        tipo: m.tipo,
+        monto: montoADto(m.montoValorMinimo, m.moneda),
+        fechaEfectiva: m.fechaEfectiva,
+        nota: m.nota,
+        revertido: m.revertido,
+      }))
+    );
   });
 }
