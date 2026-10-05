@@ -7,8 +7,11 @@ import { PageHeader } from '@/components/PageHeader';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDecidirSobrante } from '@/hooks/use-decidir-sobrante';
 import { useMetas } from '@/hooks/use-metas';
+import { usePeriodos } from '@/hooks/use-periodos';
+import { useReabrirPeriodo } from '@/hooks/use-reabrir-periodo';
 import { useResumen } from '@/hooks/use-resumen';
 import { formatearMonto } from '@/lib/dinero';
+import { hoyISO } from '@/lib/fechas';
 import { cn } from '@/lib/utils';
 
 /**
@@ -24,11 +27,19 @@ export function Resumen() {
   const { data: metas } = useMetas();
   const decidirSobrante = useDecidirSobrante();
   const crearPeriodo = useCrearPeriodo();
+  const reabrirPeriodo = useReabrirPeriodo();
+  const { data: periodos } = usePeriodos();
   const navigate = useNavigate();
   const [mostrarSelectorMeta, setMostrarSelectorMeta] = useState(false);
   const [metaSeleccionada, setMetaSeleccionada] = useState('');
 
   const esDeficit = resumen ? resumen.sobrante.valorMinimo < 0 : false;
+
+  // Reabrir (backend ADR-009) solo tiene sentido mientras el periodo siga dentro de su quincena y el sobrante no
+  // se haya guardado en una meta; el backend valida el resto (arrastre ya reclamado, actividad posterior...) y
+  // responde con la razón, que se muestra tal cual.
+  const periodoDelResumen = periodos?.find((p) => p.id === resumen?.periodoId);
+  const sePuedeIntentarReabrir = periodoDelResumen?.estado === 'cerrado' && periodoDelResumen.fechaFin >= hoyISO() && resumen?.decisionSobrante !== 'ahorrado';
 
   return (
     <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-4 pb-8 sm:max-w-2xl sm:px-8 sm:pt-8">
@@ -60,6 +71,26 @@ export function Resumen() {
                 </div>
               </div>
             </div>
+
+            {sePuedeIntentarReabrir && (
+              <div className="border-border bg-card flex flex-col gap-2.5 rounded-2xl border p-4.5">
+                <div>
+                  <h2 className="font-display text-[15px] font-semibold">¿Lo cerraste sin querer?</h2>
+                  <p className="text-muted-foreground mt-0.5 text-[12.5px]">
+                    Puedes reabrirlo y seguir registrando en este periodo, siempre que no hayas decidido qué hacer con el sobrante.
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-xl"
+                  disabled={reabrirPeriodo.isPending}
+                  onClick={() => reabrirPeriodo.mutate(resumen.periodoId, { onSuccess: () => navigate('/') })}
+                >
+                  {reabrirPeriodo.isPending ? 'Reabriendo…' : 'Reabrir periodo'}
+                </Button>
+                {reabrirPeriodo.isError && <p className="text-destructive text-sm">{reabrirPeriodo.error.message}</p>}
+              </div>
+            )}
 
             <DesglosePeriodo periodoId={resumen.periodoId} />
 

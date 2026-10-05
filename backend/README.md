@@ -1116,6 +1116,18 @@ activo (reproduce el reporte real); deja de aparecer en cuanto se
 decide (arrastrar o ahorrar); con varios pendientes acumulados,
 devuelve el más antiguo; y nunca cruza de un tenant a otro (BOLA).
 
+### Reabrir un periodo cerrado por error
+
+`POST /v1/periodos/:periodoId/reabrir` (`modulos/cierre/reabrir-periodo.ts`, [ADR-009](../docs/adr/009-reapertura-de-periodo.md)). Nació de un caso real: un usuario pulsó **Cerrar periodo** creyendo que era **Cerrar sesión**, y no había forma de deshacerlo — el resumen no se puede borrar (ADR-001) y es único por periodo.
+
+Nada se borra: el resumen se **anula** (`resumenes.anulado_en`, migración 0020) y se permite uno nuevo al volver a cerrar; el drenaje del sobrante y los cargos automáticos del borrador promovido se deshacen con **movimientos de reversión**. El trigger de `resumenes` solo admite esa transición (y la de decidir el sobrante); el `DELETE` sigue bloqueado.
+
+Se rechaza con `409 REAPERTURA_NO_PERMITIDA` y un mensaje que explica por qué cuando: el periodo no está cerrado o ya está abierto; su quincena ya terminó (el cierre perezoso lo volvería a cerrar); hay un cierre más reciente; el sobrante ya se guardó en una meta o lo reclamó otro periodo; o el periodo que se abrió después del cierre ya tiene movimientos del usuario (solo se retira si únicamente trae recurrentes y pagos de tarjeta materializados solos). Un déficit, que se decide solo al cerrar, también se puede reabrir mientras nadie reclame el arrastre.
+
+El duplicado que retira pasa a `descartado`, no `archivado`: el Historial muestra los archivados. `reabrirPeriodoTx` recibe una transacción, para poder ensayarla sobre datos reales y revertirla.
+
+Lo que lee resúmenes (`obtenerResumen`, el aviso de sobrante pendiente, el barrido de N días, el reclamo de arrastres) excluye los anulados; `test/integracion/reapertura.test.ts` (21 pruebas) cubre el caso feliz, el escenario del borrador promovido, cada rechazo, esas lecturas y la defensa del trigger.
+
 ## Metas de ahorro
 
 ```

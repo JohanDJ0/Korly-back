@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api';
 interface Periodo {
   id: string;
   cuentaId: string;
-  estado: 'borrador' | 'activo' | 'cerrado' | 'archivado';
+  estado: 'borrador' | 'activo' | 'cerrado' | 'archivado' | 'descartado';
   fechaInicio: string;
   fechaFin: string;
 }

@@ -15,7 +15,11 @@ import { tenants } from './tenants.js';
 export const TIPOS_PERIODO_SOPORTADOS = ['quincenal'] as const;
 export type TipoPeriodoSoportado = (typeof TIPOS_PERIODO_SOPORTADOS)[number];
 
-export const ESTADOS_PERIODO = ['borrador', 'activo', 'cerrado', 'archivado'] as const;
+/**
+ * 'descartado' (ADR-009): el duplicado vacío que una reapertura retira. A
+ * diferencia de 'archivado', el Historial no lo muestra.
+ */
+export const ESTADOS_PERIODO = ['borrador', 'activo', 'cerrado', 'archivado', 'descartado'] as const;
 export type EstadoPeriodo = (typeof ESTADOS_PERIODO)[number];
 
 /**
@@ -48,7 +52,7 @@ export const periodos = pgTable(
   },
   (t) => [
     check('periodos_tipo_valido', sql`${t.tipo} in ('quincenal')`),
-    check('periodos_estado_valido', sql`${t.estado} in ('borrador','activo','cerrado','archivado')`),
+    check('periodos_estado_valido', sql`${t.estado} in ('borrador','activo','cerrado','archivado','descartado')`),
     // Invariante 9 (modelo-dominio.md): solo un periodo activo por
     // tenant. Es un índice parcial, no solo una regla de aplicación —
     // defensa en profundidad contra una carrera entre dos requests de

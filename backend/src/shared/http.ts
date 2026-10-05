@@ -14,6 +14,8 @@ const CODIGO_A_STATUS: Record<string, number> = {
   PERIODO_NO_ENCONTRADO: 404,
   PERIODO_NO_ACTIVO: 409,
   SOBRANTE_YA_DECIDIDO: 409,
+  // ADR-009: reabrir un periodo cerrado solo es posible mientras su sobrante no se haya destinado y no haya actividad posterior; 409 porque depende del estado actual.
+  REAPERTURA_NO_PERMITIDA: 409,
   NO_SOPORTADO: 501,
   GASTO_NO_ENCONTRADO: 404,
   // No documentados en openapi.yaml (que solo lista 404 genérico para

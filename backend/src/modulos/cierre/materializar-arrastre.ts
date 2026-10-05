@@ -93,7 +93,9 @@ export async function reclamarArrastresTx(
       and(
         eq(arrastres.tenantId, tenantId),
         isNull(arrastres.periodoDestinoId),
-        eq(resumenes.decisionSobrante, 'arrastrado')
+        eq(resumenes.decisionSobrante, 'arrastrado'),
+        // Un resumen anulado por una reapertura (ADR-009) ya no tiene dinero que reclamar.
+        isNull(resumenes.anuladoEn)
       )
     );
 

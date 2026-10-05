@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ne } from 'drizzle-orm';
 import { crearCuentaTx } from '../ledger/registrar-movimiento.js';
 import { resolverPendientesTx } from '../cierre/cerrar-periodo.js';
 import { reclamarArrastresTx } from '../cierre/materializar-arrastre.js';
@@ -164,7 +164,8 @@ export async function listarPeriodos(tenantId: string, fechaReferencia: Date = a
   return conTenant(tenantId, async (tx) => {
     await resolverPendientesTx(tx, tenantId, fechaReferencia);
 
-    const condiciones = [eq(periodos.tenantId, tenantId)];
+    // 'descartado' (ADR-009) es un duplicado que una reapertura retiró: nunca se lista.
+    const condiciones = [eq(periodos.tenantId, tenantId), ne(periodos.estado, 'descartado')];
 
     // documento-maestro-v2.md §9.2: el plan Free ve 12 meses de
     // historial, no todo — a diferencia de los gates de "crear algo

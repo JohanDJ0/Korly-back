@@ -1,4 +1,4 @@
-import { and, eq, lt } from 'drizzle-orm';
+import { and, eq, isNull, lt } from 'drizzle-orm';
 import { resumenes } from '../../db/schema/cierre.js';
 import { metas } from '../../db/schema/metas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
@@ -122,5 +122,13 @@ export async function resolverDecisionesVencidasTx(tx: Ejecutor, tenantId: strin
   await tx
     .update(resumenes)
     .set({ decisionSobrante: 'arrastrado', decisionSobranteFecha: fechaReferencia })
-    .where(and(eq(resumenes.tenantId, tenantId), eq(resumenes.decisionSobrante, 'pendiente'), lt(resumenes.generadoEn, limite)));
+    .where(
+      and(
+        eq(resumenes.tenantId, tenantId),
+        eq(resumenes.decisionSobrante, 'pendiente'),
+        // Un resumen anulado por una reapertura (ADR-009) no se decide: el trigger lo rechazaría.
+        isNull(resumenes.anuladoEn),
+        lt(resumenes.generadoEn, limite)
+      )
+    );
 }

@@ -5,7 +5,7 @@ import { apiFetch } from '@/lib/api';
 export interface Periodo {
   id: string;
   cuentaId: string;
-  estado: 'borrador' | 'activo' | 'cerrado' | 'archivado';
+  estado: 'borrador' | 'activo' | 'cerrado' | 'archivado' | 'descartado';
   fechaInicio: string;
   fechaFin: string;
   /** Extensión sobre openapi.yaml — distingue dos periodos con el mismo rango de fechas (ver Historial.tsx). */

@@ -1,4 +1,4 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, isNull } from 'drizzle-orm';
 import { type TipoMovimiento } from '../../db/schema/ledger.js';
 import { resumenes, type EstadoDecisionSobrante } from '../../db/schema/cierre.js';
 import { obtenerNetoPorTipoEfectivoTx } from '../ledger/registrar-movimiento.js';
@@ -82,7 +82,7 @@ export async function obtenerResumenTx(tx: Ejecutor, tenantId: string, periodoId
   const [fila] = await tx
     .select()
     .from(resumenes)
-    .where(and(eq(resumenes.tenantId, tenantId), eq(resumenes.periodoId, periodoId)))
+    .where(and(eq(resumenes.tenantId, tenantId), eq(resumenes.periodoId, periodoId), isNull(resumenes.anuladoEn)))
     .limit(1);
 
   return fila ? { ...fila, decisionSobrante: fila.decisionSobrante as EstadoDecisionSobrante } : null;
@@ -108,7 +108,7 @@ export async function obtenerResumenPendiente(tenantId: string): Promise<Resumen
     const [fila] = await tx
       .select()
       .from(resumenes)
-      .where(and(eq(resumenes.tenantId, tenantId), eq(resumenes.decisionSobrante, 'pendiente')))
+      .where(and(eq(resumenes.tenantId, tenantId), eq(resumenes.decisionSobrante, 'pendiente'), isNull(resumenes.anuladoEn)))
       .orderBy(asc(resumenes.generadoEn))
       .limit(1);
 

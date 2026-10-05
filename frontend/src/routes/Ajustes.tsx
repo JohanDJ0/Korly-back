@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronRight, Crown, Download, Repeat, ShieldCheck, Tag } from 'lucide-react';
+import { Bell, ChevronRight, Crown, Download, LogOut, Repeat, ShieldCheck, Tag } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
+import { CerrarPeriodo } from '@/components/CerrarPeriodo';
 import { EliminarCuenta } from '@/components/EliminarCuenta';
 import { PageHeader } from '@/components/PageHeader';
 import { useActualizarPreferencias } from '@/hooks/use-actualizar-preferencias';
@@ -17,9 +18,10 @@ import { supabase } from '@/lib/supabase';
 
 /**
  * Primera y única preferencia hoy (documento-maestro-v2.md §13.4):
- * apagar los recordatorios por correo. `Cerrar sesión` vivía antes al
- * fondo de Home.tsx — esta es conceptualmente su casa (un ajuste de
- * cuenta, no una acción de la pantalla principal).
+ * apagar los recordatorios por correo. `Cerrar sesión` vive en la tarjeta de
+ * Cuenta (arriba), y `Cerrar periodo` en su propia sección, lejos de ella:
+ * un usuario real pulsó el segundo creyendo que salía de su cuenta (ver
+ * CerrarPeriodo.tsx). Nunca deben quedar juntos.
  *
  * Sin sección de plan/facturación a propósito: `tenants.plan` existe en
  * el backend (documento-maestro-v2.md §9.2) pero ningún endpoint lo
@@ -56,6 +58,10 @@ export function Ajustes() {
                 {usuario.email[0]?.toUpperCase()}
               </div>
               <span className="min-w-0 flex-1 truncate text-[14.5px] font-semibold">{usuario.email}</span>
+              <Button variant="outline" size="sm" className="shrink-0 rounded-xl" onClick={() => supabase.auth.signOut()}>
+                <LogOut size={14} />
+                Cerrar sesión
+              </Button>
             </div>
           </section>
         )}
@@ -154,6 +160,12 @@ export function Ajustes() {
           </div>
         </section>
         <section className="flex flex-col gap-2.5">
+          <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">PERIODO</h2>
+          <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3.5">
+            <CerrarPeriodo />
+          </div>
+        </section>
+        <section className="flex flex-col gap-2.5">
           <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">PRIVACIDAD Y DATOS</h2>
           <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3.5">
             <Link to="/privacidad" className="flex items-center gap-3">
@@ -171,16 +183,6 @@ export function Ajustes() {
             <EliminarCuenta />
           </div>
         </section>
-      </div>
-
-      <div className="px-5 pb-6 sm:px-0">
-        <Button
-          variant="outline"
-          className="border-destructive/25 text-destructive hover:bg-destructive/5 w-full rounded-2xl py-3 sm:w-auto"
-          onClick={() => supabase.auth.signOut()}
-        >
-          Cerrar sesión
-        </Button>
       </div>
 
       <BottomNav />

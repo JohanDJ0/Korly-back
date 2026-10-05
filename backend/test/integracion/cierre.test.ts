@@ -344,7 +344,7 @@ describe('cierre', () => {
           where periodo_id = ${periodo.id}
         `)
       )
-    ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/Solo decision_sobrante/) } });
+    ).rejects.toMatchObject({ cause: { message: expect.stringMatching(/Solo la decisión del sobrante/) } });
   });
 
   it('un resumen ya decidido no se puede modificar de ninguna forma, ni siquiera intentar volverlo a pendiente', async () => {

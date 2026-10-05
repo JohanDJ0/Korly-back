@@ -153,6 +153,50 @@ export async function revertirMovimientoTx(
   });
 }
 
+/**
+ * Reversión que invierte cada partida **en su propia cuenta**, sin
+ * redirigir nada. Es lo que necesitan los movimientos con más de una
+ * cuenta real: el drenaje de un cierre (periodo → `arrastre_pendiente`) y
+ * el pago de tarjeta (periodo → tarjeta). `revertirMovimientoTx` de arriba
+ * apunta TODAS las partidas con cuenta a una sola `cuentaDestino`, lo que
+ * para estos movimientos dejaría ambas patas en la misma cuenta.
+ *
+ * Solo para deshacer un movimiento dentro de la misma cuenta que lo
+ * originó — el caso de la reapertura de un periodo (ADR-009), donde el
+ * periodo vuelve a estar activo y su saldo SÍ debe recuperar lo drenado.
+ * Una corrección normal de un periodo cerrado sigue usando
+ * `revertirMovimientoTx` y se registra en el periodo activo de hoy.
+ */
+export async function revertirMovimientoEnSusCuentasTx(
+  tx: Ejecutor,
+  tenantId: string,
+  movimientoIdOriginal: string,
+  fechaEfectiva: string,
+  nota?: string
+): Promise<{ movimientoId: string }> {
+  const [movimientoOriginal] = await tx
+    .select({ moneda: movimientos.moneda })
+    .from(movimientos)
+    .where(and(eq(movimientos.tenantId, tenantId), eq(movimientos.id, movimientoIdOriginal)))
+    .limit(1);
+  if (!movimientoOriginal) throw new Error('No se encontró el movimiento a revertir');
+
+  const asientosOriginales = await tx
+    .select({ cuentaId: asientos.cuentaId, montoValorMinimo: asientos.montoValorMinimo })
+    .from(asientos)
+    .where(and(eq(asientos.tenantId, tenantId), eq(asientos.movimientoId, movimientoIdOriginal)));
+
+  return registrarMovimientoTx(tx, {
+    tenantId,
+    tipo: 'reversion',
+    moneda: movimientoOriginal.moneda,
+    fechaEfectiva,
+    nota,
+    movimientoRevertidoId: movimientoIdOriginal,
+    partidas: asientosOriginales.map((asiento) => ({ cuentaId: asiento.cuentaId, montoValorMinimo: -asiento.montoValorMinimo })),
+  });
+}
+
 export async function obtenerSaldoCuenta(tenantId: string, cuentaId: string): Promise<bigint> {
   return conTenant(tenantId, async (tx) => {
     const [fila] = await tx

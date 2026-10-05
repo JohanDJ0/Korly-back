@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { cerrarPeriodoManualmente } from './cerrar-periodo.js';
 import { decidirSobrante, type DecisionSobranteEntrada } from './decidir-sobrante.js';
+import { reabrirPeriodo } from './reabrir-periodo.js';
 import { obtenerResumen, obtenerResumenPendiente, type ResumenGenerado } from './generar-resumen.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { montoADto } from '../../shared/http.js';
@@ -23,6 +24,16 @@ export async function rutasCierre(app: FastifyInstance): Promise<void> {
   app.post<{ Params: { periodoId: string } }>('/periodos/:periodoId/cerrar', async (request, reply) => {
     const resumen = await cerrarPeriodoManualmente(request.identidad.tenantId, request.params.periodoId);
     reply.send(resumenADto(resumen));
+  });
+
+  /**
+   * ADR-009: deshace un cierre hecho por error. 409 con un mensaje que
+   * explica la razón cuando ya no es posible (el sobrante se destinó, hay
+   * actividad posterior, la quincena terminó...).
+   */
+  app.post<{ Params: { periodoId: string } }>('/periodos/:periodoId/reabrir', async (request, reply) => {
+    const resultado = await reabrirPeriodo(request.identidad.tenantId, request.params.periodoId);
+    reply.send({ periodoId: resultado.periodoId, estado: 'activo' });
   });
 
   /**

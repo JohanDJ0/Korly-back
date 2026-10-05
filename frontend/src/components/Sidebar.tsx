@@ -1,6 +1,8 @@
+import { LogOut } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 import { NAV_DESTINOS } from '@/lib/nav-destinos';
+import { supabase } from '@/lib/supabase';
 import { cn } from '@/lib/utils';
 
 /**
@@ -16,6 +18,10 @@ import { cn } from '@/lib/utils';
  * escritorio (con contenido a una sola columna hasta `lg`, ver
  * Home.tsx/Metas.tsx). Se monta una sola vez en ProtectedRoute.tsx, no
  * en cada pantalla.
+ *
+ * `Cerrar sesión` va al pie, separado de la navegación: es la salida que
+ * un usuario real buscó en vano antes de pulsar, por error, Cerrar periodo.
+ * En móvil vive en la tarjeta de Cuenta de Ajustes (`Más`).
  */
 export function Sidebar() {
   return (
@@ -41,6 +47,15 @@ export function Sidebar() {
           {etiqueta}
         </NavLink>
       ))}
+
+      <button
+        type="button"
+        onClick={() => supabase.auth.signOut()}
+        className="text-muted-foreground hover:bg-secondary mt-auto flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium"
+      >
+        <LogOut size={19} strokeWidth={2.2} />
+        Cerrar sesión
+      </button>
     </aside>
   );
 }

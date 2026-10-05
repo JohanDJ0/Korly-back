@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { bigint, check, pgPolicy, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import { bigint, check, pgPolicy, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { periodos } from './periodos.js';
 import { appBackend } from './roles.js';
 import { tenants } from './tenants.js';
@@ -47,9 +47,12 @@ export const resumenes = pgTable(
     decisionSobrante: text('decision_sobrante').notNull().default('pendiente'),
     decisionSobranteFecha: timestamp('decision_sobrante_fecha', { withTimezone: true }),
     generadoEn: timestamp('generado_en', { withTimezone: true }).notNull().defaultNow(),
+    /** Nulo mientras el resumen está vigente. Lo pone la reapertura del periodo (ADR-009); un resumen anulado no se modifica más. */
+    anuladoEn: timestamp('anulado_en', { withTimezone: true }),
   },
   (t) => [
-    unique('resumenes_periodo_unico').on(t.periodoId),
+    // Un periodo tiene a lo sumo un resumen VIGENTE; los anulados por una reapertura (ADR-009) se conservan como historial.
+    uniqueIndex('resumenes_periodo_vigente_unico').on(t.periodoId).where(sql`anulado_en is null`),
     check('resumenes_decision_valida', sql`${t.decisionSobrante} in ('pendiente','ahorrado','arrastrado')`),
     check(
       'resumenes_decision_fecha_consistente',

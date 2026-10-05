@@ -1,11 +1,10 @@
 import { AlertTriangle, CreditCard, Plus, Settings } from 'lucide-react';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActividadReciente } from '@/components/ActividadReciente';
-import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { BottomNav } from '@/components/BottomNav';
 import { CifraDisponible } from '@/components/CifraDisponible';
 import { FormularioGasto } from '@/components/FormularioGasto';
@@ -13,7 +12,6 @@ import { FormularioIngreso } from '@/components/FormularioIngreso';
 import { HojaInferior } from '@/components/HojaInferior';
 import { RecordatorioContextual } from '@/components/RecordatorioContextual';
 import { ResumenCompactoPeriodo } from '@/components/ResumenCompactoPeriodo';
-import { useCerrarPeriodo } from '@/hooks/use-cerrar-periodo';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
 import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
@@ -45,8 +43,6 @@ export function Home() {
   const { data: periodoActivo } = usePeriodoActivo();
   const { data: resumenPendiente } = useResumenPendiente();
   const crearPeriodo = useCrearPeriodo();
-  const cerrarPeriodo = useCerrarPeriodo();
-  const navigate = useNavigate();
   const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
 
   const sinPeriodoActivo = error instanceof ApiError && error.codigo === 'PERIODO_NO_ENCONTRADO';
@@ -186,32 +182,6 @@ export function Home() {
           </div>
         )}
       </div>
-
-      {
-        // Acciones secundarias, poco frecuentes — atenuadas a propósito
-        // para no competir con la cifra ni el CTA principal. Fuera del
-        // grid a propósito: ocupa el ancho completo en vez de quedar
-        // atrapada en la columna izquierda.
-      }
-      {periodoId && (
-        <div className="mt-1 mb-4 flex justify-center px-5 sm:px-0">
-          <BotonConfirmar
-            variant="ghost"
-            size="sm"
-            className="text-muted-foreground"
-            disabled={cerrarPeriodo.isPending}
-            pregunta="¿Cerrar este periodo ahora? No se puede deshacer."
-            onConfirmar={() => {
-              cerrarPeriodo.mutate(periodoId, {
-                onSuccess: (resumen) => navigate(`/resumen/${resumen.periodoId}`),
-              });
-            }}
-          >
-            {cerrarPeriodo.isPending ? 'Cerrando…' : 'Cerrar periodo'}
-          </BotonConfirmar>
-        </div>
-      )}
-      {cerrarPeriodo.isError && <p className="text-destructive text-center text-sm">{cerrarPeriodo.error.message}</p>}
 
       <BottomNav />
 

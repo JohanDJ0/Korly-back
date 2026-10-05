@@ -141,6 +141,13 @@
       "when": 1791015025150,
       "tag": "0019_purga_controlada_de_cuenta",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1791160388725,
+      "tag": "0020_agrega_reapertura_de_periodo",
+      "breakpoints": true
     }
   ]
 }
