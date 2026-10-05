@@ -2022,7 +2022,16 @@ configurados.
   `construirCorreoRecordatorio`), porque con el diseño con banda y botón Gmail lo
   mandaba a la pestaña Promociones; la versión sencilla, con la cifra en el asunto,
   llegó a Principal (probado contra una cuenta real de Gmail).
-- `CORS_ORIGIN` acepta una lista separada por comas **sin espacios**.
+- `CORS_ORIGIN` acepta una lista separada por comas **sin espacios**. En producción
+  vale solo `https://app.korly.com.mx` (se quitó `korly-app.vercel.app`; en Supabase
+  las Redirect URLs son `app.korly.com.mx` y `localhost:5173`, cada una con su `/**`).
+- **Wait for CI** está activado en los dos servicios de Railway (`Korly-back` y
+  `recordatorios`): un push a `master` solo se despliega cuando terminan bien las pruebas de
+  GitHub Actions. Los workflows tienen filtro de rutas (`backend-ci.yml` y
+  `frontend-ci.yml`), así que un push que solo toca `docs/` no dispara pruebas y por tanto
+  no despliega. Requiere haber aceptado los permisos actualizados de la app de Railway en
+  GitHub (github.com/settings/installations → Railway); sin eso, el despliegue se queda
+  esperando.
 
 **Nota del registro `.com.mx`:** no admite privacidad de WHOIS por
 política del registro (no es específico de Cloudflare) — los datos de
