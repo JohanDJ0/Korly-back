@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
  */
 export function NoEncontrado() {
   return (
-    <div className="flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center">
+    <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
       <div className="bg-secondary flex h-14 w-14 items-center justify-center rounded-2xl">
         <Compass size={26} className="text-secondary-foreground" />
       </div>

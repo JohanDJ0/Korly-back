@@ -22,7 +22,7 @@ createRoot(document.getElementById('root')!).render(
     }
     <Sentry.ErrorBoundary
       fallback={({ resetError }) => (
-        <div className="flex min-h-svh flex-col items-center justify-center gap-4 p-6 text-center">
+        <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
           <h1 className="text-xl font-semibold">Algo salió mal</h1>
           <p className="text-muted-foreground">Ocurrió un error inesperado. Puedes intentar de nuevo.</p>
           <Button onClick={resetError}>Reintentar</Button>

@@ -42,7 +42,7 @@ export function HojaInferior({ titulo, onCerrar, children }: HojaInferiorProps) 
         role="dialog"
         aria-modal="true"
         aria-label={titulo}
-        className="bg-card relative flex max-h-[88vh] w-full max-w-sm flex-col gap-5 overflow-y-auto rounded-t-3xl p-6 pb-8 shadow-2xl md:rounded-3xl md:pb-6"
+        className="bg-card relative flex max-h-[88dvh] w-full max-w-sm flex-col gap-5 overflow-y-auto rounded-t-3xl p-6 pb-8 shadow-2xl md:rounded-3xl md:pb-6"
       >
         <div className="bg-muted mx-auto h-1 w-10 rounded-full md:hidden" />
         <div className="flex items-center justify-between">

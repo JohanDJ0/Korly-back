@@ -130,13 +130,13 @@ export function FilaMeta({ meta }: FilaMetaProps) {
 
       {modo === null && (
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="min-w-24 flex-1 rounded-xl" onClick={() => setModo('aportar')}>
+          <Button variant="outline" size="sm" className="flex-auto rounded-xl" onClick={() => setModo('aportar')}>
             <Plus size={14} /> Aportar
           </Button>
-          <Button variant="outline" size="sm" className="min-w-32 flex-1 rounded-xl" onClick={() => setModo('pagar')}>
+          <Button variant="outline" size="sm" className="flex-auto rounded-xl" onClick={() => setModo('pagar')}>
             Pagar con la meta
           </Button>
-          <Button variant="outline" size="sm" className="min-w-32 flex-1 rounded-xl" onClick={() => setModo('retirar')}>
+          <Button variant="outline" size="sm" className="flex-auto rounded-xl" onClick={() => setModo('retirar')}>
             Pasar a mi quincena
           </Button>
           <BotonConfirmar

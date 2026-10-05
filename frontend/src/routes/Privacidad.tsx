@@ -29,7 +29,7 @@ export function Privacidad() {
   const haySesion = useAuthStore((s) => s.session !== null);
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-2xl flex-col gap-6 px-5 py-8 sm:py-12">
+    <div className="mx-auto flex min-h-dvh max-w-2xl flex-col gap-6 px-5 py-8 sm:py-12">
       <Link to={haySesion ? '/ajustes' : '/login'} className="text-muted-foreground flex items-center gap-1.5 text-[13px] hover:underline">
         <ArrowLeft size={15} />
         {haySesion ? 'Volver a Ajustes' : 'Volver'}

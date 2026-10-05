@@ -12,7 +12,7 @@ interface AuthCardProps {
  */
 export function AuthCard({ titulo, descripcion, children }: AuthCardProps) {
   return (
-    <div className="flex min-h-svh items-center justify-center p-6">
+    <div className="flex min-h-dvh items-center justify-center p-6">
       <div className="border-border bg-card w-full max-w-sm rounded-3xl border p-8 shadow-sm">
         <div className="flex flex-col items-center gap-1 pb-6 text-center">
           <img src="/logo/full.svg" alt="Korly" className="mb-3 h-9" />

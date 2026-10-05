@@ -44,7 +44,7 @@ export function Resumen() {
   const sePuedeIntentarReabrir = periodoDelResumen?.estado === 'cerrado' && periodoDelResumen.fechaFin >= hoyISO() && resumen?.decisionSobrante !== 'ahorrado';
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col gap-4 pb-8 sm:max-w-2xl sm:px-8 sm:pt-8">
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col gap-4 pb-8 sm:max-w-2xl sm:px-8 sm:pt-8">
       <PageHeader titulo="Resumen del periodo" />
 
       <div className="flex flex-col gap-4 px-5 sm:px-0">

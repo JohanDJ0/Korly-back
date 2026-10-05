@@ -15,7 +15,7 @@ export function Metas() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
       <PageHeader
         titulo="Metas de ahorro"
         accion={

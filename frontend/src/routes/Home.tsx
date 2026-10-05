@@ -55,7 +55,7 @@ export function Home() {
   const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
       <div className="flex items-center justify-between px-5 pt-5 pb-1 sm:hidden">
         <div className="flex items-center gap-2">
           <img src="/logo/icon.svg" alt="" className="h-[30px] w-[30px] rounded-[9px]" />
