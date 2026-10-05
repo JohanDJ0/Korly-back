@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
  */
 export function BottomNav() {
   return (
-    <nav className="bg-card border-border sticky bottom-0 flex h-[76px] shrink-0 items-center border-t pb-2 sm:hidden">
+    <nav className="bg-card border-border sticky bottom-0 mt-auto flex h-[76px] shrink-0 items-center border-t pb-2 sm:hidden">
       {NAV_DESTINOS.map(({ to, etiqueta, Icono, fin }) => (
         <NavLink
           key={to}
