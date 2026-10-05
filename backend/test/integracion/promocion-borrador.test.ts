@@ -137,4 +137,49 @@ describe('promoción de borrador a activo', () => {
     const activo = await obtenerPeriodoActivo(tenantId, new Date('2026-08-20T00:00:00Z'));
     expect(activo?.id).toBe(borrador.id);
   });
+
+  describe('borrador duplicado de la quincena en curso', () => {
+    const MITAD_DE_QUINCENA = new Date('2026-08-10T00:00:00Z');
+
+    async function activoConBorradorDuplicado(tenantId: string) {
+      const activo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+      const duplicado = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-02T00:00:00Z'));
+      expect(duplicado.estado).toBe('borrador');
+      expect([duplicado.fechaInicio, duplicado.fechaFin]).toEqual([activo.fechaInicio, activo.fechaFin]);
+      return { activo, duplicado };
+    }
+
+    it('cerrar la quincena en curso NO activa el borrador que la duplica', async () => {
+      const tenantId = await tenantNuevo();
+      const { activo, duplicado } = await activoConBorradorDuplicado(tenantId);
+
+      await cerrarPeriodoManualmente(tenantId, activo.id, MITAD_DE_QUINCENA);
+
+      expect(await obtenerPeriodoActivo(tenantId, MITAD_DE_QUINCENA)).toBeNull();
+      expect(await estadoDe(tenantId, duplicado.id)).toBe('borrador');
+    });
+
+    it('pedir un periodo después de cerrar retira el duplicado y nace activo', async () => {
+      const tenantId = await tenantNuevo();
+      const { activo, duplicado } = await activoConBorradorDuplicado(tenantId);
+      await cerrarPeriodoManualmente(tenantId, activo.id, MITAD_DE_QUINCENA);
+
+      const nuevo = await crearPeriodo(tenantId, 'quincenal', MITAD_DE_QUINCENA);
+
+      expect(nuevo.estado).toBe('activo');
+      expect(nuevo.id).not.toBe(duplicado.id);
+      expect(await estadoDe(tenantId, duplicado.id)).toBeUndefined(); // el duplicado ya no existe
+      expect((await obtenerPeriodoActivo(tenantId, MITAD_DE_QUINCENA))?.id).toBe(nuevo.id);
+    });
+
+    it('el cierre vencido (perezoso) tampoco deja dos periodos para la misma quincena', async () => {
+      const tenantId = await tenantNuevo();
+      const { activo, duplicado } = await activoConBorradorDuplicado(tenantId);
+
+      expect(await obtenerPeriodoActivo(tenantId, new Date('2026-08-16T00:00:00Z'))).toBeNull();
+
+      expect(await estadoDe(tenantId, activo.id)).toBe('cerrado');
+      expect(await estadoDe(tenantId, duplicado.id)).toBe('borrador');
+    });
+  });
 });

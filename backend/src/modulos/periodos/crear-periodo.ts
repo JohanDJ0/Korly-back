@@ -103,7 +103,11 @@ export async function crearPeriodo(
     const borradorExistente = await obtenerBorradorTx(tx, tenantId);
     if (borradorExistente) {
       const representaHoy = borradorExistente.fechaInicio === fechaInicio && borradorExistente.fechaFin === fechaFin;
-      if (representaHoy) return borradorExistente;
+      // Solo se reutiliza mientras hay un activo bloqueando. Sin activo, un
+      // borrador de esta misma quincena no se promovió porque duplica un
+      // periodo ya cerrado (`promoverBorradorSiExisteTx`): estorba, y el
+      // periodo que se pide ahora debe nacer activo, no volver a borrador.
+      if (representaHoy && hayActivo) return borradorExistente;
       await eliminarBorradorHuerfanoTx(tx, tenantId, borradorExistente);
     }
 

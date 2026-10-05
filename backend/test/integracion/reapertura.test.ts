@@ -115,23 +115,30 @@ describe('reapertura de periodo', () => {
     });
   });
 
-  describe('el escenario real: el cierre promovió un borrador duplicado', () => {
-    /** Recurrente que cae en la quincena, creado antes de cualquier periodo: se materializa en el activo y en el borrador al promoverse. */
+  describe('el escenario real: tras el cierre quedó activo un periodo duplicado de la quincena', () => {
+    /**
+     * Recurrente que cae en la quincena, creado antes de cualquier periodo: se materializa en el periodo y en su duplicado.
+     * El duplicado nace como lo hacía antes la promoción automática del borrador (que ya no ocurre, ver promocion-borrador.test.ts):
+     * cerrado el periodo real, se abre otro para las mismas fechas y materializa sus cargos automáticos.
+     */
     async function conBorradorPromovido() {
       const tenantId = await tenantNuevo();
       await crearGastoRecurrente({ tenantId, descripcion: 'Gas', montoValorMinimo: 500n, moneda: 'MXN', frecuencia: 'mensual', diaMes: 10, fechaReferencia: INICIO });
       const periodo = await periodoConActividad(tenantId); // activo, con el recurrente materializado
-      const borrador = await crearPeriodo(tenantId, 'quincenal', INICIO); // misma quincena y ya hay uno activo: queda borrador
-      expect(borrador.estado).toBe('borrador');
-      return { tenantId, periodo, borradorId: borrador.id, borradorCuentaId: borrador.cuentaId };
+      return { tenantId, periodo };
+    }
+
+    async function cerrarYDuplicar(tenantId: string, periodoId: string) {
+      await cerrarPeriodoManualmente(tenantId, periodoId, HOY);
+      const duplicado = await crearPeriodo(tenantId, 'quincenal', HOY);
+      expect(duplicado.estado).toBe('activo');
+      return { borradorId: duplicado.id, borradorCuentaId: duplicado.cuentaId };
     }
 
     it('retira el duplicado: lo marca descartado, anula sus cargos automáticos y reabre el periodo real', async () => {
-      const { tenantId, periodo, borradorId, borradorCuentaId } = await conBorradorPromovido();
-      await cerrarPeriodoManualmente(tenantId, periodo.id, HOY);
-
-      const activoTrasCerrar = await obtenerPeriodoActivo(tenantId, HOY); // el cierre perezoso promueve el borrador
-      expect(activoTrasCerrar?.id).toBe(borradorId);
+      const { tenantId, periodo } = await conBorradorPromovido();
+      const { borradorId, borradorCuentaId } = await cerrarYDuplicar(tenantId, periodo.id);
+      expect((await obtenerPeriodoActivo(tenantId, HOY))?.id).toBe(borradorId);
       expect(await obtenerSaldoCuenta(tenantId, borradorCuentaId)).toBe(-500n); // el cargo automático
 
       await reabrirPeriodo(tenantId, periodo.id, HOY);
@@ -143,9 +150,8 @@ describe('reapertura de periodo', () => {
     });
 
     it('el duplicado descartado no aparece en el listado de periodos', async () => {
-      const { tenantId, periodo, borradorId } = await conBorradorPromovido();
-      await cerrarPeriodoManualmente(tenantId, periodo.id, HOY);
-      await obtenerPeriodoActivo(tenantId, HOY);
+      const { tenantId, periodo } = await conBorradorPromovido();
+      const { borradorId } = await cerrarYDuplicar(tenantId, periodo.id);
       await reabrirPeriodo(tenantId, periodo.id, HOY);
 
       const ids = (await listarPeriodos(tenantId, HOY)).map((p) => p.id);
@@ -155,9 +161,8 @@ describe('reapertura de periodo', () => {
     });
 
     it('rechaza reabrir si el usuario ya registró algo en el periodo promovido, y no cambia nada', async () => {
-      const { tenantId, periodo, borradorId, borradorCuentaId } = await conBorradorPromovido();
-      await cerrarPeriodoManualmente(tenantId, periodo.id, HOY);
-      await obtenerPeriodoActivo(tenantId, HOY);
+      const { tenantId, periodo } = await conBorradorPromovido();
+      const { borradorId, borradorCuentaId } = await cerrarYDuplicar(tenantId, periodo.id);
       await registrarGasto({ tenantId, periodoId: borradorId, monto: 80n, moneda: 'MXN', fechaEfectiva: '2026-08-10', fechaReferencia: HOY });
 
       await expect(reabrirPeriodo(tenantId, periodo.id, HOY)).rejects.toMatchObject({

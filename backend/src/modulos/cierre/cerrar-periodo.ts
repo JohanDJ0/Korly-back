@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { periodos } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
@@ -122,17 +122,31 @@ export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fecha
  * `estado = 'borrador'`, a diferencia de `'activo'`), se promueve el de
  * `fechaInicio` más próxima y, en empate, el más antiguo — los demás
  * quedan como estaban.
+ *
+ * Nunca se promueve un borrador con la misma ventana que un periodo ya
+ * cerrado: es un duplicado de esa quincena, no "el periodo siguiente".
+ * Sin esta regla, cerrar a mano (o por error) el periodo de la quincena
+ * en curso activaba solo el borrador duplicado y dejaba al usuario con
+ * dos periodos para las mismas fechas. Quien quiera abrir otro para esa
+ * quincena lo pide con `crearPeriodo`, que retira el borrador sobrante.
  */
 async function promoverBorradorSiExisteTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date): Promise<void> {
   const hoy = fechaISO(fechaReferencia);
 
-  const [borrador] = await tx
+  const candidatos = await tx
     .select()
     .from(periodos)
     .where(and(eq(periodos.tenantId, tenantId), eq(periodos.estado, 'borrador'), lte(periodos.fechaInicio, hoy), gte(periodos.fechaFin, hoy)))
-    .orderBy(asc(periodos.fechaInicio), asc(periodos.creadoEn))
-    .limit(1);
+    .orderBy(asc(periodos.fechaInicio), asc(periodos.creadoEn));
+  if (candidatos.length === 0) return;
 
+  const cerrados = await tx
+    .select({ fechaInicio: periodos.fechaInicio, fechaFin: periodos.fechaFin })
+    .from(periodos)
+    .where(and(eq(periodos.tenantId, tenantId), inArray(periodos.estado, ['cerrado', 'archivado'])));
+  const ventanasCerradas = new Set(cerrados.map((c) => `${c.fechaInicio}|${c.fechaFin}`));
+
+  const borrador = candidatos.find((c) => !ventanasCerradas.has(`${c.fechaInicio}|${c.fechaFin}`));
   if (!borrador) return;
 
   await tx.update(periodos).set({ estado: 'activo' }).where(eq(periodos.id, borrador.id));

@@ -39,6 +39,8 @@ export function Resumen() {
   // se haya guardado en una meta; el backend valida el resto (arrastre ya reclamado, actividad posterior...) y
   // responde con la razón, que se muestra tal cual.
   const periodoDelResumen = periodos?.find((p) => p.id === resumen?.periodoId);
+  // Con un periodo activo no hay nada que crear: pedirlo dejaría un borrador duplicado de la misma quincena.
+  const hayPeriodoActivo = periodos?.some((p) => p.estado === 'activo') ?? true;
   const sePuedeIntentarReabrir = periodoDelResumen?.estado === 'cerrado' && periodoDelResumen.fechaFin >= hoyISO() && resumen?.decisionSobrante !== 'ahorrado';
 
   return (
@@ -158,15 +160,19 @@ export function Resumen() {
             )}
             {resumen.decisionSobrante === 'ahorrado' && <p className="text-muted-foreground text-sm">Este sobrante se guardó como ahorro.</p>}
 
-            <Button
-              variant="secondary"
-              className="h-11 rounded-xl"
-              onClick={() => crearPeriodo.mutate(undefined, { onSuccess: () => navigate('/') })}
-              disabled={crearPeriodo.isPending}
-            >
-              {crearPeriodo.isPending ? 'Creando…' : 'Crear periodo siguiente'}
-            </Button>
-            {crearPeriodo.isError && <p className="text-destructive text-sm">{crearPeriodo.error.message}</p>}
+            {!hayPeriodoActivo && (
+              <>
+                <Button
+                  variant="secondary"
+                  className="h-11 rounded-xl"
+                  onClick={() => crearPeriodo.mutate(undefined, { onSuccess: () => navigate('/') })}
+                  disabled={crearPeriodo.isPending}
+                >
+                  {crearPeriodo.isPending ? 'Creando…' : 'Crear periodo siguiente'}
+                </Button>
+                {crearPeriodo.isError && <p className="text-destructive text-sm">{crearPeriodo.error.message}</p>}
+              </>
+            )}
           </>
         )}
       </div>

@@ -1070,6 +1070,15 @@ resumen sin actividad real. La condición estricta evita ese churn:
 promueve cuando genuinamente le toca, deja huérfano (sin tocar) cuando
 su ventana completa ya pasó sin haber sido usado.
 
+**Nunca se promueve un borrador que duplica un periodo cerrado.** Un
+borrador con la misma ventana (`fechaInicio`/`fechaFin`) que un periodo
+ya `cerrado`/`archivado` es un duplicado de esa quincena, no "el periodo
+siguiente". Antes se promovía igual: cerrar a mano (o por error) el
+periodo de la quincena en curso activaba el borrador duplicado y dejaba
+dos periodos para las mismas fechas, el segundo con cargos automáticos.
+Ahora el duplicado se queda como borrador y `crearPeriodo` lo retira (ver
+"Higiene de borradores") cuando el usuario pide abrir otro periodo.
+
 **El borrador promovido reclama arrastres pendientes**, igual que un
 periodo recién creado — si no lo hiciera, un usuario cuyo borrador se
 promueve no recibiría su arrastre decidido hasta que por casualidad se
@@ -2554,6 +2563,14 @@ la que le tocaría a uno creado ahora mismo
   llegara a tenerlo (no debería, pero la comprobación no es
   decorativa), la operación entera aborta con un error en vez de
   borrar datos financieros.
+
+**Sin activo, un borrador de la misma quincena se retira, no se reutiliza.**
+La reutilización de arriba solo aplica mientras hay un activo bloqueando.
+Si no lo hay, un borrador de esta quincena sobró porque duplica un periodo
+ya cerrado (la promoción lo salta, ver arriba): `crearPeriodo` lo elimina
+(misma comprobación de cero asientos) y el periodo pedido nace `activo`.
+En el frontend, el resumen de un periodo ya no ofrece "Crear periodo
+siguiente" mientras haya un periodo activo.
 
 Las tres rutas están probadas contra Postgres real
 (`test/integracion/periodos.test.ts`, describe `'higiene de
