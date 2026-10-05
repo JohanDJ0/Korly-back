@@ -22,6 +22,8 @@ type IngresoFormSalida = z.output<typeof esquemaIngreso>;
 
 interface FormularioIngresoProps {
   periodoId: string;
+  /** Para cerrar la hoja inferior cuando el ingreso es uno adicional (bono, dinero extra) y no el primero. */
+  onRegistrado?: () => void;
 }
 
 /**
@@ -31,7 +33,7 @@ interface FormularioIngresoProps {
  * lugar del frontend donde el usuario escribe dinero en formato humano
  * antes de que se convierta a la unidad mínima que espera el backend.
  */
-export function FormularioIngreso({ periodoId }: FormularioIngresoProps) {
+export function FormularioIngreso({ periodoId, onRegistrado }: FormularioIngresoProps) {
   const registrarIngreso = useRegistrarIngreso();
   const { data: periodo } = usePeriodoActivo();
 
@@ -45,11 +47,14 @@ export function FormularioIngreso({ periodoId }: FormularioIngresoProps) {
   });
 
   function onSubmit(datos: IngresoFormSalida) {
-    registrarIngreso.mutate({
-      periodoId,
-      monto: { valorMinimo: Math.round(datos.monto * 100), moneda: 'MXN' },
-      fechaEfectiva: datos.fechaEfectiva,
-    });
+    registrarIngreso.mutate(
+      {
+        periodoId,
+        monto: { valorMinimo: Math.round(datos.monto * 100), moneda: 'MXN' },
+        fechaEfectiva: datos.fechaEfectiva,
+      },
+      { onSuccess: () => onRegistrado?.() }
+    );
   }
 
   return (

@@ -57,6 +57,22 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     expect(resultado?.estado).toBe('sin_ingreso');
   });
 
+  it('un ingreso adicional a mitad de la quincena (bono, dinero extra) sube el disponible y re-reparte la cifra entre los días que quedan', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 150000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: new Date('2026-08-01T00:00:00Z') });
+    const dia6 = new Date('2026-08-06T00:00:00Z'); // quedan 10 días (6 al 15)
+    const antes = await consultarDisponible(tenantId, dia6);
+
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 50000n, moneda: 'MXN', fechaEfectiva: '2026-08-06', fechaReferencia: dia6 });
+    const despues = await consultarDisponible(tenantId, dia6);
+
+    expect(antes).toMatchObject({ estado: 'ok', disponibleValorMinimo: 150000n, diasRestantes: 10, cifraDiariaValorMinimo: 15000n });
+    expect(despues).toMatchObject({ estado: 'ok', disponibleValorMinimo: 200000n, diasRestantes: 10, cifraDiariaValorMinimo: 20000n });
+    // Un ingreso no es "algo que decidiste gastar hoy": no consume la cifra de hoy ni cuenta como actividad.
+    expect(despues).toMatchObject({ gastadoHoyValorMinimo: 0n, huboActividadHoy: false });
+  });
+
   // --- 2. Piso (floor) en la cifra diaria, con división inexacta ---
 
   it('cifra diaria: división inexacta trunca hacia abajo (piso), no redondea', async () => {

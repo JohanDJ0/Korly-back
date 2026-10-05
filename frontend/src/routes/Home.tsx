@@ -45,6 +45,7 @@ export function Home() {
   const crearPeriodo = useCrearPeriodo();
   const quincena = quincenaDeHoy();
   const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
+  const [mostrarFormularioIngreso, setMostrarFormularioIngreso] = useState(false);
 
   const sinPeriodoActivo = error instanceof ApiError && error.codigo === 'PERIODO_NO_ENCONTRADO';
   const errorInesperado = error && !sinPeriodoActivo;
@@ -175,6 +176,16 @@ export function Home() {
               Registrar gasto
             </button>
           )}
+
+          {periodoId && data?.estado === 'ok' && (
+            <button
+              onClick={() => setMostrarFormularioIngreso(true)}
+              className="border-border bg-card text-foreground flex items-center justify-center gap-2 rounded-2xl border py-3 text-[14.5px] font-semibold"
+            >
+              <Plus size={17} strokeWidth={2.5} />
+              Registrar ingreso
+            </button>
+          )}
         </div>
 
         {periodoId && (
@@ -188,6 +199,12 @@ export function Home() {
       </div>
 
       <BottomNav />
+
+      {periodoId && mostrarFormularioIngreso && (
+        <HojaInferior titulo="Nuevo ingreso" onCerrar={() => setMostrarFormularioIngreso(false)}>
+          <FormularioIngreso periodoId={periodoId} onRegistrado={() => setMostrarFormularioIngreso(false)} />
+        </HojaInferior>
+      )}
 
       {periodoId && mostrarFormularioGasto && (
         <HojaInferior titulo="Nuevo gasto" onCerrar={() => setMostrarFormularioGasto(false)}>
