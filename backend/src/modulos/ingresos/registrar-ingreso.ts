@@ -5,7 +5,7 @@ import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar
 import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, esFechaIsoValida, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 
 export interface RegistrarIngresoEntrada {
@@ -44,6 +44,10 @@ export interface IngresoRegistrado {
 export async function registrarIngreso(entrada: RegistrarIngresoEntrada): Promise<IngresoRegistrado> {
   if (entrada.monto <= 0n) {
     throw new ErrorDominio('VALIDACION', 'El monto de un ingreso debe ser positivo');
+  }
+  // Sin esto, una fecha inválida llegaba hasta Postgres y salía como un 500 genérico.
+  if (!esFechaIsoValida(entrada.fechaEfectiva)) {
+    throw new ErrorDominio('VALIDACION', "El campo 'fechaEfectiva' debe tener formato YYYY-MM-DD y ser una fecha real");
   }
 
   return conTenant(entrada.tenantId, async (tx) => {

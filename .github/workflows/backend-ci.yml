@@ -4,10 +4,13 @@ on:
   push:
     paths:
       - 'backend/**'
+      # El contrato se compara contra las rutas del servidor (test/integracion/openapi.test.ts, ADR-010).
+      - 'docs/openapi.yaml'
       - '.github/workflows/backend-ci.yml'
   pull_request:
     paths:
       - 'backend/**'
+      - 'docs/openapi.yaml'
       - '.github/workflows/backend-ci.yml'
 
 jobs:

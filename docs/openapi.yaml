@@ -1,17 +1,30 @@
 openapi: 3.0.3
 info:
-  title: API — Gestión Financiera por Periodos (MVP)
-  version: "1.0.0"
+  title: API de Korly — gestión financiera por periodos
+  version: "1.1.0"
   description: >
-    Contrato del ciclo central: crear periodo, registrar ingreso, registrar
-    gasto, consultar disponible, cerrar periodo, decidir sobrante.
-    Alcance limitado al MVP definido en docs/documento-maestro-v2.md
-    y docs/modelo-dominio.md. No incluye Business, metas avanzadas,
-    ni agregación bancaria.
+    Contrato de la API REST de Korly (ADR-006), alineado con lo que el
+    servidor responde de verdad. Una prueba automática
+    (`backend/test/integracion/openapi.test.ts`) compara las rutas
+    registradas en el servidor contra este archivo y falla si una operación
+    existe en uno y no en el otro (ADR-010). Los campos de cada operación se
+    mantienen a mano: al cambiar una respuesta o un cuerpo, se cambia aquí.
+
+
+    **Convenciones.** Todos los montos son `Monto` (entero en unidades mínimas
+    más moneda, ADR-002). Los errores de dominio responden
+    `{ codigo, mensaje }` (esquema `Error`) con el estado HTTP que asigna
+    `backend/src/shared/http.ts`. Toda operación (salvo las de Sistema y el
+    webhook de Stripe) exige `Authorization: Bearer <token de Supabase>` y
+    puede responder `401` (`NO_AUTENTICADO` si falta el token,
+    `TOKEN_INVALIDO` si venció o Supabase lo rechaza), `429`
+    (`DEMASIADAS_SOLICITUDES`, límite de peticiones) y `503`
+    (`AUTENTICACION_NO_DISPONIBLE`, Supabase Auth no respondió: no significa
+    que la sesión sea inválida y el cliente no debe cerrarla).
 
 servers:
-  - url: https://api.curly-back.mx/v1
-    description: Producción (placeholder)
+  - url: https://api.korly.com.mx/v1
+    description: Producción
 
 tags:
   - name: Periodos
@@ -21,6 +34,13 @@ tags:
   - name: Cierre
   - name: Metas
   - name: Categorías
+  - name: Recurrentes
+  - name: Tarjetas
+  - name: Suscripción
+  - name: Preferencias
+  - name: Cuenta
+  - name: Importación y exportación
+  - name: Sistema
 
 # ============================================================
 # SEGURIDAD
@@ -33,15 +53,111 @@ security:
 # ============================================================
 paths:
 
+  # ---------- SISTEMA ----------
+  /me:
+    get:
+      tags: [Sistema]
+      summary: Identidad resuelta de la sesión
+      description: Devuelve los identificadores internos (no los de Supabase, ADR-003).
+      responses:
+        '200':
+          description: Identidad de la sesión
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [usuarioId, tenantId]
+                properties:
+                  usuarioId: { type: string, format: uuid }
+                  tenantId: { type: string, format: uuid }
+
+  /salud:
+    get:
+      tags: [Sistema]
+      summary: El proceso está vivo
+      description: Fuera de `/v1`, sin autenticación y sin límite de peticiones; lo llama la infraestructura.
+      security: []
+      servers:
+        - url: https://api.korly.com.mx
+      responses:
+        '200':
+          description: Vivo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estado: { type: string, example: ok }
+
+  /salud/listo:
+    get:
+      tags: [Sistema]
+      summary: Listo para recibir tráfico (la base de datos contesta)
+      security: []
+      servers:
+        - url: https://api.korly.com.mx
+      responses:
+        '200':
+          description: Listo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estado: { type: string, example: ok }
+        '503':
+          description: La base de datos no contesta
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  estado: { type: string, example: sin_base_de_datos }
+
+  /webhooks/stripe:
+    post:
+      tags: [Suscripción]
+      summary: Webhook de Stripe
+      description: >
+        Sin Bearer token: la autenticación es la firma `Stripe-Signature`,
+        verificada contra el cuerpo crudo. Sin límite de peticiones (Stripe
+        reintenta y manda ráfagas legítimas). Procesa los eventos de
+        suscripción de forma idempotente.
+      security: []
+      parameters:
+        - name: Stripe-Signature
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Evento de Stripe tal cual (se verifica la firma, no el esquema).
+      responses:
+        '204':
+          description: Evento aceptado
+        '400':
+          description: Falta la firma (`FIRMA_FALTANTE`) o no se pudo verificar el evento (`FIRMA_INVALIDA`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
   # ---------- PERIODOS ----------
   /periodos:
     post:
       tags: [Periodos]
-      summary: Crear un periodo (queda en estado Borrador)
+      summary: Crear el periodo de la quincena en curso
       description: >
-        Si ya existe un periodo Activo, la creación es válida pero el nuevo
-        periodo permanece en Borrador hasta que el activo cierre
-        (invariante 9 y 10 del modelo de dominio).
+        El rango lo decide el servidor con el calendario (ADR-004: 1–15 o
+        16–fin de mes); el cliente solo manda el tipo y por ahora solo se
+        admite `quincenal`. Si el tenant no tiene periodo activo, el nuevo
+        nace `activo` (y materializa recurrentes y mensualidades de tarjeta,
+        y reclama arrastres). Si ya hay uno activo, se crea en `borrador` y
+        se reutiliza el borrador vigente en vez de crear otro.
       requestBody:
         required: true
         content:
@@ -50,54 +166,37 @@ paths:
               $ref: '#/components/schemas/CrearPeriodoRequest'
       responses:
         '201':
-          description: Periodo creado en estado Borrador
+          description: Periodo creado (o borrador reutilizado)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Periodo'
         '400':
           $ref: '#/components/responses/ErrorValidacion'
-        '409':
-          description: Ya existe un periodo Borrador pendiente de activar
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Error'
 
     get:
       tags: [Periodos]
-      summary: Listar periodos del usuario (historial)
-      parameters:
-        - name: estado
-          in: query
-          schema:
-            $ref: '#/components/schemas/EstadoPeriodo'
-        - name: cursor
-          in: query
-          schema:
-            type: string
-          description: Cursor de paginación (paginación por cursor, no offset — ver ADR sobre móvil futuro)
-        - name: limite
-          in: query
-          schema:
-            type: integer
-            default: 20
-            maximum: 100
+      summary: Listar los periodos del usuario (historial)
+      description: >
+        Todos, el más reciente primero, sin paginar. Excluye los
+        `descartado` (duplicados que una reapertura retiró). El plan
+        gratuito ve los últimos 12 meses. Aplica el cierre perezoso antes
+        de responder.
       responses:
         '200':
-          description: Lista paginada de periodos
+          description: Lista de periodos
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PeriodoListaPaginada'
+                type: array
+                items:
+                  $ref: '#/components/schemas/Periodo'
 
   /periodos/activo:
     get:
       tags: [Periodos]
       summary: Obtener el periodo activo del usuario
-      description: >
-        Si no hay periodo activo (el usuario aún no ha creado ninguno, o el
-        único existente sigue en Borrador), responde 404.
+      description: Aplica el cierre perezoso y la promoción de borrador antes de responder.
       responses:
         '200':
           description: Periodo activo
@@ -106,7 +205,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/Periodo'
         '404':
-          description: No hay periodo activo
+          description: No hay periodo activo (`PERIODO_NO_ENCONTRADO`)
           content:
             application/json:
               schema:
@@ -128,32 +227,119 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
 
-  /periodos/{periodoId}/cerrar:
-    post:
-      tags: [Cierre]
-      summary: Forzar el cierre manual de un periodo activo
+  /periodos/{periodoId}/desglose:
+    get:
+      tags: [Periodos]
+      summary: Desglose de lo gastado en un periodo por rubro y por semana
       description: >
-        El cierre normalmente ocurre de forma perezosa (ver ADR-004 y
-        modelo de dominio §3). Este endpoint permite al usuario cerrar
-        antes de la fecha de fin si así lo decide. Operación idempotente:
-        cerrar un periodo ya cerrado devuelve 200 sin efecto adicional
-        (invariante 8).
+        Se calcula al consultar (no se guarda), así que funciona igual para
+        un periodo cerrado que para el activo. Cuadra con `totalGastado`
+        del resumen. Los gastos recurrentes van aparte (`recurrentes`) y no
+        entran a `rubros` ni a `semanas`. Lo aportado a metas y retirado
+        de vuelta a la quincena en el mismo periodo se compensa.
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
       responses:
         '200':
-          description: Periodo cerrado, incluye el resumen generado
+          description: Desglose del periodo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Desglose'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /periodos/{periodoId}/pagos-tarjeta:
+    get:
+      tags: [Tarjetas]
+      summary: Mensualidades de tarjeta que ya se aplicaron a un periodo
+      description: >
+        Un pago de tarjeta nunca aparece en el listado de gastos (es otro
+        tipo de movimiento); esta es la forma de saber qué mensualidades
+        se descontaron de la quincena.
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Pagos aplicados al periodo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PagoTarjetaAplicado'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  # ---------- CIERRE ----------
+  /periodos/{periodoId}/cerrar:
+    post:
+      tags: [Cierre]
+      summary: Cerrar manualmente un periodo activo
+      description: >
+        El cierre normalmente ocurre de forma perezosa (ADR-004). Idempotente:
+        cerrar un periodo ya cerrado devuelve su resumen sin efecto adicional
+        (invariante 8). El sobrante (o déficit) se drena a la cuenta puente.
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Periodo cerrado, con el resumen generado
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ResumenPeriodo'
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: Solo se puede cerrar un periodo activo (`PERIODO_NO_ACTIVO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /periodos/{periodoId}/reabrir:
+    post:
+      tags: [Cierre]
+      summary: Deshacer el cierre de un periodo hecho por error
+      description: >
+        ADR-009. No borra nada: anula el resumen (se conserva), revierte el
+        drenaje del sobrante y retira, como `descartado`, el periodo
+        duplicado que se haya abierto después si solo tiene cargos
+        automáticos. Solo se permite mientras el periodo sea el último
+        cerrado, su quincena no haya terminado, el sobrante no se haya
+        destinado a una meta ni reclamado por otro periodo, y no haya
+        actividad del usuario en el periodo posterior.
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Periodo reabierto
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [periodoId, estado]
+                properties:
+                  periodoId: { type: string, format: uuid }
+                  estado: { type: string, enum: [activo] }
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: No se puede reabrir (`REAPERTURA_NO_PERMITIDA`); el mensaje explica la razón
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /periodos/{periodoId}/resumen:
     get:
       tags: [Cierre]
-      summary: Consultar el resumen inmutable de un periodo cerrado
+      summary: Resumen inmutable de un periodo cerrado
+      description: >
+        Responde 404 tanto si el periodo no existe como si todavía no está
+        cerrado (no hay forma barata de distinguirlos). Un resumen anulado
+        por una reapertura no cuenta.
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
       responses:
@@ -165,22 +351,32 @@ paths:
                 $ref: '#/components/schemas/ResumenPeriodo'
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
-        '409':
-          description: El periodo aún no está cerrado, no existe resumen todavía
+
+  /resumenes/pendiente:
+    get:
+      tags: [Cierre]
+      summary: Resumen con el sobrante todavía sin decidir, si hay alguno
+      description: >
+        Responde 200 con `null` si no hay ninguno: "nada pendiente" es el
+        estado normal. Si hay varios, el más antiguo.
+      responses:
+        '200':
+          description: Resumen pendiente de decisión, o `null`
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Error'
+                nullable: true
+                allOf:
+                  - $ref: '#/components/schemas/ResumenPeriodo'
 
   /periodos/{periodoId}/sobrante/decision:
     post:
       tags: [Cierre]
       summary: Decidir qué hacer con el sobrante de un periodo cerrado
       description: >
-        Solo válido si el periodo está Cerrado y tiene sobrante positivo
-        sin decisión previa. Si el usuario no decide en el plazo definido
-        por producto, el sistema aplica el default: arrastrar
-        (modelo de dominio §3, estado Cerrado).
+        Solo con sobrante positivo y sin decisión previa (un déficit se
+        arrastra solo). Si no se decide en 7 días, el sistema arrastra.
+        `ahorrar` mueve el sobrante a la meta indicada de inmediato.
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
       requestBody:
@@ -191,15 +387,17 @@ paths:
               $ref: '#/components/schemas/DecisionSobranteRequest'
       responses:
         '200':
-          description: Decisión aplicada; genera el asiento correspondiente
+          description: Decisión aplicada
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/DecisionSobranteResultado'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
         '409':
-          description: El periodo no está en condición de recibir una decisión (no cerrado, sin sobrante, o ya decidido)
+          description: "El periodo no puede recibir una decisión (no cerrado, sin sobrante o ya decidido: `SOBRANTE_YA_DECIDIDO`)"
           content:
             application/json:
               schema:
@@ -209,11 +407,11 @@ paths:
   /periodos/{periodoId}/ingresos:
     post:
       tags: [Ingresos]
-      summary: Registrar un ingreso asociado al periodo
+      summary: Registrar un ingreso en el periodo
       description: >
-        El ingreso pertenece al periodo que financia, no necesariamente
-        al periodo en el que cae su fecha real (ADR-007). El periodo
-        destino debe estar Activo.
+        Un periodo admite varios ingresos (pago dividido, bono, dinero
+        extra; ADR-007). La fecha es solo cuándo llegó el dinero: no mueve
+        la quincena. El periodo debe estar activo.
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
       requestBody:
@@ -228,11 +426,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Ingreso'
+                $ref: '#/components/schemas/MovimientoCreado'
         '400':
           $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
         '409':
-          description: El periodo no está Activo
+          description: El periodo no está activo (`PERIODO_NO_ACTIVO`)
           content:
             application/json:
               schema:
@@ -240,18 +440,72 @@ paths:
 
     get:
       tags: [Ingresos]
-      summary: Listar ingresos de un periodo
+      summary: Listar los ingresos de un periodo
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
       responses:
         '200':
-          description: Lista de ingresos
+          description: Lista de ingresos (incluye los revertidos, marcados)
           content:
             application/json:
               schema:
                 type: array
                 items:
                   $ref: '#/components/schemas/Ingreso'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /ingresos/{ingresoId}:
+    patch:
+      tags: [Ingresos]
+      summary: Editar un ingreso
+      description: >
+        Como todo es inmutable (ADR-001), revierte el movimiento original y
+        registra uno nuevo en el periodo activo actual. `monto` es
+        obligatorio aunque solo se quiera cambiar la nota.
+      parameters:
+        - $ref: '#/components/parameters/IngresoId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditarIngresoRequest'
+      responses:
+        '200':
+          description: Ingreso corregido
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EditarIngresoResultado'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: Ya estaba corregido (`INGRESO_YA_REVERTIDO`) o no hay periodo activo para el ajuste (`SIN_PERIODO_ACTIVO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    delete:
+      tags: [Ingresos]
+      summary: Eliminar un ingreso
+      description: "Nunca es un hard delete: se revierte su movimiento en el periodo activo."
+      parameters:
+        - $ref: '#/components/parameters/IngresoId'
+      responses:
+        '204':
+          description: Ingreso revertido
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: Ya estaba corregido (`INGRESO_YA_REVERTIDO`) o no hay periodo activo (`SIN_PERIODO_ACTIVO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ---------- GASTOS ----------
   /periodos/{periodoId}/gastos:
@@ -259,10 +513,10 @@ paths:
       tags: [Gastos]
       summary: Registrar un gasto (captura rápida)
       description: >
-        Endpoint de mayor frecuencia de uso del sistema. Diseñado para
-        captura en ≤2 toques desde el cliente: monto es el único campo
-        obligatorio, categoría y nota son opcionales
-        (Documento Maestro §13.2). El periodo destino debe estar Activo.
+        Endpoint de mayor frecuencia de uso. Un gasto se registra aunque
+        supere el disponible (ya ocurrió en la vida real): el cliente
+        avisa y pide confirmación, el servidor no lo bloquea. El periodo
+        debe estar activo.
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
       requestBody:
@@ -277,11 +531,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Gasto'
+                $ref: '#/components/schemas/MovimientoCreado'
         '400':
           $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
         '409':
-          description: El periodo no está Activo
+          description: El periodo no está activo (`PERIODO_NO_ACTIVO`)
           content:
             application/json:
               schema:
@@ -289,36 +545,37 @@ paths:
 
     get:
       tags: [Gastos]
-      summary: Listar gastos de un periodo
+      summary: Listar los gastos de un periodo
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
         - name: cursor
           in: query
-          schema:
-            type: string
+          schema: { type: string }
+          description: Cursor de paginación (`siguienteCursor` de la respuesta anterior)
         - name: limite
           in: query
-          schema:
-            type: integer
-            default: 50
-            maximum: 200
+          schema: { type: integer, minimum: 1, default: 50, maximum: 200 }
       responses:
         '200':
-          description: Lista paginada de gastos
+          description: Página de gastos (incluye los revertidos, marcados)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/GastoListaPaginada'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
 
   /gastos/{gastoId}:
     patch:
       tags: [Gastos]
       summary: Editar un gasto
       description: >
-        Si el periodo del gasto sigue Activo, la edición es directa.
-        Si el periodo ya está Cerrado, el servidor genera automáticamente
-        un asiento de reversión más uno nuevo en el periodo activo actual
-        — el cliente no gestiona esa diferencia (modelo de dominio §3).
+        Revierte el movimiento original y registra uno nuevo en el periodo
+        activo actual; si el gasto era de un periodo ya cerrado, el ajuste
+        cae en el activo. `monto` es obligatorio aunque solo se cambie la
+        nota o la categoría.
       parameters:
         - $ref: '#/components/parameters/GastoId'
       requestBody:
@@ -329,62 +586,70 @@ paths:
               $ref: '#/components/schemas/EditarGastoRequest'
       responses:
         '200':
-          description: >
-            Gasto actualizado. Si el gasto pertenecía a un periodo cerrado,
-            la respuesta incluye el ajuste generado en el periodo activo.
+          description: Gasto corregido
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/EditarGastoResultado'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
-
-    delete:
-      tags: [Gastos]
-      summary: Eliminar un gasto
-      description: >
-        Nunca es un hard delete (Documento Maestro §7.6). Sobre un periodo
-        Activo, el asiento se revierte directamente. Sobre un periodo
-        Cerrado, se genera un asiento de reversión en el periodo activo.
-      parameters:
-        - $ref: '#/components/parameters/GastoId'
-      responses:
-        '204':
-          description: Gasto revertido (soft delete vía asiento de reversión)
-        '404':
-          $ref: '#/components/responses/ErrorNoEncontrado'
-
-  # ---------- DISPONIBLE (el motor de flujo de caja) ----------
-  /periodos/activo/disponible:
-    get:
-      tags: [Disponible]
-      summary: Obtener la cifra de disponible del periodo activo
-      description: >
-        Endpoint central del producto — implementa el motor de flujo de
-        caja descrito en modelo-dominio.md §5. La cifra se recalcula en
-        cada llamada, nunca se almacena. Si el periodo activo no tiene
-        ingreso registrado, responde con estado sin_ingreso y sin cifra
-        numérica confiable: el cliente NUNCA debe inventar un valor en
-        ese caso ni mostrar un $0 como si fuera un cálculo real.
-      responses:
-        '200':
-          description: Estado del disponible del periodo activo
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Disponible'
-        '404':
-          description: No hay periodo activo
+        '409':
+          description: Ya estaba corregido (`GASTO_YA_REVERTIDO`) o no hay periodo activo (`SIN_PERIODO_ACTIVO`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
 
-  # ---------- METAS DE AHORRO (básico) ----------
+    delete:
+      tags: [Gastos]
+      summary: Eliminar un gasto
+      description: "Nunca es un hard delete: se revierte su movimiento en el periodo activo."
+      parameters:
+        - $ref: '#/components/parameters/GastoId'
+      responses:
+        '204':
+          description: Gasto revertido
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: Ya estaba corregido (`GASTO_YA_REVERTIDO`) o no hay periodo activo (`SIN_PERIODO_ACTIVO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ---------- DISPONIBLE (el motor de flujo de caja) ----------
+  /periodos/activo/disponible:
+    get:
+      tags: [Disponible]
+      summary: Cifra de disponible del periodo activo
+      description: >
+        Endpoint central del producto (modelo-dominio.md §5). Se recalcula
+        en cada llamada, nunca se almacena. Si el periodo activo no tiene
+        ingreso, responde `sin_ingreso` y sin cifra: el cliente nunca debe
+        inventar un valor ni mostrar un $0 como si fuera un cálculo.
+      responses:
+        '200':
+          description: Estado del disponible
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Disponible'
+        '404':
+          description: No hay periodo activo (`PERIODO_NO_ENCONTRADO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ---------- METAS DE AHORRO ----------
   /metas:
     post:
       tags: [Metas]
       summary: Crear una meta de ahorro
+      description: El plan gratuito admite 2 metas activas (las archivadas no cuentan).
       requestBody:
         required: true
         content:
@@ -398,13 +663,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Meta'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '403':
+          description: Límite de metas del plan gratuito (`LIMITE_METAS_ALCANZADO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
     get:
       tags: [Metas]
-      summary: Listar metas de ahorro del usuario
+      summary: Listar las metas de ahorro (sin las archivadas)
       responses:
         '200':
-          description: Lista de metas
+          description: Lista de metas, la más reciente primero
           content:
             application/json:
               schema:
@@ -412,14 +685,86 @@ paths:
                 items:
                   $ref: '#/components/schemas/Meta'
 
+  /metas/{metaId}:
+    patch:
+      tags: [Metas]
+      summary: Editar el nombre y/o el objetivo de una meta
+      description: >
+        Son datos de configuración, no del ledger: el avance se deriva del
+        saldo real, así que cambiar el objetivo solo recalcula el
+        porcentaje. Hay que mandar al menos un campo. La moneda no se edita.
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EditarMetaRequest'
+      responses:
+        '200':
+          description: Meta actualizada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meta'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+    delete:
+      tags: [Metas]
+      summary: Eliminar una meta
+      description: >
+        Sin movimientos nunca, se borra. Con historial y saldo exactamente
+        en cero, se archiva (sale del listado y deja de contar para el
+        límite del plan). Con saldo distinto de cero se rechaza.
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+      responses:
+        '204':
+          description: Meta eliminada o archivada
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: La meta todavía tiene saldo (`META_CON_HISTORIAL`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /metas/{metaId}/movimientos:
+    get:
+      tags: [Metas]
+      summary: Historial de una meta
+      description: >
+        Aportes (incluido el sobrante ahorrado), retiros a la quincena,
+        pagos y aportes externos; los 50 más recientes. Las reversiones no
+        salen como filas: su original aparece con `revertido: true`.
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+      responses:
+        '200':
+          description: Movimientos de la meta
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MovimientoMeta'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
   /metas/{metaId}/aportes:
     post:
       tags: [Metas]
-      summary: Registrar un aporte a una meta
+      summary: Aportar a una meta desde la quincena
       description: >
-        Reduce el disponible del periodo activo — decisión confirmada en
-        modelo-dominio.md §6: el aporte se trata como un gasto más para
-        efectos del motor de flujo de caja.
+        Reduce el disponible del periodo activo (modelo-dominio.md §6) y
+        no puede superarlo: `APORTE_EXCEDE_DISPONIBLE`. Lo aportado y
+        retirado de vuelta en el mismo periodo no cuenta como gasto ni
+        como ingreso en el resumen.
       parameters:
         - $ref: '#/components/parameters/MetaId'
       requestBody:
@@ -435,8 +780,12 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Aporte'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
         '409':
-          description: No hay periodo activo del cual descontar el aporte
+          description: No hay periodo activo (`SIN_PERIODO_ACTIVO`) o el monto supera el disponible (`APORTE_EXCEDE_DISPONIBLE`)
           content:
             application/json:
               schema:
@@ -445,8 +794,11 @@ paths:
   /metas/{metaId}/retiros:
     post:
       tags: [Metas]
-      summary: Registrar un retiro de una meta
-      description: El motivo es obligatorio (requisito original del producto).
+      summary: Pasar dinero de una meta a la quincena
+      description: >
+        Aumenta el disponible del periodo activo, como un ingreso. El
+        motivo es obligatorio y el monto no puede superar el saldo de la
+        meta (`SALDO_META_INSUFICIENTE`).
       parameters:
         - $ref: '#/components/parameters/MetaId'
       requestBody:
@@ -462,16 +814,155 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Retiro'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: No hay periodo activo (`SIN_PERIODO_ACTIVO`) o la meta no alcanza (`SALDO_META_INSUFICIENTE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /metas/{metaId}/pagos:
+    post:
+      tags: [Metas]
+      summary: Pagar algo directo con el dinero de una meta
+      description: >
+        Sale de la meta sin pasar por la quincena: no cambia el disponible,
+        el resumen ni el desglose, y no exige periodo activo. El monto no
+        puede superar el saldo de la meta.
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearRetiroRequest'
+      responses:
+        '201':
+          description: Pago registrado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Retiro'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: La meta no alcanza (`SALDO_META_INSUFICIENTE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /metas/{metaId}/pagos/{movimientoId}:
+    delete:
+      tags: [Metas]
+      summary: Deshacer un pago hecho con la meta
+      description: El dinero vuelve a la meta (por reversión), no a la quincena.
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+        - $ref: '#/components/parameters/MovimientoId'
+      responses:
+        '204':
+          description: Pago deshecho
+        '404':
+          description: La meta o el pago no existen (`META_NO_ENCONTRADA`, `PAGO_META_NO_ENCONTRADO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Ya estaba deshecho (`PAGO_META_YA_REVERTIDO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /metas/{metaId}/depositos:
+    post:
+      tags: [Metas]
+      summary: Aporte externo — dinero que ya existía fuera de la app, directo a la meta
+      description: >
+        No toca la quincena (ni el disponible, ni el resumen, ni el
+        desglose), no está limitado por el disponible y no exige periodo
+        activo. `motivo` es opcional ("ahorro que ya tenía").
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [monto]
+              properties:
+                monto:
+                  $ref: '#/components/schemas/Monto'
+                motivo:
+                  type: string
+                  maxLength: 200
+      responses:
+        '201':
+          description: Aporte externo registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, metaId, monto]
+                properties:
+                  id: { type: string, format: uuid }
+                  metaId: { type: string, format: uuid }
+                  monto:
+                    $ref: '#/components/schemas/Monto'
+                  motivo:
+                    type: string
+                    nullable: true
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /metas/{metaId}/depositos/{movimientoId}:
+    delete:
+      tags: [Metas]
+      summary: Deshacer un aporte externo
+      description: >
+        El dinero sale de la meta de vuelta a "fuera". Solo si la meta
+        todavía lo tiene: si ya se pagó o se pasó a la quincena, deshacerlo
+        la dejaría en negativo (`SALDO_META_INSUFICIENTE`).
+      parameters:
+        - $ref: '#/components/parameters/MetaId'
+        - $ref: '#/components/parameters/MovimientoId'
+      responses:
+        '204':
+          description: Aporte externo deshecho
+        '404':
+          description: La meta o el aporte no existen (`META_NO_ENCONTRADA`, `DEPOSITO_META_NO_ENCONTRADO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Ya estaba deshecho (`DEPOSITO_META_YA_REVERTIDO`) o la meta ya no tiene ese dinero (`SALDO_META_INSUFICIENTE`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   # ---------- CATEGORÍAS ----------
   /categorias:
     get:
       tags: [Categorías]
-      summary: Listar categorías disponibles (predeterminadas + personalizadas del usuario)
+      summary: Listar las categorías (predeterminadas + personalizadas)
       description: >
-        Disponible en el plan gratuito sin restricción de acceso
-        (Documento Maestro §9.1) — el límite, si existe, es de cantidad
-        de categorías personalizadas, nunca de acceso a la funcionalidad.
+        Sin restricción de acceso en el plan gratuito (Documento Maestro
+        §9.1); el límite es de cantidad de personalizadas. Predeterminadas
+        primero, alfabético dentro de cada grupo.
       responses:
         '200':
           description: Lista de categorías
@@ -498,29 +989,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Categoria'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
         '403':
-          description: Límite de categorías personalizadas alcanzado para el plan actual
+          description: Límite de categorías personalizadas del plan (`LIMITE_CATEGORIAS_ALCANZADO`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
 
   /categorias/{categoriaId}:
-    parameters:
-      - name: categoriaId
-        in: path
-        required: true
-        schema:
-          type: string
-          format: uuid
-
     patch:
       tags: [Categorías]
       summary: Cambiar el nombre y/o el ícono de una categoría
       description: >
-        PATCH real — manda solo el campo que quieras cambiar. Aplica igual
-        a predeterminadas y personalizadas: lo único que sigue protegido es
-        no poder eliminar una predeterminada (ver DELETE de este mismo path).
+        PATCH real: manda solo el campo que quieras cambiar. Aplica igual
+        a predeterminadas y personalizadas.
+      parameters:
+        - $ref: '#/components/parameters/CategoriaId'
       requestBody:
         required: true
         content:
@@ -534,6 +1020,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Categoria'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
 
@@ -542,14 +1030,495 @@ paths:
       summary: Eliminar una categoría personalizada
       description: >
         Nunca una predeterminada (`CATEGORIA_PREDETERMINADA`) ni una que ya
-        esté en uso en algún gasto, gasto recurrente o cargo de tarjeta
-        (`CATEGORIA_EN_USO`) — evita que un reporte ya generado quede
-        apuntando a una categoría que dejó de existir.
+        esté en uso en algún gasto, recurrente o cargo de tarjeta
+        (`CATEGORIA_EN_USO`).
+      parameters:
+        - $ref: '#/components/parameters/CategoriaId'
       responses:
         '204':
           description: Categoría eliminada
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: Predeterminada o en uso
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ---------- GASTOS RECURRENTES ----------
+  /gastos-recurrentes:
+    get:
+      tags: [Recurrentes]
+      summary: Listar las plantillas de gastos recurrentes
+      responses:
+        '200':
+          description: Lista de recurrentes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GastoRecurrente'
+
+    post:
+      tags: [Recurrentes]
+      summary: Crear un gasto recurrente
+      description: >
+        Se materializa solo como gasto real al activarse cada periodo al que
+        le toque. Pausar (`activo: false`) es su "eliminar": nunca hay
+        hard delete.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearGastoRecurrenteRequest'
+      responses:
+        '201':
+          description: Recurrente creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GastoRecurrente'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+
+  /gastos-recurrentes/{recurrenteId}:
+    patch:
+      tags: [Recurrentes]
+      summary: Editar, pausar o reanudar un gasto recurrente
+      parameters:
+        - name: recurrenteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarGastoRecurrenteRequest'
+      responses:
+        '200':
+          description: Recurrente actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GastoRecurrente'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  # ---------- TARJETAS ----------
+  /tarjetas:
+    get:
+      tags: [Tarjetas]
+      summary: Listar las tarjetas de crédito (sin las archivadas)
+      responses:
+        '200':
+          description: Lista de tarjetas con su deuda y crédito disponible
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tarjeta'
+
+    post:
+      tags: [Tarjetas]
+      summary: Crear una tarjeta
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearTarjetaRequest'
+      responses:
+        '201':
+          description: Tarjeta creada
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tarjeta'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+
+  /tarjetas/{tarjetaId}:
+    delete:
+      tags: [Tarjetas]
+      summary: Eliminar una tarjeta
+      description: >
+        Sin cargos nunca, se borra. Con cargos todos ya corregidos y deuda
+        en cero, se archiva. Con alguna compra vigente se rechaza.
+      parameters:
+        - $ref: '#/components/parameters/TarjetaId'
+      responses:
+        '204':
+          description: Tarjeta eliminada o archivada
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: Tiene compras vigentes (`TARJETA_CON_HISTORIAL`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /tarjetas/{tarjetaId}/cargos:
+    get:
+      tags: [Tarjetas]
+      summary: Listar las compras de una tarjeta con sus mensualidades
+      parameters:
+        - $ref: '#/components/parameters/TarjetaId'
+      responses:
+        '200':
+          description: Compras de la tarjeta, la más antigua primero (incluye las corregidas, marcadas)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CargoTarjeta'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+    post:
+      tags: [Tarjetas]
+      summary: Registrar una compra con tarjeta (a una sola exhibición o a MSI)
+      description: >
+        Sube la deuda de inmediato y calcula las mensualidades con sus
+        fechas de vencimiento reales; cada una se descuenta sola de la
+        quincena en la que vence. El límite de crédito sí se bloquea.
+      parameters:
+        - $ref: '#/components/parameters/TarjetaId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrarCargoRequest'
+      responses:
+        '201':
+          description: Compra registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, mensualidades]
+                properties:
+                  id: { type: string, format: uuid }
+                  mensualidades:
+                    type: array
+                    items:
+                      type: object
+                      required: [numeroPago, monto, fechaVencimiento]
+                      properties:
+                        numeroPago: { type: integer }
+                        monto:
+                          $ref: '#/components/schemas/Monto'
+                        fechaVencimiento: { type: string, format: date }
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '403':
+          description: El cargo excede el crédito disponible (`LIMITE_CREDITO_EXCEDIDO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /tarjetas/{tarjetaId}/cargos/{cargoId}:
+    delete:
+      tags: [Tarjetas]
+      summary: Corregir una compra mal registrada
+      description: >
+        Siempre por reversión, nunca borrado. Las mensualidades ya cobradas
+        se devuelven al disponible del periodo activo de hoy; las que aún
+        no vencían se eliminan.
+      parameters:
+        - $ref: '#/components/parameters/TarjetaId'
+        - name: cargoId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Compra corregida
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [mensualidadesRevertidas, mensualidadesEliminadas]
+                properties:
+                  mensualidadesRevertidas: { type: integer }
+                  mensualidadesEliminadas: { type: integer }
+        '404':
+          description: La tarjeta o la compra no existen (`TARJETA_NO_ENCONTRADA`, `CARGO_NO_ENCONTRADO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: Ya estaba corregida (`CARGO_YA_REVERTIDO`) o no hay periodo activo para el ajuste (`SIN_PERIODO_ACTIVO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ---------- SUSCRIPCIÓN ----------
+  /suscripcion:
+    get:
+      tags: [Suscripción]
+      summary: Plan y estado de la suscripción
+      responses:
+        '200':
+          description: Estado de la suscripción
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EstadoSuscripcion'
+
+  /suscripcion/checkout:
+    post:
+      tags: [Suscripción]
+      summary: Crear una sesión de Stripe Checkout para pasar a Pro
+      description: Límite estricto de 10 por minuto (cada llamada crea una sesión en Stripe).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intervalo]
+              properties:
+                intervalo:
+                  type: string
+                  enum: [mensual, anual]
+      responses:
+        '200':
+          description: Sesión creada; el cliente redirige a `url`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UrlSesion'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+
+  /suscripcion/portal:
+    post:
+      tags: [Suscripción]
+      summary: Crear una sesión del portal de facturación de Stripe
+      description: Límite estricto de 10 por minuto.
+      responses:
+        '200':
+          description: Sesión creada; el cliente redirige a `url`
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UrlSesion'
+        '409':
+          description: Todavía no hay suscripción (`SIN_SUSCRIPCION`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ---------- PREFERENCIAS ----------
+  /preferencias:
+    get:
+      tags: [Preferencias]
+      summary: Preferencias de notificaciones
+      responses:
+        '200':
+          description: Preferencias
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferencias'
+
+    patch:
+      tags: [Preferencias]
+      summary: Activar o desactivar los recordatorios por correo
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Preferencias'
+      responses:
+        '200':
+          description: Preferencias actualizadas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Preferencias'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+
+  # ---------- CUENTA (derechos ARCO) ----------
+  /cuenta/datos:
+    get:
+      tags: [Cuenta]
+      summary: Descargar todos los datos de la cuenta (derecho de acceso)
+      description: >
+        JSON con todo lo que Korly guarda del usuario, una entrada por
+        tabla. Gratis en todos los planes. Límite de 10 por hora.
+      responses:
+        '200':
+          description: Archivo `korly-mis-datos.json`
+          headers:
+            Content-Disposition:
+              schema: { type: string, example: 'attachment; filename="korly-mis-datos.json"' }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DatosCuenta'
+
+  /cuenta/eliminar:
+    post:
+      tags: [Cuenta]
+      summary: Eliminar la cuenta y todos sus datos (derecho de cancelación)
+      description: >
+        Irreversible (ADR-008: única excepción al "nada se borra"). Es POST
+        porque lleva un cuerpo. Límite de 5 por hora.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [confirmacion]
+              properties:
+                confirmacion:
+                  type: string
+                  enum: [ELIMINAR]
+                  description: La palabra exacta ELIMINAR
+      responses:
+        '200':
+          description: Cuenta eliminada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [usuarioAuthEliminado]
+                properties:
+                  usuarioAuthEliminado:
+                    type: boolean
+                    description: false si no se pudo borrar el usuario en Supabase Auth (los datos de Korly sí se borraron)
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+
+  # ---------- IMPORTACIÓN Y EXPORTACIÓN ----------
+  /exportar/gastos.csv:
+    get:
+      tags: [Importación y exportación]
+      summary: Exportar los gastos a CSV
+      description: Función de Korly Pro.
+      parameters:
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+      responses:
+        '200':
+          description: Archivo `gastos.csv`
+          headers:
+            Content-Disposition:
+              schema: { type: string, example: 'attachment; filename="gastos.csv"' }
+          content:
+            text/csv:
+              schema: { type: string }
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '403':
+          $ref: '#/components/responses/ErrorFuncionPro'
+
+  /exportar/ingresos.csv:
+    get:
+      tags: [Importación y exportación]
+      summary: Exportar los ingresos a CSV
+      description: Función de Korly Pro.
+      parameters:
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+      responses:
+        '200':
+          description: Archivo `ingresos.csv`
+          headers:
+            Content-Disposition:
+              schema: { type: string, example: 'attachment; filename="ingresos.csv"' }
+          content:
+            text/csv:
+              schema: { type: string }
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '403':
+          $ref: '#/components/responses/ErrorFuncionPro'
+
+  /periodos/{periodoId}/gastos/importar:
+    post:
+      tags: [Importación y exportación]
+      summary: Importar gastos desde un CSV
+      description: >
+        El CSV va como `text/csv` en el cuerpo (no multipart). Columnas
+        buscadas por nombre: `fecha` y `monto` obligatorias; `moneda`,
+        `categoria` y `nota` opcionales. Las filas inválidas no abortan la
+        importación: se reportan en `errores`.
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+      responses:
+        '201':
+          description: Resultado de la importación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoImportacion'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: El periodo no está activo (`PERIODO_NO_ACTIVO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /periodos/{periodoId}/ingresos/importar:
+    post:
+      tags: [Importación y exportación]
+      summary: Importar ingresos desde un CSV
+      description: Mismo formato y comportamiento que la importación de gastos (sin la columna de categoría).
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema: { type: string }
+      responses:
+        '201':
+          description: Resultado de la importación
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoImportacion'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+        '409':
+          description: El periodo no está activo (`PERIODO_NO_ACTIVO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
 # ============================================================
 # COMPONENTES
@@ -571,33 +1540,63 @@ components:
       name: periodoId
       in: path
       required: true
-      schema:
-        type: string
-        format: uuid
+      schema: { type: string, format: uuid }
     GastoId:
       name: gastoId
       in: path
       required: true
-      schema:
-        type: string
-        format: uuid
+      schema: { type: string, format: uuid }
+    IngresoId:
+      name: ingresoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     MetaId:
       name: metaId
       in: path
       required: true
-      schema:
-        type: string
-        format: uuid
+      schema: { type: string, format: uuid }
+    MovimientoId:
+      name: movimientoId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CategoriaId:
+      name: categoriaId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    TarjetaId:
+      name: tarjetaId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Desde:
+      name: desde
+      in: query
+      schema: { type: string, format: date }
+      description: Fecha mínima (YYYY-MM-DD), inclusive
+    Hasta:
+      name: hasta
+      in: query
+      schema: { type: string, format: date }
+      description: Fecha máxima (YYYY-MM-DD), inclusive
 
   responses:
     ErrorValidacion:
-      description: Solicitud inválida (campos faltantes o fuera de rango)
+      description: "Solicitud inválida (`VALIDACION`: campos faltantes o fuera de rango)"
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/Error'
     ErrorNoEncontrado:
-      description: Recurso no encontrado
+      description: El recurso no existe, o es de otro usuario (no se distingue, ADR-005)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    ErrorFuncionPro:
+      description: Función exclusiva de Korly Pro (`FUNCION_PRO`)
       content:
         application/json:
           schema:
@@ -617,7 +1616,7 @@ components:
       properties:
         valorMinimo:
           type: integer
-          description: Monto en la unidad mínima de la moneda (centavos para MXN)
+          description: Monto en la unidad mínima de la moneda (centavos para MXN). Entre -(2^53-1) y 2^53-1.
           example: 124000
         moneda:
           type: string
@@ -635,13 +1634,23 @@ components:
           type: string
           example: El periodo especificado no está en estado Activo
 
+    MovimientoCreado:
+      type: object
+      description: Respuesta delgada de las altas de ingresos y gastos; alcanza para encadenar los pasos siguientes.
+      required: [id, movimientoId, periodoId]
+      properties:
+        id: { type: string, format: uuid }
+        movimientoId: { type: string, format: uuid }
+        periodoId: { type: string, format: uuid }
+
     EstadoPeriodo:
       type: string
-      enum: [borrador, activo, cerrado, archivado]
+      enum: [borrador, activo, cerrado, archivado, descartado]
 
     TipoPeriodo:
       type: string
-      enum: [quincenal, semanal, mensual, personalizado]
+      enum: [quincenal]
+      description: Por ahora solo `quincenal`; los demás tipos no están soportados todavía.
 
     # ---------- Periodo ----------
 
@@ -651,68 +1660,37 @@ components:
       properties:
         tipo:
           $ref: '#/components/schemas/TipoPeriodo'
-        fechaInicio:
-          type: string
-          format: date
-          description: >
-            Requerida solo si tipo = personalizado. Para quincenal/semanal/
-            mensual, la fecha de inicio se deriva de la regla de anclaje
-            a calendario (ADR-004), no se especifica manualmente.
-        fechaFin:
-          type: string
-          format: date
-          description: Requerida solo si tipo = personalizado
 
     Periodo:
       type: object
-      required: [id, tipo, estado, fechaInicio, fechaFin]
+      required: [id, cuentaId, estado, fechaInicio, fechaFin, creadoEn]
       properties:
-        id:
+        id: { type: string, format: uuid }
+        cuentaId:
           type: string
           format: uuid
-        tipo:
-          $ref: '#/components/schemas/TipoPeriodo'
+          description: Cuenta del ledger del periodo (interno; el cliente no la necesita)
         estado:
           $ref: '#/components/schemas/EstadoPeriodo'
-        fechaInicio:
+        fechaInicio: { type: string, format: date }
+        fechaFin: { type: string, format: date }
+        creadoEn:
           type: string
-          format: date
-        fechaFin:
-          type: string
-          format: date
-        tieneIngresoRegistrado:
-          type: boolean
-          description: Ver Disponible — determina si la cifra es confiable
-
-    PeriodoListaPaginada:
-      type: object
-      properties:
-        datos:
-          type: array
-          items:
-            $ref: '#/components/schemas/Periodo'
-        siguienteCursor:
-          type: string
-          nullable: true
+          format: date-time
+          description: Distingue dos periodos con el mismo rango de fechas
 
     ResumenPeriodo:
       type: object
-      description: Snapshot inmutable generado al cierre (invariante 15).
-      required: [periodoId, totalIngresos, totalGastado, sobrante, generadoEn]
+      description: Snapshot generado al cierre; solo cambia la decisión del sobrante (invariante 15).
+      required: [periodoId, totalIngresos, totalGastado, sobrante, decisionSobrante, generadoEn]
       properties:
-        periodoId:
-          type: string
-          format: uuid
+        periodoId: { type: string, format: uuid }
         totalIngresos:
           $ref: '#/components/schemas/Monto'
         totalGastado:
           $ref: '#/components/schemas/Monto'
         sobrante:
           $ref: '#/components/schemas/Monto'
-          description: Puede ser negativo si hubo sobregiro
-        porcentajeUtilizado:
-          type: number
-          format: float
         decisionSobrante:
           type: string
           enum: [pendiente, ahorrado, arrastrado]
@@ -734,15 +1712,91 @@ components:
 
     DecisionSobranteResultado:
       type: object
+      required: [periodoId, decision, montoAplicado]
       properties:
-        periodoId:
-          type: string
-          format: uuid
+        periodoId: { type: string, format: uuid }
         decision:
           type: string
           enum: [ahorrado, arrastrado]
         montoAplicado:
           $ref: '#/components/schemas/Monto'
+
+    Desglose:
+      type: object
+      required: [periodoId, fechaInicio, fechaFin, totalGastado, totalVariable, recurrentes, rubros, semanas, semanaMasCara]
+      properties:
+        periodoId: { type: string, format: uuid }
+        fechaInicio: { type: string, format: date }
+        fechaFin: { type: string, format: date }
+        totalGastado:
+          $ref: '#/components/schemas/Monto'
+        totalVariable:
+          allOf:
+            - $ref: '#/components/schemas/Monto'
+          description: '`totalGastado` menos los recurrentes: es lo que cubren `rubros` y `semanas`.'
+        recurrentes:
+          type: object
+          required: [total, items]
+          properties:
+            total:
+              $ref: '#/components/schemas/Monto'
+            items:
+              type: array
+              items:
+                type: object
+                required: [id, descripcion, frecuencia, diaMes, monto]
+                properties:
+                  id: { type: string, format: uuid }
+                  descripcion: { type: string }
+                  frecuencia: { type: string, enum: [quincenal, mensual] }
+                  diaMes: { type: integer, nullable: true }
+                  monto:
+                    $ref: '#/components/schemas/Monto'
+        rubros:
+          type: array
+          description: De mayor a menor monto.
+          items:
+            type: object
+            required: [clave, etiqueta, tipo, monto]
+            properties:
+              clave: { type: string }
+              etiqueta: { type: string }
+              tipo:
+                type: string
+                enum: [categoria, sin_categoria, aportes_meta, pagos_tarjeta]
+              monto:
+                $ref: '#/components/schemas/Monto'
+        semanas:
+          type: array
+          description: Bloques de 7 días (el último puede tener más).
+          items:
+            type: object
+            required: [numero, fechaInicio, fechaFin, dias, diasTranscurridos, total, promedioDiario, rubros]
+            properties:
+              numero: { type: integer }
+              fechaInicio: { type: string, format: date }
+              fechaFin: { type: string, format: date }
+              dias: { type: integer }
+              diasTranscurridos:
+                type: integer
+                description: En el periodo activo, el bloque en curso solo cuenta los días que ya pasaron.
+              total:
+                $ref: '#/components/schemas/Monto'
+              promedioDiario:
+                $ref: '#/components/schemas/Monto'
+              rubros:
+                type: array
+                items:
+                  type: object
+                  required: [clave, monto]
+                  properties:
+                    clave: { type: string }
+                    monto:
+                      $ref: '#/components/schemas/Monto'
+        semanaMasCara:
+          type: integer
+          nullable: true
+          description: Número de la semana con mayor promedio diario; null si no hay al menos dos semanas comparables.
 
     # ---------- Ingreso ----------
 
@@ -755,41 +1809,66 @@ components:
         fechaEfectiva:
           type: string
           format: date
-          description: Fecha real en que llegó el dinero (puede diferir del inicio del periodo, ver ADR-007)
+          description: Fecha real en que llegó el dinero; no mueve la quincena (ADR-007).
         nota:
           type: string
           maxLength: 200
 
     Ingreso:
       type: object
-      required: [id, periodoId, monto, fechaEfectiva, fechaRegistro]
+      required: [id, periodoId, monto, fechaEfectiva, fechaRegistro, revertido]
       properties:
-        id:
-          type: string
-          format: uuid
-        periodoId:
-          type: string
-          format: uuid
+        id: { type: string, format: uuid }
+        periodoId: { type: string, format: uuid }
         monto:
           $ref: '#/components/schemas/Monto'
-        fechaEfectiva:
+        fechaEfectiva: { type: string, format: date }
+        fechaRegistro: { type: string, format: date-time }
+        nota: { type: string }
+        revertido:
+          type: boolean
+          description: true si ya se corrigió (editar o eliminar); el ledger lo conserva.
+
+    EditarIngresoRequest:
+      type: object
+      required: [monto]
+      properties:
+        monto:
+          $ref: '#/components/schemas/Monto'
+        nota: { type: string }
+
+    EditarIngresoResultado:
+      type: object
+      required: [ingreso, ajusteGenerado, periodoDelAjuste]
+      properties:
+        ingreso:
+          type: object
+          required: [id, periodoId, monto]
+          properties:
+            id: { type: string, format: uuid }
+            periodoId: { type: string, format: uuid }
+            monto:
+              $ref: '#/components/schemas/Monto'
+        ajusteGenerado:
+          type: boolean
+          description: true si el original pertenecía a un periodo cerrado
+        periodoDelAjuste:
           type: string
-          format: date
-        fechaRegistro:
-          type: string
-          format: date-time
-        nota:
-          type: string
+          format: uuid
+          nullable: true
 
     # ---------- Gasto ----------
 
     CrearGastoRequest:
       type: object
-      required: [monto]
-      description: Monto es el único campo obligatorio — captura en ≤2 toques.
+      required: [monto, fechaEfectiva]
+      description: "El cliente precarga la fecha de hoy: la captura sigue siendo de ≤2 toques."
       properties:
         monto:
           $ref: '#/components/schemas/Monto'
+        fechaEfectiva:
+          type: string
+          format: date
         categoriaId:
           type: string
           format: uuid
@@ -797,38 +1876,31 @@ components:
         nota:
           type: string
           maxLength: 200
-        fechaEfectiva:
-          type: string
-          format: date
-          description: Por defecto, la fecha/hora actual del servidor resuelta a la zona del usuario
 
     Gasto:
       type: object
-      required: [id, periodoId, monto, fechaEfectiva, fechaRegistro]
+      required: [id, periodoId, monto, fechaEfectiva, fechaRegistro, revertido, esRecurrente]
       properties:
-        id:
-          type: string
-          format: uuid
-        periodoId:
-          type: string
-          format: uuid
+        id: { type: string, format: uuid }
+        periodoId: { type: string, format: uuid }
         monto:
           $ref: '#/components/schemas/Monto'
         categoriaId:
           type: string
           format: uuid
-          nullable: true
-        nota:
-          type: string
-        fechaEfectiva:
-          type: string
-          format: date
-        fechaRegistro:
-          type: string
-          format: date-time
+        nota: { type: string }
+        fechaEfectiva: { type: string, format: date }
+        fechaRegistro: { type: string, format: date-time }
+        revertido:
+          type: boolean
+          description: true si ya se corrigió (editar o eliminar); el ledger lo conserva.
+        esRecurrente:
+          type: boolean
+          description: true si lo materializó un gasto recurrente (cargo automático).
 
     EditarGastoRequest:
       type: object
+      required: [monto]
       properties:
         monto:
           $ref: '#/components/schemas/Monto'
@@ -842,16 +1914,22 @@ components:
           type: string
           format: date
           description: >
-            Corrige la fecha calendario del gasto (hallazgo real: un gasto
-            capturado por la noche podía guardarse con la fecha del día
-            siguiente). Omitirlo deja la fila corregida fechada al momento
-            de esta edición, igual que antes de agregar este campo.
+            Corrige la fecha calendario del gasto. Como la fila se recrea por
+            completo en cada edición, omitir cualquier campo no conserva el
+            valor anterior: lo deja vacío (la fecha, en el momento de la edición).
 
     EditarGastoResultado:
       type: object
+      required: [gasto, ajusteGenerado, periodoDelAjuste]
       properties:
         gasto:
-          $ref: '#/components/schemas/Gasto'
+          type: object
+          required: [id, periodoId, monto]
+          properties:
+            id: { type: string, format: uuid }
+            periodoId: { type: string, format: uuid }
+            monto:
+              $ref: '#/components/schemas/Monto'
         ajusteGenerado:
           type: boolean
           description: true si el gasto original pertenecía a un periodo cerrado
@@ -862,6 +1940,7 @@ components:
 
     GastoListaPaginada:
       type: object
+      required: [datos, siguienteCursor]
       properties:
         datos:
           type: array
@@ -875,46 +1954,43 @@ components:
 
     Disponible:
       type: object
-      required: [estado, periodoId]
+      required: [estado, periodoId, calculadoEn]
       description: >
-        Ver modelo-dominio.md §5. El campo estado determina cómo debe
-        presentarse: si es sin_ingreso, el cliente muestra el llamado a
-        registrar ingreso en lugar de cualquier cifra numérica.
+        Ver modelo-dominio.md §5. Si `estado` es `sin_ingreso`, el cliente
+        muestra el llamado a registrar un ingreso en lugar de cualquier cifra.
       properties:
         estado:
           type: string
           enum: [ok, sin_ingreso]
-        periodoId:
-          type: string
-          format: uuid
+        periodoId: { type: string, format: uuid }
         disponible:
-          $ref: '#/components/schemas/Monto'
-          description: Presente solo si estado = ok. Puede ser negativo (sobregiro)
+          allOf:
+            - $ref: '#/components/schemas/Monto'
+          description: Solo si estado = ok. Puede ser negativo (sobregiro).
         diasRestantes:
           type: integer
-          description: Incluye el día de hoy. Presente solo si estado = ok
+          description: Incluye el día de hoy. Solo si estado = ok.
         cifraDiaria:
-          $ref: '#/components/schemas/Monto'
+          allOf:
+            - $ref: '#/components/schemas/Monto'
           description: >
-            Objetivo fijo del día (calculado sobre el disponible de antes
-            de cualquier gasto de hoy) menos gastadoHoy — puede ser
-            negativo si hoy ya se excedió el objetivo. No es
-            piso(disponible / diasRestantes) directo: ver
-            modelo-dominio.md §5 y §6 sobre por qué esa fórmula más
-            simple redistribuía a mitad del propio día. Presente solo si
-            estado = ok
+            Objetivo fijo del día (calculado sobre el disponible de antes de
+            cualquier gasto de hoy) menos `gastadoHoy`; puede ser negativa si
+            hoy ya se excedió. Solo si estado = ok.
         gastadoHoy:
-          $ref: '#/components/schemas/Monto'
+          allOf:
+            - $ref: '#/components/schemas/Monto'
+          description: Cuánto ha salido netamente hoy; nunca negativo. Solo si estado = ok.
+        huboActividadHoy:
+          type: boolean
           description: >
-            Extensión sobre este contrato (ver backend/README.md,
-            "Disponible"). Cuánto ha salido netamente de la cuenta hoy
-            (gastos menos sus reversiones del mismo día); nunca negativo.
-            cifraDiaria + gastadoHoy = el objetivo fijo de hoy. Presente
-            solo si estado = ok
+            true si el usuario decidió algo hoy (un gasto, un aporte o un
+            retiro de meta); los cargos automáticos no cuentan. Distinto de
+            `gastadoHoy > 0`: un retiro que cubre un gasto da neto cero. Solo si estado = ok.
         calculadoEn:
           type: string
           format: date-time
-          description: Nunca se almacena — se recalcula en cada consulta
+          description: Nunca se almacena — se recalcula en cada consulta.
 
     # ---------- Metas de ahorro ----------
 
@@ -928,22 +2004,32 @@ components:
         montoObjetivo:
           $ref: '#/components/schemas/Monto'
 
-    Meta:
+    EditarMetaRequest:
       type: object
-      required: [id, nombre, montoObjetivo, montoAcumulado]
+      description: Al menos uno de los dos campos.
       properties:
-        id:
-          type: string
-          format: uuid
         nombre:
           type: string
+          maxLength: 100
+        montoObjetivo:
+          $ref: '#/components/schemas/Monto'
+
+    Meta:
+      type: object
+      required: [id, nombre, montoObjetivo, montoAcumulado, porcentajeAvance]
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
         montoObjetivo:
           $ref: '#/components/schemas/Monto'
         montoAcumulado:
-          $ref: '#/components/schemas/Monto'
+          allOf:
+            - $ref: '#/components/schemas/Monto'
+          description: Saldo real de la cuenta de la meta; nunca se cachea.
         porcentajeAvance:
           type: number
           format: float
+          description: Puede pasar de 100 si se aportó más del objetivo.
 
     CrearAporteRequest:
       type: object
@@ -954,24 +2040,17 @@ components:
 
     Aporte:
       type: object
+      required: [id, metaId, monto, periodoOrigenId]
       properties:
-        id:
-          type: string
-          format: uuid
-        metaId:
-          type: string
-          format: uuid
+        id: { type: string, format: uuid }
+        metaId: { type: string, format: uuid }
         monto:
           $ref: '#/components/schemas/Monto'
-        periodoOrigenId:
-          type: string
-          format: uuid
-        fechaRegistro:
-          type: string
-          format: date-time
+        periodoOrigenId: { type: string, format: uuid }
 
     CrearRetiroRequest:
       type: object
+      description: Sirve para retiros a la quincena y para pagos con la meta.
       required: [monto, motivo]
       properties:
         monto:
@@ -979,24 +2058,40 @@ components:
         motivo:
           type: string
           maxLength: 200
-          description: Obligatorio — requisito original del producto
+          description: Obligatorio
 
     Retiro:
       type: object
+      required: [id, metaId, monto, motivo]
       properties:
-        id:
-          type: string
-          format: uuid
-        metaId:
-          type: string
-          format: uuid
+        id: { type: string, format: uuid }
+        metaId: { type: string, format: uuid }
         monto:
           $ref: '#/components/schemas/Monto'
-        motivo:
+        motivo: { type: string }
+
+    MovimientoMeta:
+      type: object
+      required: [id, tipo, monto, fechaEfectiva, nota, revertido]
+      properties:
+        id: { type: string, format: uuid }
+        tipo:
           type: string
-        fechaRegistro:
+          enum: [aporte, retiro, pago, deposito]
+          description: >
+            `aporte` desde la quincena (o sobrante ahorrado), `retiro` a la
+            quincena, `pago` directo con la meta, `deposito` aporte externo.
+        monto:
+          allOf:
+            - $ref: '#/components/schemas/Monto'
+          description: Con signo desde el punto de vista de la meta; positivo entra, negativo sale.
+        fechaEfectiva: { type: string, format: date }
+        nota:
           type: string
-          format: date-time
+          nullable: true
+        revertido:
+          type: boolean
+          description: Solo los pagos y los aportes externos se pueden deshacer.
 
     # ---------- Categorías ----------
 
@@ -1017,21 +2112,20 @@ components:
           type: string
           maxLength: 50
         icono:
-          allOf: [$ref: '#/components/schemas/IconoCategoria']
+          allOf:
+            - $ref: '#/components/schemas/IconoCategoria'
           nullable: true
 
     ActualizarCategoriaRequest:
       type: object
-      description: >
-        PATCH real — solo se cambia el campo que se manda. Aplica igual a
-        predeterminadas y personalizadas (lo único protegido de verdad es
-        no poder eliminarlas, ver DELETE /categorias/{categoriaId}).
+      description: PATCH real — solo se cambia el campo que se manda.
       properties:
         nombre:
           type: string
           maxLength: 50
         icono:
-          allOf: [$ref: '#/components/schemas/IconoCategoria']
+          allOf:
+            - $ref: '#/components/schemas/IconoCategoria'
           nullable: true
           description: 'null quita el ícono elegido — el cliente vuelve a emparejar por palabra clave sobre el nombre.'
 
@@ -1039,13 +2133,254 @@ components:
       type: object
       required: [id, nombre, esPredeterminada, icono]
       properties:
-        id:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        esPredeterminada: { type: boolean }
+        icono:
+          allOf:
+            - $ref: '#/components/schemas/IconoCategoria'
+          nullable: true
+
+    # ---------- Gastos recurrentes ----------
+
+    FrecuenciaRecurrente:
+      type: string
+      enum: [quincenal, mensual]
+
+    GastoRecurrente:
+      type: object
+      required: [id, descripcion, monto, categoriaId, frecuencia, diaMes, activo]
+      properties:
+        id: { type: string, format: uuid }
+        descripcion: { type: string }
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
           type: string
           format: uuid
-        nombre:
-          type: string
-        esPredeterminada:
-          type: boolean
-        icono:
-          allOf: [$ref: '#/components/schemas/IconoCategoria']
           nullable: true
+        frecuencia:
+          $ref: '#/components/schemas/FrecuenciaRecurrente'
+        diaMes:
+          type: integer
+          minimum: 1
+          maximum: 31
+          nullable: true
+          description: Obligatorio si la frecuencia es mensual; null si es quincenal.
+        activo: { type: boolean }
+
+    CrearGastoRecurrenteRequest:
+      type: object
+      required: [descripcion, monto, frecuencia]
+      properties:
+        descripcion: { type: string }
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+        frecuencia:
+          $ref: '#/components/schemas/FrecuenciaRecurrente'
+        diaMes:
+          type: integer
+          minimum: 1
+          maximum: 31
+          nullable: true
+
+    ActualizarGastoRecurrenteRequest:
+      type: object
+      description: PATCH — solo se cambia lo que se manda.
+      properties:
+        descripcion: { type: string }
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+        frecuencia:
+          $ref: '#/components/schemas/FrecuenciaRecurrente'
+        diaMes:
+          type: integer
+          minimum: 1
+          maximum: 31
+          nullable: true
+        activo: { type: boolean }
+
+    # ---------- Tarjetas ----------
+
+    CrearTarjetaRequest:
+      type: object
+      required: [nombre, limiteCredito, diaCorte, diasParaPago]
+      properties:
+        nombre: { type: string }
+        limiteCredito:
+          $ref: '#/components/schemas/Monto'
+        diaCorte:
+          type: integer
+          minimum: 1
+          maximum: 31
+        diasParaPago:
+          type: integer
+          minimum: 1
+          maximum: 90
+          description: Días después del corte para pagar (los bancos mexicanos calculan la fecha límite así).
+
+    Tarjeta:
+      type: object
+      required: [id, nombre, limiteCredito, deuda, creditoDisponible, diaCorte, diasParaPago]
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        limiteCredito:
+          $ref: '#/components/schemas/Monto'
+        deuda:
+          allOf:
+            - $ref: '#/components/schemas/Monto'
+          description: Positiva cuando hay deuda (el saldo del ledger es negativo; esa convención no se expone).
+        creditoDisponible:
+          $ref: '#/components/schemas/Monto'
+        diaCorte: { type: integer }
+        diasParaPago: { type: integer }
+
+    RegistrarCargoRequest:
+      type: object
+      required: [descripcion, monto]
+      properties:
+        descripcion: { type: string }
+        monto:
+          allOf:
+            - $ref: '#/components/schemas/Monto'
+          description: Monto total de la compra.
+        numeroPlazos:
+          type: integer
+          minimum: 1
+          maximum: 60
+          default: 1
+          description: 1 = una exhibición; más de 1 = MSI.
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+        fechaCompra:
+          type: string
+          format: date
+          description: Por defecto, hoy.
+
+    CargoTarjeta:
+      type: object
+      required: [id, descripcion, montoTotal, numeroPlazos, categoriaId, fechaCompra, revertido, mensualidades]
+      properties:
+        id: { type: string, format: uuid }
+        descripcion: { type: string }
+        montoTotal:
+          $ref: '#/components/schemas/Monto'
+        numeroPlazos: { type: integer }
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+        fechaCompra: { type: string, format: date }
+        revertido:
+          type: boolean
+          description: true si ya se corrigió.
+        mensualidades:
+          type: array
+          items:
+            type: object
+            required: [numeroPago, monto, fechaVencimiento, pagado]
+            properties:
+              numeroPago: { type: integer }
+              monto:
+                $ref: '#/components/schemas/Monto'
+              fechaVencimiento: { type: string, format: date }
+              pagado:
+                type: boolean
+                description: true si ya se descontó de una quincena.
+
+    PagoTarjetaAplicado:
+      type: object
+      required: [tarjetaNombre, cargoDescripcion, numeroPago, numeroPlazos, monto]
+      properties:
+        tarjetaNombre: { type: string }
+        cargoDescripcion: { type: string }
+        numeroPago: { type: integer }
+        numeroPlazos: { type: integer }
+        monto:
+          $ref: '#/components/schemas/Monto'
+
+    # ---------- Suscripción, preferencias, cuenta ----------
+
+    EstadoSuscripcion:
+      type: object
+      required: [plan, estadoSuscripcion, suscripcionVigenteHasta]
+      properties:
+        plan:
+          type: string
+          enum: [free, pro]
+        estadoSuscripcion:
+          type: string
+          enum: [trialing, activa, pago_pendiente, cancelada]
+          nullable: true
+        suscripcionVigenteHasta:
+          type: string
+          format: date-time
+          nullable: true
+
+    UrlSesion:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          format: uri
+
+    Preferencias:
+      type: object
+      required: [recibirRecordatorios]
+      properties:
+        recibirRecordatorios: { type: boolean }
+
+    DatosCuenta:
+      type: object
+      required: [version, generadoEn, cuenta, datos]
+      properties:
+        version:
+          type: integer
+          enum: [1]
+        generadoEn:
+          type: string
+          format: date-time
+        cuenta:
+          type: object
+          description: Datos de la cuenta; el correo se consulta a Supabase Auth (ADR-003).
+          required: [correo]
+          properties:
+            correo:
+              type: string
+              nullable: true
+          additionalProperties: true
+        datos:
+          type: object
+          description: Una entrada por tabla con `tenant_id`, con todas sus filas tal como están guardadas.
+          additionalProperties:
+            type: array
+            items:
+              type: object
+
+    ResultadoImportacion:
+      type: object
+      required: [creados, errores]
+      properties:
+        creados: { type: integer }
+        errores:
+          type: array
+          items:
+            type: object
+            required: [fila, mensaje]
+            properties:
+              fila:
+                type: integer
+                description: 1-indexado sobre las filas de datos, sin contar el encabezado.
+              mensaje: { type: string }

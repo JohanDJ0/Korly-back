@@ -8,7 +8,7 @@ import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear
 import { obtenerSaldoTarjetaTx, obtenerTarjetaPorIdTx } from './tarjetas.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
-import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
+import { ahoraEnMexico, esFechaIsoValida, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 import { calcularVencimientoMensualidad } from './calcular-ciclo.js';
 
@@ -85,6 +85,9 @@ export async function registrarCargoTarjeta(entrada: RegistrarCargoEntrada): Pro
   // (1e9) ponía a la API a insertar filas durante minutos. Los MSI reales llegan a 24.
   if (!Number.isInteger(entrada.numeroPlazos) || entrada.numeroPlazos < 1 || entrada.numeroPlazos > MAX_PLAZOS) {
     throw new ErrorDominio('VALIDACION', `El campo 'numeroPlazos' debe ser un entero entre 1 y ${MAX_PLAZOS}`);
+  }
+  if (entrada.fechaCompra !== undefined && !esFechaIsoValida(entrada.fechaCompra)) {
+    throw new ErrorDominio('VALIDACION', "El campo 'fechaCompra' debe tener formato YYYY-MM-DD y ser una fecha real");
   }
   const fechaEfectiva = entrada.fechaCompra ?? fechaISO(ahoraEnMexico());
 

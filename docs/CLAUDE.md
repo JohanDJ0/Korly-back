@@ -37,7 +37,7 @@ Están justificadas en los ADRs. **No proponer alternativas sin leer el ADR corr
 | 3 | **`user_id` propio (UUID)**, nunca el ID del proveedor de auth. Tabla de mapeo aparte | ADR-003 |
 | 4 | **Periodos anclados a calendario** (quincenal = 1–15 / 16–fin de mes, longitud variable). Nunca "inicio + N días" | ADR-004 |
 | 5 | **`tenant_id` + RLS en toda tabla de dominio** desde la primera migración | ADR-005 |
-| 6 | **REST `/v1` + OpenAPI generado desde el código.** No tRPC, no GraphQL | ADR-006 |
+| 6 | **REST `/v1` + contrato OpenAPI.** No tRPC, no GraphQL. Hoy el contrato se mantiene a mano con una prueba que falla si se desfasa de las rutas (ADR-010); generarlo desde el código queda para cuando exista el cliente móvil | ADR-006, ADR-010 |
 | 7 | **Periodo ≠ ingreso.** Son entidades separadas. Los días restantes se cuentan contra el fin del periodo | ADR-007 |
 
 ### Reglas derivadas

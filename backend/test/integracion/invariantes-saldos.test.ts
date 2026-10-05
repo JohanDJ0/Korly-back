@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
+import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { obtenerSaldoCuenta, registrarMovimientoTx } from '../../src/modulos/ledger/registrar-movimiento.js';
 import { aportarAMeta, crearMeta, deshacerPagoMeta, pagarConMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
@@ -85,6 +86,45 @@ describe('invariantes de saldos', () => {
 
     expect(await obtenerSaldoCuenta(tenantId, meta.cuentaId)).toBe(2500n); // 3000 - 1000 - 500 + 1000
     expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(2500n); // 5000 - 3000 + 500
+  });
+
+  describe('fechas inválidas: un error de validación, no un 500', () => {
+    const FECHAS_INVALIDAS = ['no-es-fecha', '2026-02-31', '', '2026-8-1'];
+
+    it.each(FECHAS_INVALIDAS)('un gasto con fechaEfectiva %j se rechaza con VALIDACION', async (fecha) => {
+      const { tenantId, periodo } = await tenantConIngreso();
+
+      await expect(
+        registrarGasto({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: fecha, fechaReferencia: HOY })
+      ).rejects.toMatchObject({ codigo: 'VALIDACION' });
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(5000n);
+    });
+
+    it.each(FECHAS_INVALIDAS)('un ingreso con fechaEfectiva %j se rechaza con VALIDACION', async (fecha) => {
+      const { tenantId, periodo } = await tenantConIngreso();
+
+      await expect(
+        registrarIngreso({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: fecha, fechaReferencia: HOY })
+      ).rejects.toMatchObject({ codigo: 'VALIDACION' });
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(5000n);
+    });
+
+    it('una compra con tarjeta con fechaCompra inválida se rechaza con VALIDACION', async () => {
+      const { tenantId } = await tenantConIngreso();
+      const tarjeta = await crearTarjeta(tenantId, 'BBVA Oro', 100000n, 'MXN', 15, 20);
+
+      await expect(
+        registrarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, descripcion: 'Laptop', montoTotalValorMinimo: 1000n, moneda: 'MXN', numeroPlazos: 1, fechaCompra: '2026-13-45' })
+      ).rejects.toMatchObject({ codigo: 'VALIDACION' });
+    });
+
+    it('una fecha válida sigue funcionando', async () => {
+      const { tenantId, periodo } = await tenantConIngreso();
+
+      await registrarGasto({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(4900n);
+    });
   });
 
   describe('tarjetas', () => {

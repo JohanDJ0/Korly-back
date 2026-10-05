@@ -2761,6 +2761,22 @@ tanto, para que la pantalla no alcance a pintar el error. Un fallo transitorio d
 (red o 5xx) ya NO se confunde con un token inválido: el backend responde 503
 `AUTENTICACION_NO_DISPONIBLE` y el usuario conserva su sesión.
 
+## Contrato OpenAPI
+
+`docs/openapi.yaml` describe las 59 operaciones de `/v1` tal como el servidor responde hoy.
+Se mantiene a mano (ADR-010), con `test/integracion/openapi.test.ts` como red: compara las
+rutas que Fastify registra contra las operaciones documentadas, en las dos direcciones, y
+revisa que el archivo esté bien armado (`$ref` que resuelven, parámetros de ruta declarados,
+etiqueta/resumen/respuestas en cada operación). Agregar una ruta sin documentarla, o
+documentar una que no existe, hace fallar la prueba — y el CI del backend corre también
+cuando cambia `docs/openapi.yaml`. La prueba no compara los campos de cada respuesta: al
+cambiar una respuesta o un cuerpo, hay que actualizar el contrato a mano.
+
+**Fechas inválidas = 400, no 500.** `registrarGasto`, `registrarIngreso` y
+`registrarCargoTarjeta` (`fechaCompra`) ahora validan el formato `YYYY-MM-DD` y que sea una
+fecha real (`2026-02-31`, `'no-es-fecha'` o `''` salían como un error genérico de Postgres,
+un 500); también se rechaza `2026-8-1`, que Postgres aceptaba y normalizaba.
+
 ## Seguridad
 
 Pase de hardening manual sobre todo el proyecto (backend + frontend),

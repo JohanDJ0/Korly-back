@@ -59,6 +59,10 @@ export async function registrarGasto(entrada: RegistrarGastoEntrada): Promise<Ga
   if (entrada.monto <= 0n) {
     throw new ErrorDominio('VALIDACION', 'El monto de un gasto debe ser positivo');
   }
+  // Sin esto, una fecha inválida llegaba hasta Postgres y salía como un 500 genérico.
+  if (!esFechaIsoValida(entrada.fechaEfectiva)) {
+    throw new ErrorDominio('VALIDACION', "El campo 'fechaEfectiva' debe tener formato YYYY-MM-DD y ser una fecha real");
+  }
 
   return conTenant(entrada.tenantId, async (tx) => {
     const periodo = await obtenerPeriodoPorIdTx(tx, entrada.tenantId, entrada.periodoId, entrada.fechaReferencia ?? ahoraEnMexico());
