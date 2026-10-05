@@ -93,7 +93,7 @@ describe('tarjetas de crédito y MSI', () => {
       expect(await listarTarjetas(tenantId)).toHaveLength(1);
     });
 
-    it('sigue bloqueada aunque el único cargo ya se haya corregido — asientos/movimientos son inmutables a nivel de base de datos', async () => {
+    it('con el único cargo ya corregido se archiva: desaparece del listado y no admite cargos nuevos (sus movimientos son inmutables, ADR-001)', async () => {
       const tenantId = await tenantNuevo();
       const tarjeta = await tarjetaDePrueba(tenantId);
       const cargo = await registrarCargoTarjeta({
@@ -107,11 +107,28 @@ describe('tarjetas de crédito y MSI', () => {
 
       await eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: cargo.id, fechaReferencia: HOY_DE_PRUEBA });
 
-      // Corregido (deuda en cero, oculto de "ver compras"), pero la fila
-      // de cargos_tarjeta sigue ahí — su movimiento nunca se puede borrar
-      // (trigger de Postgres, ADR-001), así que eliminarTarjeta sigue
-      // bloqueada para siempre en cuanto existió un primer cargo.
-      await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({ codigo: 'TARJETA_CON_HISTORIAL' });
+      // Corregido (deuda en cero), pero la fila de cargos_tarjeta y su
+      // movimiento no se pueden borrar (trigger de Postgres, ADR-001): se archiva.
+      await eliminarTarjeta(tenantId, tarjeta.id);
+
+      expect(await listarTarjetas(tenantId)).toHaveLength(0);
+      await expect(
+        registrarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, descripcion: 'Otra', montoTotalValorMinimo: 100n, moneda: 'MXN', numeroPlazos: 1 })
+      ).rejects.toMatchObject({ codigo: 'TARJETA_NO_ENCONTRADA' });
+      await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({ codigo: 'TARJETA_NO_ENCONTRADA' });
+    });
+
+    it('con un cargo corregido y otro vigente sigue bloqueada, con el mensaje que explica qué hacer', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId);
+      const corregido = await registrarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, descripcion: 'Laptop', montoTotalValorMinimo: 100000n, moneda: 'MXN', numeroPlazos: 1 });
+      await registrarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, descripcion: 'Silla', montoTotalValorMinimo: 50000n, moneda: 'MXN', numeroPlazos: 1 });
+      await eliminarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, cargoId: corregido.id, fechaReferencia: HOY_DE_PRUEBA });
+
+      await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({
+        codigo: 'TARJETA_CON_HISTORIAL',
+        message: expect.stringContaining('Corrígelas primero'),
+      });
       expect(await listarTarjetas(tenantId)).toHaveLength(1);
     });
   });
@@ -200,8 +217,9 @@ describe('tarjetas de crédito y MSI', () => {
       // Sí tocó un periodo real: la fila del cargo permanece, marcada como corregida — no se borra (ADR-001).
       const cargos = await listarCargosTarjeta(tenantId, tarjeta.id);
       expect(cargos[0]?.revertido).toBe(true);
-      // Sigue teniendo un cargo real (aunque corregido) — eliminarTarjeta debe seguir bloqueada.
-      await expect(eliminarTarjeta(tenantId, tarjeta.id)).rejects.toMatchObject({ codigo: 'TARJETA_CON_HISTORIAL' });
+      // Todo lo que tenía quedó corregido (incluida la mensualidad ya cobrada): se puede eliminar.
+      await eliminarTarjeta(tenantId, tarjeta.id);
+      expect(await listarTarjetas(tenantId)).toHaveLength(0);
     });
 
     it('rechaza corregir dos veces el mismo cargo', async () => {

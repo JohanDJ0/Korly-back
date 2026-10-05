@@ -302,9 +302,9 @@ async function revertirPagoTarjetaTx(
  * trigger lo rechazó en pruebas contra Postgres real.
  *
  * Por eso una tarjeta con al menos un cargo, por corregido que esté,
- * nunca vuelve a tener cero filas en `cargos_tarjeta` — `eliminarTarjeta`
- * (tarjetas.ts) sigue bloqueada para siempre en cuanto existe un primer
- * cargo, sin ningún caso especial que distinga "corregido" de "real".
+ * nunca vuelve a tener cero filas en `cargos_tarjeta`: `eliminarTarjeta`
+ * (tarjetas.ts) la **archiva** en vez de borrarla cuando todos sus cargos
+ * ya están corregidos, y la sigue bloqueando mientras quede alguno vigente.
  *
  * Lo que SÍ se revierte de verdad:
  * - El movimiento del cargo, contra la propia cuenta de la tarjeta.

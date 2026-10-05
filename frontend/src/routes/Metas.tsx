@@ -31,7 +31,7 @@ export function Metas() {
         {error && <p className="text-destructive">{error.message}</p>}
         {metas?.length === 0 && <p className="text-muted-foreground">Todavía no tienes ninguna meta.</p>}
         {metas && metas.length > 0 && (
-          <ul className="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 xl:grid-cols-3">
+          <ul className="flex flex-col gap-3 sm:grid sm:grid-cols-[repeat(auto-fill,minmax(18rem,1fr))] sm:items-start sm:gap-4">
             {metas.map((meta) => (
               <FilaMeta key={meta.id} meta={meta} />
             ))}

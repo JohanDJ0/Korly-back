@@ -35,6 +35,13 @@ export const tarjetas = pgTable(
     diaCorte: smallint('dia_corte').notNull(),
     diasParaPago: smallint('dias_para_pago').notNull(),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * "Eliminar" una tarjeta que ya tuvo cargos (ya corregidos) la archiva en
+     * vez de borrarla: sus movimientos son inmutables (ADR-001) y la fila de
+     * `cargos_tarjeta` sigue apuntando a ella. Una tarjeta archivada se trata
+     * como inexistente en todo (listado, cargos, pagos).
+     */
+    archivadaEn: timestamp('archivada_en', { withTimezone: true }),
   },
   (t) => [
     check('tarjetas_limite_credito_positivo', sql`${t.limiteCreditoValorMinimo} > 0`),

@@ -23,8 +23,9 @@ interface FilaTarjetaProps {
  *
  * "Eliminar" siempre se muestra (sin pedir los cargos por adelantado
  * solo para decidir si mostrarlo o no — eso repetiría el costo que
- * "Ver compras" ya evita a propósito): el backend rechaza con
- * `TARJETA_CON_HISTORIAL` si ya tiene cargos, y ese mensaje se muestra
+ * "Ver compras" ya evita a propósito): el backend la borra (o archiva, si
+ * ya tuvo cargos todos corregidos) y rechaza con `TARJETA_CON_HISTORIAL`
+ * si aún tiene compras vigentes; ese mensaje se muestra
  * tal cual, mismo criterio que `LIMITE_CREDITO_EXCEDIDO` en
  * FormularioCargo (el backend decide, el frontend no adivina).
  */

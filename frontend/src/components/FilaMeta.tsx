@@ -77,12 +77,12 @@ export function FilaMeta({ meta }: FilaMetaProps) {
           <Target size={17} className="text-secondary-foreground" />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-[15px] font-semibold">{meta.nombre}</p>
+          <p className="text-[15px] font-semibold break-words">{meta.nombre}</p>
           <p className="text-muted-foreground mt-px text-[12.5px]">
             {formatearMonto(meta.montoAcumulado)} de {formatearMonto(meta.montoObjetivo)}
           </p>
         </div>
-        <span className="font-display text-primary text-[15px] font-bold">{meta.porcentajeAvance.toFixed(0)}%</span>
+        <span className="font-display text-primary shrink-0 text-[15px] font-bold">{meta.porcentajeAvance.toFixed(0)}%</span>
       </div>
 
       <div className="bg-muted h-2 overflow-hidden rounded-full">
@@ -90,17 +90,17 @@ export function FilaMeta({ meta }: FilaMetaProps) {
       </div>
 
       {modo === null && (
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="flex-1 rounded-xl" onClick={() => setModo('aportar')}>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" className="min-w-24 flex-1 rounded-xl" onClick={() => setModo('aportar')}>
             <Plus size={14} /> Aportar
           </Button>
-          <Button variant="outline" size="sm" className="flex-1 rounded-xl" onClick={() => setModo('retirar')}>
+          <Button variant="outline" size="sm" className="min-w-24 flex-1 rounded-xl" onClick={() => setModo('retirar')}>
             Retirar
           </Button>
           <BotonConfirmar
             variant="ghost"
             size="sm"
-            className="text-destructive"
+            className="text-destructive ml-auto"
             pregunta={`¿Eliminar la meta "${meta.nombre}"?`}
             onConfirmar={() => eliminarMeta.mutate(meta.id)}
             disabled={eliminarMeta.isPending}
@@ -123,7 +123,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
             min="0"
             placeholder="Monto"
             autoFocus
-            className="w-28"
+            className="w-28 min-w-0"
           />
           {modo === 'retirar' && (
             <Input
@@ -133,7 +133,7 @@ export function FilaMeta({ meta }: FilaMetaProps) {
                 setErrorValidacion(null);
               }}
               placeholder="Motivo"
-              className="w-40"
+              className="w-40 min-w-0 flex-1"
             />
           )}
           <Button size="sm" onClick={confirmar} disabled={pendiente}>

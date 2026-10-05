@@ -1,4 +1,4 @@
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import { cargosTarjeta } from '../../db/schema/cargos-tarjeta.js';
 import { asientos, cuentas } from '../../db/schema/ledger.js';
 import { tarjetas } from '../../db/schema/tarjetas.js';
@@ -74,10 +74,10 @@ async function saldoCuentaTx(tx: Ejecutor, cuentaId: string): Promise<bigint> {
   return BigInt(fila?.saldo ?? '0');
 }
 
-/** Más reciente primero — sin distinción activa/pausada (a diferencia de recurrentes, no hay concepto de "pausar" una tarjeta todavía). */
+/** Sin distinción activa/pausada (a diferencia de recurrentes, no hay concepto de "pausar" una tarjeta todavía). Las archivadas no se listan. */
 export async function listarTarjetas(tenantId: string): Promise<TarjetaConSaldo[]> {
   return conTenant(tenantId, async (tx) => {
-    const filas = await tx.select(COLUMNAS_TARJETA).from(tarjetas).where(eq(tarjetas.tenantId, tenantId));
+    const filas = await tx.select(COLUMNAS_TARJETA).from(tarjetas).where(and(eq(tarjetas.tenantId, tenantId), isNull(tarjetas.archivadaEn)));
 
     const conSaldo: TarjetaConSaldo[] = [];
     for (const tarjeta of filas) {
@@ -101,7 +101,7 @@ export async function obtenerTarjetaPorIdTx(tx: Ejecutor, tenantId: string, tarj
   const [fila] = await tx
     .select(COLUMNAS_TARJETA)
     .from(tarjetas)
-    .where(and(eq(tarjetas.tenantId, tenantId), eq(tarjetas.id, tarjetaId)))
+    .where(and(eq(tarjetas.tenantId, tenantId), eq(tarjetas.id, tarjetaId), isNull(tarjetas.archivadaEn)))
     .limit(1);
   return fila ?? null;
 }
@@ -111,25 +111,24 @@ export async function obtenerSaldoTarjetaTx(tx: Ejecutor, cuentaId: string): Pro
 }
 
 /**
- * Solo permitido si la tarjeta nunca tuvo ningún cargo — el mismo
- * momento en que "me equivoqué al crearla" es seguro de deshacer del
- * todo. Un cargo ya registrado generó un movimiento `'cargo_tarjeta'`
- * real (inmutable, ADR-001); borrar la tarjeta en ese caso dejaría ese
- * movimiento apuntando a una cuenta sin dueño. Sin cargos, en cambio,
- * la cuenta de la tarjeta nunca recibió ni un solo asiento — no hay
- * nada del ledger que preservar, así que sí se borra de verdad (fila
- * de `tarjetas` + su `cuenta`), a diferencia de gastos/ingresos, que
- * nunca se borran de verdad por la misma inmutabilidad.
+ * Elimina una tarjeta según su historial:
  *
- * Nota: `eliminarCargoTarjeta` (registrar-cargo.ts) puede corregir un
- * cargo mal registrado. Si ninguna de sus mensualidades había cobrado
- * todavía, esa corrección **borra la fila del cargo de verdad** (nunca
- * tocó ningún periodo, no hay nada que ADR-001 proteja ahí) — una
- * tarjeta cuyo único cargo se corrigió así vuelve a tener cero cargos
- * reales, y este chequeo la deja pasar sin ningún caso especial. Si
- * alguna mensualidad ya se había cobrado, la fila del cargo permanece
- * (con su reversión) y esta función sigue bloqueando el borrado, tal
- * como debe ser: sí hay un hecho financiero real que preservar.
+ * - **Sin cargos nunca:** se borra de verdad (fila de `tarjetas` + su
+ *   `cuenta`) — la cuenta jamás recibió un asiento, no hay nada del ledger
+ *   que preservar.
+ * - **Con cargos, todos ya corregidos y deuda en cero:** se **archiva**
+ *   (`archivada_en`) en vez de borrarla. Un cargo, aunque corregido, dejó
+ *   movimientos inmutables (trigger de Postgres, ADR-001) y su fila en
+ *   `cargos_tarjeta` sigue apuntando a la tarjeta, así que no se puede
+ *   borrar; pero ya no debe estorbarle al usuario. Archivada, desaparece
+ *   del listado y se trata como inexistente (no admite cargos nuevos).
+ * - **Con algún cargo vigente (sin corregir):** se rechaza. Hay deuda real;
+ *   el usuario debe corregir esos cargos primero (Ver compras → Corregir).
+ *
+ * `eliminarCargoTarjeta` (registrar-cargo.ts) deja el cargo con su
+ * reversión; las mensualidades aún no cobradas se borran y las ya cobradas
+ * se revierten, de modo que "todos corregidos" implica saldo cero — igual
+ * se comprueba el saldo como cinturón y tirantes.
  */
 export async function eliminarTarjeta(tenantId: string, tarjetaId: string): Promise<void> {
   return conTenant(tenantId, async (tx) => {
@@ -139,14 +138,28 @@ export async function eliminarTarjeta(tenantId: string, tarjetaId: string): Prom
     }
 
     const [fila] = await tx
-      .select({ total: sql<number>`count(*)::int` })
+      .select({
+        total: sql<number>`count(*)::int`,
+        vigentes: sql<number>`count(*) filter (where not exists (select 1 from movimientos r where r.movimiento_revertido_id = ${cargosTarjeta.movimientoId}))::int`,
+      })
       .from(cargosTarjeta)
       .where(and(eq(cargosTarjeta.tenantId, tenantId), eq(cargosTarjeta.tarjetaId, tarjetaId)));
-    if ((fila?.total ?? 0) > 0) {
-      throw new ErrorDominio('TARJETA_CON_HISTORIAL', 'No se puede eliminar una tarjeta que ya tiene cargos registrados');
+    const total = fila?.total ?? 0;
+    const vigentes = fila?.vigentes ?? 0;
+
+    if (total === 0) {
+      await tx.delete(tarjetas).where(and(eq(tarjetas.tenantId, tenantId), eq(tarjetas.id, tarjetaId)));
+      await tx.delete(cuentas).where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.id, tarjeta.cuentaId)));
+      return;
     }
 
-    await tx.delete(tarjetas).where(and(eq(tarjetas.tenantId, tenantId), eq(tarjetas.id, tarjetaId)));
-    await tx.delete(cuentas).where(and(eq(cuentas.tenantId, tenantId), eq(cuentas.id, tarjeta.cuentaId)));
+    if (vigentes > 0 || (await saldoCuentaTx(tx, tarjeta.cuentaId)) !== 0n) {
+      throw new ErrorDominio(
+        'TARJETA_CON_HISTORIAL',
+        'Esta tarjeta tiene compras vigentes. Corrígelas primero en "Ver compras" y después podrás eliminarla.'
+      );
+    }
+
+    await tx.update(tarjetas).set({ archivadaEn: new Date() }).where(and(eq(tarjetas.tenantId, tenantId), eq(tarjetas.id, tarjetaId)));
   });
 }
