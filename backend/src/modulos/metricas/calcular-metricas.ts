@@ -7,6 +7,8 @@ export interface DatosTenant {
   plan: Plan;
   estadoSuscripcion: EstadoSuscripcion | null;
   recibirRecordatorios: boolean;
+  /** Pidió que le avisemos cuando Korly Pro esté disponible (botón "Avísame"). */
+  pidioAvisoPro: boolean;
   tienePeriodo: boolean;
   tieneIngreso: boolean;
   /** Instantes reales en que el usuario capturó a mano un gasto o un cargo de tarjeta. */
@@ -42,7 +44,7 @@ export interface Metricas {
   };
   retencionSemanal: { semana: number; activos: Proporcion }[];
   recordatorios: { usuariosConRecordatoriosActivos: number; enviadosUltimos7Dias: number };
-  suscripciones: { free: number; enPrueba: number; proActivo: number; pagoPendiente: number; canceladas: number };
+  suscripciones: { free: number; enPrueba: number; proActivo: number; pagoPendiente: number; canceladas: number; pidieronAvisoPro: number };
 }
 
 const HORA_MS = 60 * 60 * 1000;
@@ -148,6 +150,7 @@ export function calcularMetricas(tenants: DatosTenant[], ahora: Date, filtro: { 
       proActivo: tenants.filter((t) => t.plan === 'pro' && t.estadoSuscripcion === 'activa').length,
       pagoPendiente: tenants.filter((t) => t.estadoSuscripcion === 'pago_pendiente').length,
       canceladas: tenants.filter((t) => t.plan === 'free' && t.estadoSuscripcion === 'cancelada').length,
+      pidieronAvisoPro: tenants.filter((t) => t.pidioAvisoPro).length,
     },
   };
 }
@@ -184,6 +187,7 @@ export function formatearReporte(m: Metricas): string {
     '',
     'SUSCRIPCIONES',
     `  Free ${m.suscripciones.free} · En prueba ${m.suscripciones.enPrueba} · Pro activo ${m.suscripciones.proActivo} · Pago pendiente ${m.suscripciones.pagoPendiente} · Canceladas ${m.suscripciones.canceladas}`,
+    `  Pidieron que les avisemos cuando Pro exista ... ${m.suscripciones.pidieronAvisoPro} de ${m.cohorte.usuarios}`,
   ];
   return lineas.join('\n');
 }

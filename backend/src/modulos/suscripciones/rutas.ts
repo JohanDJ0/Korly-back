@@ -1,5 +1,13 @@
 import type { FastifyInstance } from 'fastify';
-import { crearSesionCheckout, crearSesionPortal, obtenerEstadoSuscripcion, type Intervalo } from './suscripciones.js';
+import {
+  cancelarAvisoPro,
+  crearSesionCheckout,
+  crearSesionPortal,
+  obtenerEstadoSuscripcion,
+  requerirCobrosHabilitados,
+  solicitarAvisoPro,
+  type Intervalo,
+} from './suscripciones.js';
 import { ErrorDominio } from '../../shared/errores.js';
 
 interface CrearCheckoutBody {
@@ -27,6 +35,7 @@ export async function rutasSuscripciones(app: FastifyInstance): Promise<void> {
 
   // Cada llamada crea una sesión (y a veces un Customer) en Stripe: límite estricto para no gastar cuota ni ensuciar la cuenta.
   app.post('/suscripcion/checkout', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
+    requerirCobrosHabilitados();
     const body = request.body as CrearCheckoutBody | undefined;
     if (body?.intervalo !== 'mensual' && body?.intervalo !== 'anual') {
       throw new ErrorDominio('VALIDACION', "El campo 'intervalo' es obligatorio y debe ser 'mensual' o 'anual'");
@@ -42,10 +51,21 @@ export async function rutasSuscripciones(app: FastifyInstance): Promise<void> {
   });
 
   app.post('/suscripcion/portal', { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } }, async (request, reply) => {
+    requerirCobrosHabilitados();
     const sesion = await crearSesionPortal({
       tenantId: request.identidad.tenantId,
       urlRetorno: `${urlFrontend()}/ajustes`,
     });
     reply.send(sesion);
+  });
+
+  // "Avísame cuando Korly Pro esté disponible": solo guarda la fecha en que lo pidió, sin tocar Stripe.
+  app.post('/suscripcion/aviso-pro', async (request, reply) => {
+    reply.send(await solicitarAvisoPro(request.identidad.tenantId));
+  });
+
+  app.delete('/suscripcion/aviso-pro', async (request, reply) => {
+    await cancelarAvisoPro(request.identidad.tenantId);
+    reply.code(204).send();
   });
 }

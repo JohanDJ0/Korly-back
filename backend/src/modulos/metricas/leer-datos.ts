@@ -31,6 +31,7 @@ export async function leerDatosMetricas(opciones: { desde?: string; hasta?: stri
       t.plan,
       t.estado_suscripcion,
       t.recibir_recordatorios,
+      (t.aviso_pro_solicitado_en is not null) as pidio_aviso_pro,
       exists (select 1 from periodos p where p.tenant_id = t.id) as tiene_periodo,
       exists (select 1 from ingresos i where i.tenant_id = t.id) as tiene_ingreso,
       (select count(*)::int from recordatorios_enviados r where r.tenant_id = t.id and r.creado_en >= ${hace7Dias}::timestamptz) as recordatorios_7d
@@ -70,6 +71,7 @@ export async function leerDatosMetricas(opciones: { desde?: string; hasta?: stri
     plan: fila['plan'] as DatosTenant['plan'],
     estadoSuscripcion: (fila['estado_suscripcion'] as DatosTenant['estadoSuscripcion']) ?? null,
     recibirRecordatorios: Boolean(fila['recibir_recordatorios']),
+    pidioAvisoPro: Boolean(fila['pidio_aviso_pro']),
     tienePeriodo: Boolean(fila['tiene_periodo']),
     tieneIngreso: Boolean(fila['tiene_ingreso']),
     capturas: capturasPorTenant.get(String(fila['id'])) ?? [],

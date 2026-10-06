@@ -70,6 +70,8 @@ const CODIGO_A_STATUS: Record<string, number> = {
   // empezado nunca un checkout. Mismo criterio que SIN_PERIODO_ACTIVO:
   // el request está bien formado, lo que falta es un estado previo.
   SIN_SUSCRIPCION: 409,
+  // Checkout/portal con `COBROS_HABILITADOS` apagado (Korly Pro "próximamente"). 403 como FUNCION_PRO: el request es válido, lo que falta es que la función exista para este usuario.
+  COBROS_NO_DISPONIBLES: 403,
 };
 
 /**

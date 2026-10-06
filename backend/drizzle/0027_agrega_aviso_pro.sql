@@ -1,0 +1,1 @@
+ALTER TABLE "tenants" ADD COLUMN "aviso_pro_solicitado_en" timestamp with time zone;

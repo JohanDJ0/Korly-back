@@ -4,7 +4,7 @@ import { metas } from '../../db/schema/metas.js';
 import { periodos } from '../../db/schema/periodos.js';
 import { crearCuentaTx, registrarMovimientoTx, revertirMovimientoEnSusCuentasTx } from '../ledger/registrar-movimiento.js';
 import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
-import { obtenerPlanTenantTx } from '../planes/planes.js';
+import { cobrosHabilitados, obtenerPlanTenantTx } from '../planes/planes.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { ahoraEnMexico, fechaISO } from '../../shared/fechas.js';
@@ -49,7 +49,11 @@ export async function crearMeta(tenantId: string, nombre: string, monto: bigint,
         .from(metas)
         .where(and(eq(metas.tenantId, tenantId), isNull(metas.archivadaEn)));
       if ((fila?.total ?? 0) >= LIMITE_METAS_FREE) {
-        throw new ErrorDominio('LIMITE_METAS_ALCANZADO', `Alcanzaste el límite de ${LIMITE_METAS_FREE} metas del plan gratuito — Korly Pro las tiene ilimitadas`);
+        const limite = `Alcanzaste el límite de ${LIMITE_METAS_FREE} metas del plan gratuito`;
+        throw new ErrorDominio(
+          'LIMITE_METAS_ALCANZADO',
+          cobrosHabilitados() ? `${limite} — Korly Pro las tiene ilimitadas` : `${limite}. Las metas ilimitadas llegarán con Korly Pro: en Ajustes puedes pedir que te avisemos.`
+        );
       }
     }
 

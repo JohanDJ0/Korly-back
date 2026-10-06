@@ -210,5 +210,20 @@ describe('exportar a CSV', () => {
       const { tenantId } = await resolverOcrearIdentidad(`test-exportar-${randomUUID()}`);
       await expect(exportarIngresosCsv(tenantId)).rejects.toMatchObject({ codigo: 'FUNCION_PRO' });
     });
+
+    it('mientras Pro no se vende, el rechazo dice que llegará pronto y dónde pedir el aviso; cuando sí se vende, no', async () => {
+      const anterior = process.env.COBROS_HABILITADOS;
+      try {
+        const { tenantId } = await resolverOcrearIdentidad(`test-exportar-${randomUUID()}`);
+
+        delete process.env.COBROS_HABILITADOS;
+        await expect(exportarGastosCsv(tenantId)).rejects.toThrow(/llegará pronto.*avisemos/);
+        process.env.COBROS_HABILITADOS = 'true';
+        await expect(exportarGastosCsv(tenantId)).rejects.toThrow(/^La exportación a CSV es una función de Korly Pro$/);
+      } finally {
+        if (anterior === undefined) delete process.env.COBROS_HABILITADOS;
+        else process.env.COBROS_HABILITADOS = anterior;
+      }
+    });
   });
 });

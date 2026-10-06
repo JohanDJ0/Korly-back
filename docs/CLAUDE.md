@@ -22,6 +22,7 @@ Aplicación SaaS de gestión financiera personal basada en el ciclo de ingreso p
 | Archivo | Contenido |
 |---|---|
 | `docs/documento-maestro-v2.md` | Visión, mercado, arquitectura, roadmap. Fuente de verdad |
+| `docs/plan-pro.md` | Qué incluye Korly Pro (y cuáles ventajas ya existen). Manda sobre §9.2 del documento maestro para Pro |
 | `docs/adr/` | Decisiones de arquitectura. **Leer antes de proponer cambios estructurales** |
 
 ---

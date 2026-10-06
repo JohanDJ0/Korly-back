@@ -13,6 +13,7 @@ import { useExportar } from '@/hooks/use-exportar';
 import { useGastos } from '@/hooks/use-gastos';
 import { useIngresos } from '@/hooks/use-ingresos';
 import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
+import { useSuscripcion } from '@/hooks/use-suscripcion';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { usePeriodos } from '@/hooks/use-periodos';
 import { ApiError } from '@/lib/api';
@@ -90,6 +91,9 @@ export function Historial() {
   );
 
   const exportar = useExportar();
+  // El servidor rechaza la exportación fuera de Pro (FUNCION_PRO): en vez de ofrecer un botón que solo da error, se desactiva y se explica.
+  const { data: suscripcion } = useSuscripcion();
+  const exportacionDisponible = suscripcion?.plan === 'pro';
   // Importar solo tiene sentido contra el periodo activo (backend/README.md,
   // "Importación") — al ver un periodo ya cerrado en /historial/:periodoId,
   // no se ofrece, en vez de dejar que el usuario lo intente y falle con
@@ -107,13 +111,18 @@ export function Historial() {
           // "importación/exportación" (ver backend/README.md, "Exportación").
         }
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="rounded-xl" disabled={exportar.isPending} onClick={() => exportar.mutate('gastos')}>
+          <Button variant="outline" size="sm" className="rounded-xl" disabled={exportar.isPending || !exportacionDisponible} onClick={() => exportar.mutate('gastos')}>
             <Download size={13} /> Gastos (CSV)
           </Button>
-          <Button variant="outline" size="sm" className="rounded-xl" disabled={exportar.isPending} onClick={() => exportar.mutate('ingresos')}>
+          <Button variant="outline" size="sm" className="rounded-xl" disabled={exportar.isPending || !exportacionDisponible} onClick={() => exportar.mutate('ingresos')}>
             <Download size={13} /> Ingresos (CSV)
           </Button>
         </div>
+        {suscripcion && !exportacionDisponible && (
+          <p className="text-muted-foreground text-[12.5px]">
+            Exportar a CSV es parte de Korly Pro{suscripcion.cobrosHabilitados ? ' (lo contratas en Ajustes → Plan).' : ', que llegará pronto: en Ajustes → Plan puedes pedir que te avisemos.'}
+          </p>
+        )}
         {exportar.isError && <p className="text-destructive text-sm">{exportar.error.message}</p>}
 
         {periodoViendose && (

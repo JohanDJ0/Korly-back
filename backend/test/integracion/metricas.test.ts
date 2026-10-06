@@ -8,6 +8,7 @@ import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-id
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { leerDatosMetricas } from '../../src/modulos/metricas/leer-datos.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
+import { cancelarAvisoPro, solicitarAvisoPro } from '../../src/modulos/suscripciones/suscripciones.js';
 import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.js';
 import { registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
 import { crearTarjeta } from '../../src/modulos/tarjetas/tarjetas.js';
@@ -98,7 +99,18 @@ describe('leerDatosMetricas', () => {
     const [dato] = await leerDatosMetricas({ desde: '2035-03-01', hasta: '2035-03-02', ahora: HOY });
 
     expect(Object.keys(dato ?? {}).sort()).toEqual(
-      ['altaEn', 'capturas', 'estadoSuscripcion', 'plan', 'recibirRecordatorios', 'recordatoriosEnviadosUltimos7Dias', 'tieneIngreso', 'tienePeriodo'].sort()
+      ['altaEn', 'capturas', 'estadoSuscripcion', 'pidioAvisoPro', 'plan', 'recibirRecordatorios', 'recordatoriosEnviadosUltimos7Dias', 'tieneIngreso', 'tienePeriodo'].sort()
     );
+  });
+
+  it('marca a quien pidió que le avisemos cuando Pro exista, y deja de marcarlo si lo cancela', async () => {
+    const tenantId = await tenantEn('2036-03-01T12:00:00Z');
+    const leer = async () => (await leerDatosMetricas({ desde: '2036-03-01', hasta: '2036-03-02', ahora: HOY }))[0]?.pidioAvisoPro;
+
+    expect(await leer()).toBe(false);
+    await solicitarAvisoPro(tenantId);
+    expect(await leer()).toBe(true);
+    await cancelarAvisoPro(tenantId);
+    expect(await leer()).toBe(false);
   });
 });

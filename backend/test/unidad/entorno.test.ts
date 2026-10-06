@@ -13,6 +13,7 @@ describe('validarEntorno (arranque en producción)', () => {
     STRIPE_WEBHOOK_SECRET: 'whsec_x',
     STRIPE_PRICE_MENSUAL: 'price_m',
     STRIPE_PRICE_ANUAL: 'price_a',
+    COBROS_HABILITADOS: 'true',
     RESEND_API_KEY: 're_x',
     SENTRY_DSN: 'https://x@sentry.io/1',
     TRUST_PROXY: 'true',
@@ -69,13 +70,38 @@ describe('validarEntorno (arranque en producción)', () => {
     });
 
     it('sin Stripe del todo no es un error, solo un aviso', () => {
-      const resultado = con({ STRIPE_SECRET_KEY: undefined, STRIPE_WEBHOOK_SECRET: undefined, STRIPE_PRICE_MENSUAL: undefined, STRIPE_PRICE_ANUAL: undefined });
+      const resultado = con({ STRIPE_SECRET_KEY: undefined, STRIPE_WEBHOOK_SECRET: undefined, STRIPE_PRICE_MENSUAL: undefined, STRIPE_PRICE_ANUAL: undefined, COBROS_HABILITADOS: undefined });
       expect(resultado.errores).toEqual([]);
       expect(resultado.avisos.some((a) => a.includes('Stripe no está configurado'))).toBe(true);
     });
 
     it('avisa si producción usa una clave de modo prueba', () => {
-      expect(con({ STRIPE_SECRET_KEY: 'sk_test_x' }).avisos.some((a) => a.includes('modo prueba'))).toBe(true);
+      expect(con({ STRIPE_SECRET_KEY: 'sk_test_x', COBROS_HABILITADOS: undefined }).avisos.some((a) => a.includes('modo prueba'))).toBe(true);
+    });
+  });
+
+  describe('COBROS_HABILITADOS (Korly Pro "próximamente")', () => {
+    it('apagado (o ausente) es válido aunque Stripe esté en modo prueba: solo avisa que el cobro está apagado', () => {
+      const resultado = con({ STRIPE_SECRET_KEY: 'sk_test_x', COBROS_HABILITADOS: undefined });
+
+      expect(resultado.errores).toEqual([]);
+      expect(resultado.avisos.some((a) => a.includes('COBROS_HABILITADOS') && a.includes('apagados'))).toBe(true);
+    });
+
+    it('prendido con una clave de modo prueba es un error: cualquiera activaría Pro con la tarjeta 4242', () => {
+      const { errores } = con({ STRIPE_SECRET_KEY: 'sk_test_x', COBROS_HABILITADOS: 'true' });
+
+      expect(errores.some((e) => e.includes('COBROS_HABILITADOS=true') && e.includes('modo prueba'))).toBe(true);
+    });
+
+    it('prendido sin Stripe configurado es un error', () => {
+      const { errores } = con({ STRIPE_SECRET_KEY: undefined, STRIPE_WEBHOOK_SECRET: undefined, STRIPE_PRICE_MENSUAL: undefined, STRIPE_PRICE_ANUAL: undefined });
+
+      expect(errores.some((e) => e.includes('Stripe no está configurado'))).toBe(true);
+    });
+
+    it('prendido con Stripe real y completo no da errores', () => {
+      expect(con({}).errores).toEqual([]);
     });
   });
 

@@ -10,6 +10,7 @@ describe('calcularMetricas', () => {
       plan: 'free',
       estadoSuscripcion: null,
       recibirRecordatorios: true,
+      pidioAvisoPro: false,
       tienePeriodo: true,
       tieneIngreso: true,
       capturas: [],
@@ -27,7 +28,7 @@ describe('calcularMetricas', () => {
     recordatoriosEnviadosUltimos7Dias: 3,
   });
   // B: se registró, configuró todo y nunca capturó nada.
-  const B = tenant({ altaEn: new Date('2026-10-01T15:00:00Z') });
+  const B = tenant({ altaEn: new Date('2026-10-01T15:00:00Z'), pidioAvisoPro: true });
   // C: entró hace 27 h y capturó 5 h después del alta.
   const C = tenant({ altaEn: new Date('2026-11-09T15:00:00Z'), capturas: [new Date('2026-11-09T20:00:00Z')], recordatoriosEnviadosUltimos7Dias: 2 });
   // D: entró hace 3 h, sin ingreso todavía, ya capturó. Canceló su suscripción.
@@ -72,7 +73,7 @@ describe('calcularMetricas', () => {
 
   it('recordatorios y suscripciones', () => {
     expect(m.recordatorios).toEqual({ usuariosConRecordatoriosActivos: 4, enviadosUltimos7Dias: 5 });
-    expect(m.suscripciones).toEqual({ free: 4, enPrueba: 1, proActivo: 0, pagoPendiente: 0, canceladas: 1 });
+    expect(m.suscripciones).toEqual({ free: 4, enPrueba: 1, proActivo: 0, pagoPendiente: 0, canceladas: 1, pidieronAvisoPro: 1 });
   });
 
   it('un instante de la noche de México, que en UTC ya es el día siguiente, cuenta como del día de México', () => {
@@ -112,6 +113,7 @@ describe('formatearReporte', () => {
     plan: 'free',
     estadoSuscripcion: null,
     recibirRecordatorios: true,
+    pidioAvisoPro: false,
     tienePeriodo: true,
     tieneIngreso: true,
     capturas: [],

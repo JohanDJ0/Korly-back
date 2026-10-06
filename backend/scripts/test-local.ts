@@ -112,6 +112,8 @@ async function main(): Promise<void> {
         // Mismo motivo: los tests de modulos/suscripciones/ siempre pasan
         // un cliente de Stripe stub inyectado, nunca el real.
         STRIPE_SECRET_KEY: '',
+        // Las pruebas fijan esta bandera ellas mismas donde importa; que un backend/.env con los cobros prendidos no cambie el resultado.
+        COBROS_HABILITADOS: '',
       },
     });
     codigoSalida = resultado.status ?? 1;

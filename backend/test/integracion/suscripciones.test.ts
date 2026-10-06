@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type Stripe from 'stripe';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { crearApp } from '../../src/app.js';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
+import { supabaseAdmin } from '../../src/shared/supabase-admin.js';
 import {
+  cancelarAvisoPro,
+  solicitarAvisoPro,
   crearSesionCheckout,
   crearSesionPortal,
   obtenerEstadoSuscripcion,
@@ -119,9 +123,132 @@ describe('suscripciones', () => {
   });
 
   describe('obtenerEstadoSuscripcion', () => {
-    it('un tenant nuevo está en free, sin estado de suscripción', async () => {
+    it('un tenant nuevo está en free, sin estado de suscripción ni aviso de Pro pedido', async () => {
       const tenantId = await tenantNuevo();
-      expect(await obtenerEstadoSuscripcion(tenantId)).toEqual({ plan: 'free', estadoSuscripcion: null, suscripcionVigenteHasta: null });
+      expect(await obtenerEstadoSuscripcion(tenantId)).toEqual({
+        plan: 'free',
+        estadoSuscripcion: null,
+        suscripcionVigenteHasta: null,
+        avisoProSolicitadoEn: null,
+        cobrosHabilitados: false,
+      });
+    });
+  });
+
+  describe('cobros apagados (Korly Pro "próximamente")', () => {
+    const anterior = process.env.COBROS_HABILITADOS;
+    afterEach(() => {
+      if (anterior === undefined) delete process.env.COBROS_HABILITADOS;
+      else process.env.COBROS_HABILITADOS = anterior;
+    });
+
+    it('el estado informa si los cobros están habilitados, según COBROS_HABILITADOS', async () => {
+      const tenantId = await tenantNuevo();
+
+      delete process.env.COBROS_HABILITADOS;
+      expect((await obtenerEstadoSuscripcion(tenantId)).cobrosHabilitados).toBe(false);
+      process.env.COBROS_HABILITADOS = 'false';
+      expect((await obtenerEstadoSuscripcion(tenantId)).cobrosHabilitados).toBe(false);
+      process.env.COBROS_HABILITADOS = 'true';
+      expect((await obtenerEstadoSuscripcion(tenantId)).cobrosHabilitados).toBe(true);
+    });
+
+    it('pedir el aviso guarda la fecha; pedirlo otra vez conserva la primera; cancelarlo la borra', async () => {
+      const tenantId = await tenantNuevo();
+
+      const primera = await solicitarAvisoPro(tenantId);
+      expect(Date.parse(primera.avisoProSolicitadoEn)).toBeGreaterThan(0);
+      expect((await obtenerEstadoSuscripcion(tenantId)).avisoProSolicitadoEn).toBe(primera.avisoProSolicitadoEn);
+
+      await new Promise((resolver) => setTimeout(resolver, 15));
+      const segunda = await solicitarAvisoPro(tenantId);
+      expect(segunda.avisoProSolicitadoEn).toBe(primera.avisoProSolicitadoEn);
+
+      await cancelarAvisoPro(tenantId);
+      expect((await obtenerEstadoSuscripcion(tenantId)).avisoProSolicitadoEn).toBeNull();
+      await expect(cancelarAvisoPro(tenantId)).resolves.toBeUndefined(); // cancelar lo que no existe no es un error
+    });
+
+    it('el aviso de un usuario no toca el de otro (RLS)', async () => {
+      const [a, b] = [await tenantNuevo(), await tenantNuevo()];
+
+      await solicitarAvisoPro(a);
+
+      expect((await obtenerEstadoSuscripcion(b)).avisoProSolicitadoEn).toBeNull();
+    });
+
+    describe('por HTTP', () => {
+      const abiertas: ReturnType<typeof crearApp>[] = [];
+      const autenticado = () => {
+        vi.spyOn(supabaseAdmin.auth, 'getUser').mockResolvedValue({ data: { user: { id: `test-cobros-${randomUUID()}` } }, error: null } as never);
+        const app = crearApp({ logger: false });
+        abiertas.push(app);
+        return app;
+      };
+      const auth = { authorization: 'Bearer token-valido' };
+
+      afterEach(async () => {
+        vi.restoreAllMocks();
+        await Promise.all(abiertas.splice(0).map((app) => app.close()));
+      });
+
+      it('con los cobros apagados, el checkout responde 403 COBROS_NO_DISPONIBLES sin llegar a Stripe', async () => {
+        delete process.env.COBROS_HABILITADOS;
+
+        const respuesta = await autenticado().inject({
+          method: 'POST',
+          url: '/v1/suscripcion/checkout',
+          headers: { ...auth, 'content-type': 'application/json' },
+          payload: JSON.stringify({ intervalo: 'mensual' }),
+        });
+
+        expect(respuesta.statusCode).toBe(403);
+        expect(respuesta.json()).toMatchObject({ codigo: 'COBROS_NO_DISPONIBLES' });
+      });
+
+      it('con los cobros apagados, el portal también responde 403, aunque el cuerpo ni se valide', async () => {
+        delete process.env.COBROS_HABILITADOS;
+
+        const respuesta = await autenticado().inject({ method: 'POST', url: '/v1/suscripcion/portal', headers: auth });
+
+        expect(respuesta.statusCode).toBe(403);
+        expect(respuesta.json()).toMatchObject({ codigo: 'COBROS_NO_DISPONIBLES' });
+      });
+
+      it('con los cobros prendidos, el checkout ya no se corta por la bandera (aquí falla por otra cosa: cuerpo inválido)', async () => {
+        process.env.COBROS_HABILITADOS = 'true';
+
+        const respuesta = await autenticado().inject({ method: 'POST', url: '/v1/suscripcion/checkout', headers: { ...auth, 'content-type': 'application/json' }, payload: '{}' });
+
+        expect(respuesta.statusCode).toBe(400);
+        expect(respuesta.json()).toMatchObject({ codigo: 'VALIDACION' });
+      });
+
+      it('POST y DELETE /suscripcion/aviso-pro, y el estado los refleja', async () => {
+        delete process.env.COBROS_HABILITADOS;
+        const app = autenticado();
+
+        const pedido = await app.inject({ method: 'POST', url: '/v1/suscripcion/aviso-pro', headers: auth });
+        expect(pedido.statusCode).toBe(200);
+        expect(pedido.json()).toEqual({ avisoProSolicitadoEn: expect.any(String) });
+
+        const estado = await app.inject({ method: 'GET', url: '/v1/suscripcion', headers: auth });
+        expect(estado.json()).toMatchObject({ cobrosHabilitados: false, avisoProSolicitadoEn: pedido.json().avisoProSolicitadoEn });
+
+        const cancelado = await app.inject({ method: 'DELETE', url: '/v1/suscripcion/aviso-pro', headers: auth });
+        expect(cancelado.statusCode).toBe(204);
+
+        const despues = await app.inject({ method: 'GET', url: '/v1/suscripcion', headers: auth });
+        expect(despues.json()).toMatchObject({ avisoProSolicitadoEn: null });
+      });
+
+      it('sin sesión, el aviso responde 401', async () => {
+        const app = crearApp({ logger: false });
+        abiertas.push(app);
+
+        expect((await app.inject({ method: 'POST', url: '/v1/suscripcion/aviso-pro' })).statusCode).toBe(401);
+        expect((await app.inject({ method: 'DELETE', url: '/v1/suscripcion/aviso-pro' })).statusCode).toBe(401);
+      });
     });
   });
 

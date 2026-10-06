@@ -2161,7 +2161,28 @@ request viene firmada por Stripe — y el primer paso es justo
 *descubrir* a qué tenant pertenece buscando por `stripeCustomerId`,
 algo que RLS por diseño no permite bajo `app_backend`.
 
-**Frontend** (`Ajustes.tsx`): sección "Plan" — en Free, dos botones
+**Korly Pro "próximamente" (`COBROS_HABILITADOS`, 2026-10-05).** Hasta que
+exista alta fiscal y Stripe en modo real, el cobro está apagado: con
+`COBROS_HABILITADOS` distinto de `true` (por defecto), `POST
+/suscripcion/checkout` y `/suscripcion/portal` responden 403
+`COBROS_NO_DISPONIBLES`. Se corta en el servidor y no solo ocultando botones
+porque la cuenta de Stripe de producción está en modo prueba: cualquiera con
+la tarjeta 4242 habría subido a Pro gratis vía webhook. El arranque en
+producción falla si se prende con una clave `sk_test_` o sin Stripe
+(`shared/entorno.ts`). Las restricciones de Free no cambian (2 metas,
+exportar CSV solo Pro, 12 meses de historial) y sus mensajes de rechazo
+dicen "llegará pronto" mientras el cobro esté apagado.
+`GET /suscripcion` devuelve además `cobrosHabilitados` y
+`avisoProSolicitadoEn`; `POST`/`DELETE /suscripcion/aviso-pro` guardan o
+retiran la fecha en que el usuario pidió "Avísame cuando esté disponible"
+(`tenants.aviso_pro_solicitado_en`, migración 0027, idempotente). Ese dato
+solo sirve para avisar y para medir interés: el reporte de métricas
+(`npm run metricas`) muestra cuántos lo pidieron. Para vender Pro: poner
+`COBROS_HABILITADOS=true` con claves reales de Stripe.
+
+**Frontend** (`TarjetaPlan.tsx`, en Ajustes): sección "Plan" — con el cobro
+apagado, explica qué traerá Pro y ofrece "Avísame" (sin precios ni botones de
+pago); con el cobro prendido, en Free dos botones
 ("Pro — $89/mes", "Pro — $790/año") que abren el Checkout; en Pro,
 estado actual (prueba/vigente/pago pendiente/cancelada) + botón
 "Gestionar suscripción". Redirige de vuelta a `/ajustes?suscripcion=exito`

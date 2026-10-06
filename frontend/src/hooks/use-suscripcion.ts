@@ -8,6 +8,9 @@ export interface Suscripcion {
   plan: 'free' | 'pro';
   estadoSuscripcion: EstadoSuscripcion;
   suscripcionVigenteHasta: string | null;
+  /** `false` mientras Korly Pro es "próximamente": se muestra "Avísame" en vez de los botones de pago. */
+  cobrosHabilitados: boolean;
+  avisoProSolicitadoEn: string | null;
 }
 
 export function useSuscripcion() {

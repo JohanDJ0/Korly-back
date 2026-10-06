@@ -56,6 +56,23 @@ describe('metas de ahorro', () => {
       expect(await listarMetas(tenantId)).toHaveLength(2);
     });
 
+    it('el mensaje del límite no manda a contratar Pro mientras Pro no se vende (COBROS_HABILITADOS apagado), y sí cuando se vende', async () => {
+      const anterior = process.env.COBROS_HABILITADOS;
+      try {
+        const { tenantId } = await tenantConPeriodoActivo();
+        await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+        await crearMeta(tenantId, 'Fondo de emergencia', 2000n, 'MXN');
+
+        delete process.env.COBROS_HABILITADOS;
+        await expect(crearMeta(tenantId, 'Una tercera', 500n, 'MXN')).rejects.toThrow(/llegarán con Korly Pro.*avisemos/);
+        process.env.COBROS_HABILITADOS = 'true';
+        await expect(crearMeta(tenantId, 'Una tercera', 500n, 'MXN')).rejects.toThrow('Korly Pro las tiene ilimitadas');
+      } finally {
+        if (anterior === undefined) delete process.env.COBROS_HABILITADOS;
+        else process.env.COBROS_HABILITADOS = anterior;
+      }
+    });
+
     it('plan pro: no tiene límite de metas', async () => {
       const { tenantId } = await tenantConPeriodoActivo();
       await establecerPlan(tenantId, 'pro');

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type Stripe from 'stripe';
 import { tenants, type EstadoSuscripcion, type Plan } from '../../db/schema/tenants.js';
 import { eventosWebhookStripe } from '../../db/schema/suscripciones.js';
@@ -7,6 +7,7 @@ import { dbAdmin } from '../../shared/db-admin.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { obtenerCorreoTenantTx, type ResolverCorreo } from '../../shared/correo-tenant.js';
 import { stripe as stripeReal, obtenerPreciosSuscripcion } from '../../shared/stripe.js';
+import { cobrosHabilitados } from '../planes/planes.js';
 
 export type Intervalo = 'mensual' | 'anual';
 
@@ -116,21 +117,65 @@ export async function crearSesionPortal(entrada: CrearPortalEntrada): Promise<{ 
   });
 }
 
+/** Corta checkout y portal mientras `COBROS_HABILITADOS` esté apagado — ver `cobrosHabilitados` en `planes/planes.ts`. */
+export function requerirCobrosHabilitados(): void {
+  if (!cobrosHabilitados()) {
+    throw new ErrorDominio('COBROS_NO_DISPONIBLES', 'Korly Pro llegará pronto: todavía no se pueden contratar suscripciones');
+  }
+}
+
 export interface EstadoSuscripcionDto {
   plan: Plan;
   estadoSuscripcion: EstadoSuscripcion | null;
   suscripcionVigenteHasta: string | null;
+  /** `false` = Korly Pro todavía no se vende ("próximamente"); el frontend muestra "Avísame" en vez de los botones de pago. */
+  cobrosHabilitados: boolean;
+  avisoProSolicitadoEn: string | null;
 }
 
 export async function obtenerEstadoSuscripcion(tenantId: string): Promise<EstadoSuscripcionDto> {
   return conTenant(tenantId, async (tx) => {
     const [fila] = await tx
-      .select({ plan: tenants.plan, estadoSuscripcion: tenants.estadoSuscripcion, suscripcionVigenteHasta: tenants.suscripcionVigenteHasta })
+      .select({
+        plan: tenants.plan,
+        estadoSuscripcion: tenants.estadoSuscripcion,
+        suscripcionVigenteHasta: tenants.suscripcionVigenteHasta,
+        avisoProSolicitadoEn: tenants.avisoProSolicitadoEn,
+      })
       .from(tenants)
       .where(eq(tenants.id, tenantId))
       .limit(1);
     if (!fila) throw new Error('El tenant de la sesión no existe');
-    return { ...fila, suscripcionVigenteHasta: fila.suscripcionVigenteHasta?.toISOString() ?? null };
+    return {
+      ...fila,
+      suscripcionVigenteHasta: fila.suscripcionVigenteHasta?.toISOString() ?? null,
+      avisoProSolicitadoEn: fila.avisoProSolicitadoEn?.toISOString() ?? null,
+      cobrosHabilitados: cobrosHabilitados(),
+    };
+  });
+}
+
+/**
+ * "Avísame cuando Korly Pro esté disponible". Idempotente: pedirlo dos veces
+ * conserva la fecha de la primera (`coalesce`), no la reescribe.
+ */
+export async function solicitarAvisoPro(tenantId: string): Promise<{ avisoProSolicitadoEn: string }> {
+  return conTenant(tenantId, async (tx) => {
+    const [fila] = await tx
+      .update(tenants)
+      .set({ avisoProSolicitadoEn: sql`coalesce(${tenants.avisoProSolicitadoEn}, now())` })
+      .where(eq(tenants.id, tenantId))
+      .returning({ avisoProSolicitadoEn: tenants.avisoProSolicitadoEn });
+    if (!fila?.avisoProSolicitadoEn) throw new Error('El tenant de la sesión no existe');
+    return { avisoProSolicitadoEn: fila.avisoProSolicitadoEn.toISOString() };
+  });
+}
+
+/** Retira la petición de aviso (el usuario cambió de opinión). Idempotente. */
+export async function cancelarAvisoPro(tenantId: string): Promise<void> {
+  await conTenant(tenantId, async (tx) => {
+    const filas = await tx.update(tenants).set({ avisoProSolicitadoEn: null }).where(eq(tenants.id, tenantId)).returning({ id: tenants.id });
+    if (filas.length === 0) throw new Error('El tenant de la sesión no existe');
   });
 }
 

@@ -71,7 +71,8 @@ export function Privacidad() {
           plazo de pago que tú escribes).
         </p>
         <p>
-          <strong>Preferencias y suscripción:</strong> si quieres recibir recordatorios por correo, tu plan y el estado de tu suscripción.
+          <strong>Preferencias y suscripción:</strong> si quieres recibir recordatorios por correo, tu plan y el estado de tu suscripción, y la fecha en que
+          nos pediste que te avisemos cuando Korly Pro esté disponible (solo si pulsas ese botón).
         </p>
         <p>
           <strong>Lo que no pedimos:</strong> números de tarjeta o de cuenta bancaria, ni conectamos con tu banco. Korly solo conoce lo que tú escribes. Al pagar
@@ -83,7 +84,8 @@ export function Privacidad() {
       <Seccion titulo="3. Para qué los usamos">
         <p>
           Únicamente para dar el servicio: calcular cuánto puedes gastar hoy, mostrarte tus resúmenes y desgloses, autenticarte, cobrar tu suscripción si tienes
-          plan de pago, y mandarte recordatorios por correo (los puedes apagar en Ajustes cuando quieras). Detectamos errores técnicos para corregirlos.
+          plan de pago, y mandarte recordatorios por correo (los puedes apagar en Ajustes cuando quieras). Si pides que te avisemos cuando Korly Pro esté
+          disponible, usamos tu correo una sola vez para eso, y puedes retirar la petición en Ajustes → Plan. Detectamos errores técnicos para corregirlos.
         </p>
         <p>No vendemos tus datos, no los usamos para publicidad ni para perfiles de terceros.</p>
       </Seccion>

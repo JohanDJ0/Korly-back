@@ -75,6 +75,14 @@ export const tenants = pgTable(
      * gates (esos siguen viendo solo `plan`, actualizado por el webhook).
      */
     suscripcionVigenteHasta: timestamp('suscripcion_vigente_hasta', { withTimezone: true }),
+    /**
+     * Cuándo pidió el usuario que le avisemos cuando Korly Pro esté
+     * disponible (botón "Avísame" de Ajustes, mientras `COBROS_HABILITADOS`
+     * está apagado). `null` = no lo ha pedido o lo canceló. Sirve para medir
+     * el interés real en Pro antes de montar el cobro (ver `calcular-metricas.ts`),
+     * y es el único uso de ese dato: avisarle cuando Pro exista.
+     */
+    avisoProSolicitadoEn: timestamp('aviso_pro_solicitado_en', { withTimezone: true }),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

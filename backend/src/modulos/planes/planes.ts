@@ -16,6 +16,22 @@ export async function obtenerPlanTenantTx(tx: Ejecutor, tenantId: string): Promi
 }
 
 /**
+ * Interruptor de TODO el cobro (checkout y portal de Stripe). Apagado por
+ * defecto: hasta que exista alta fiscal y Stripe en modo real, Korly Pro es
+ * "próximamente" y nadie debe poder suscribirse — ni siquiera pagando con una
+ * tarjeta de prueba, que contra la cuenta de Stripe en modo prueba sí
+ * funciona y subiría el plan a Pro gratis vía webhook. Por eso se corta en el
+ * servidor (`suscripciones/rutas.ts`) y no solo ocultando botones en la pantalla.
+ *
+ * Se lee en cada petición (no al arrancar) para poder probarlo, igual que
+ * `FRONTEND_URL` en `suscripciones/rutas.ts`. Los mensajes de "esto es de Pro"
+ * también la consultan: no pueden decir "contrátalo" si todavía no se vende.
+ */
+export function cobrosHabilitados(): boolean {
+  return process.env.COBROS_HABILITADOS === 'true';
+}
+
+/**
  * Guarda usada por cualquier función exclusiva de Pro (exportación CSV
  * hoy; recordatorios avanzados/alerta de ritmo después). `mensaje` lo
  * decide el llamador porque el texto correcto depende de qué feature

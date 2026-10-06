@@ -71,6 +71,18 @@ export function validarEntorno(env: Record<string, string | undefined>): Problem
     avisos.push('STRIPE_SECRET_KEY es de modo prueba: los cobros no serán reales.');
   }
 
+  if (env.COBROS_HABILITADOS === 'true') {
+    // Prenderlos con la cuenta de Stripe en modo prueba dejaría a cualquiera subir a Pro con la tarjeta 4242: es un error, no un aviso.
+    if (env.STRIPE_SECRET_KEY?.startsWith('sk_test_')) {
+      errores.push('COBROS_HABILITADOS=true con STRIPE_SECRET_KEY de modo prueba: cualquiera podría activar Pro gratis con una tarjeta de prueba.');
+    }
+    if (stripeConfiguradas.length === 0) {
+      errores.push('COBROS_HABILITADOS=true pero Stripe no está configurado.');
+    }
+  } else {
+    avisos.push('COBROS_HABILITADOS no es "true": el checkout y el portal de Stripe están apagados (Korly Pro aparece como "próximamente").');
+  }
+
   if (!env.RESEND_API_KEY) avisos.push('Falta RESEND_API_KEY: los recordatorios por correo no se enviarán.');
   if (!env.SENTRY_DSN) avisos.push('Falta SENTRY_DSN: los errores en producción no se reportarán.');
   if (env.TRUST_PROXY !== 'true') {

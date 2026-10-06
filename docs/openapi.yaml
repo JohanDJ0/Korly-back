@@ -1306,6 +1306,12 @@ paths:
                 $ref: '#/components/schemas/UrlSesion'
         '400':
           $ref: '#/components/responses/ErrorValidacion'
+        '403':
+          description: Los cobros están apagados, Korly Pro todavía es "próximamente" (`COBROS_NO_DISPONIBLES`, variable `COBROS_HABILITADOS`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
 
   /suscripcion/portal:
     post:
@@ -1319,12 +1325,43 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UrlSesion'
+        '403':
+          description: Los cobros están apagados (`COBROS_NO_DISPONIBLES`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
         '409':
           description: Todavía no hay suscripción (`SIN_SUSCRIPCION`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  /suscripcion/aviso-pro:
+    post:
+      tags: [Suscripción]
+      summary: Pedir que le avisen al usuario cuando Korly Pro esté disponible
+      description: Idempotente — pedirlo otra vez conserva la fecha de la primera vez. No toca Stripe.
+      responses:
+        '200':
+          description: Aviso registrado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [avisoProSolicitadoEn]
+                properties:
+                  avisoProSolicitadoEn:
+                    type: string
+                    format: date-time
+    delete:
+      tags: [Suscripción]
+      summary: Retirar la petición de aviso de Korly Pro
+      description: Idempotente — cancelar un aviso que no existe no es un error.
+      responses:
+        '204':
+          description: Aviso retirado
 
   # ---------- PREFERENCIAS ----------
   /preferencias:
@@ -2314,7 +2351,7 @@ components:
 
     EstadoSuscripcion:
       type: object
-      required: [plan, estadoSuscripcion, suscripcionVigenteHasta]
+      required: [plan, estadoSuscripcion, suscripcionVigenteHasta, cobrosHabilitados, avisoProSolicitadoEn]
       properties:
         plan:
           type: string
@@ -2327,6 +2364,14 @@ components:
           type: string
           format: date-time
           nullable: true
+        cobrosHabilitados:
+          type: boolean
+          description: "`false` mientras Korly Pro es \"próximamente\": el cliente muestra \"Avísame\" en vez de los botones de pago."
+        avisoProSolicitadoEn:
+          type: string
+          format: date-time
+          nullable: true
+          description: Cuándo pidió el usuario que le avisemos cuando Pro esté disponible; `null` si no lo ha pedido.
 
     UrlSesion:
       type: object
