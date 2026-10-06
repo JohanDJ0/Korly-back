@@ -1,0 +1,209 @@
+<!--
+  Escena principal (viewBox 0 0 800 800). Solo clases, nada de style="" ni id=: el generador la convierte a JSX y la copia a
+  la landing. Lo importante cae en el centro (x 100–700, y 80–720) porque el recuadro se recorta según el espacio disponible.
+-->
+<rect class="k-bg" x="0" y="0" width="800" height="800" />
+<circle class="k-soft1" cx="150" cy="170" r="200" />
+<circle class="k-soft2" cx="680" cy="690" r="240" />
+<circle class="k-soft3" cx="650" cy="130" r="130" />
+
+<!-- Estrellas y puntitos -->
+<path class="k-gold" transform="translate(70 70) scale(1.5)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<path class="k-white" transform="translate(300 60)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<path class="k-gold" transform="translate(470 120) scale(0.8)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<path class="k-mint" transform="translate(745 330) scale(1.2)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<path class="k-white" transform="translate(40 380)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<path class="k-gold" transform="translate(405 740) scale(1.3)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<path class="k-white" transform="translate(760 560) scale(0.9)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<path class="k-mint" transform="translate(220 745)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
+<circle class="k-white" cx="190" cy="40" r="3" />
+<circle class="k-mint" cx="560" cy="60" r="4" />
+<circle class="k-white" cx="720" cy="190" r="3" />
+<circle class="k-gold" cx="30" cy="250" r="4" />
+<circle class="k-white" cx="150" cy="700" r="3" />
+<circle class="k-mint" cx="690" cy="760" r="4" />
+<circle class="k-white" cx="610" cy="470" r="2.5" />
+
+<!-- Escalera con una persona que se asoma (abajo a la izquierda) -->
+<g transform="translate(22 560)">
+  <g class="asoma">
+    <circle class="k-skin" cx="172" cy="-40" r="26" />
+    <path class="k-d1" d="M147 -46 q3 -30 27 -30 q24 0 27 28 q-14 -14 -30 -12 q-14 2 -24 14z" />
+    <circle class="k-d1" cx="164" cy="-38" r="2.8" />
+    <circle class="k-d1" cx="182" cy="-38" r="2.8" />
+    <path class="k-t-d" d="M165 -26 q8 8 17 0" />
+    <rect class="k-gold2" x="142" y="-16" width="62" height="70" rx="24" />
+    <rect class="k-skin2" x="205" y="-14" width="20" height="84" rx="10" transform="rotate(190 215 -4)" />
+    <circle class="k-skin" cx="230" cy="-88" r="11" />
+    <g class="brilla">
+      <circle class="k-gold" cx="230" cy="-114" r="17" />
+      <circle class="k-gold2" cx="230" cy="-114" r="11" />
+      <text class="k-txt-o" x="230" y="-109" font-size="15" text-anchor="middle">$</text>
+    </g>
+    <rect class="k-skin2" x="120" y="-4" width="20" height="54" rx="10" transform="rotate(34 130 4)" />
+  </g>
+  <rect class="k-d4" x="0" y="130" width="262" height="52" rx="9" />
+  <rect class="k-teal" x="44" y="86" width="218" height="50" rx="9" />
+  <rect class="k-teal2" x="92" y="42" width="170" height="50" rx="9" />
+  <rect class="k-mint" x="138" y="0" width="124" height="48" rx="9" />
+  <rect class="k-white" x="138" y="0" width="124" height="7" rx="3" opacity="0.35" />
+  <rect class="k-white" x="92" y="42" width="170" height="6" rx="3" opacity="0.2" />
+  <rect class="k-white" x="44" y="86" width="218" height="6" rx="3" opacity="0.18" />
+</g>
+
+<!-- Teléfono con la cifra del día (centro) -->
+<g transform="translate(400 400) rotate(-6)">
+  <rect class="k-d1" x="-124" y="-222" width="248" height="444" rx="40" />
+  <rect class="k-d3" x="-110" y="-208" width="220" height="416" rx="30" />
+  <text class="k-txt-m" x="-90" y="-156" font-size="14">Puedes gastar hoy</text>
+  <text class="k-txt" x="-90" y="-102" font-size="56">$475</text>
+  <rect class="k-d4" x="-90" y="-80" width="180" height="9" rx="4.5" />
+  <rect class="k-gold" x="-90" y="-80" width="62" height="9" rx="4.5" />
+  <text class="k-txt-m" x="-90" y="-50" font-size="11.5">por día, durante 12 días más</text>
+  <rect class="k-linea" x="-90" y="-34" width="180" height="1.2" />
+  <text class="k-txt-m" x="-90" y="-10" font-size="10.5">Disponible total</text>
+  <text class="k-txt" x="-90" y="16" font-size="19">$5,700</text>
+  <text class="k-txt-m" x="90" y="-10" font-size="10.5" text-anchor="end">Días restantes</text>
+  <text class="k-txt" x="90" y="16" font-size="19" text-anchor="end">12</text>
+  <rect class="k-d2" x="-90" y="40" width="180" height="40" rx="12" />
+  <circle class="k-teal2" cx="-70" cy="60" r="7.5" />
+  <text class="k-txt-s" x="-54" y="64" font-size="12">Súper</text>
+  <text class="k-txt-s" x="76" y="64" font-size="12" text-anchor="end">−$280</text>
+  <rect class="k-d2" x="-90" y="88" width="180" height="40" rx="12" />
+  <circle class="k-gold" cx="-70" cy="108" r="7.5" />
+  <text class="k-txt-s" x="-54" y="112" font-size="12">Café</text>
+  <text class="k-txt-s" x="76" y="112" font-size="12" text-anchor="end">−$55</text>
+  <rect class="k-d2" x="-90" y="136" width="180" height="40" rx="12" />
+  <circle class="k-teal" cx="-70" cy="156" r="7.5" />
+  <text class="k-txt-s" x="-54" y="160" font-size="12">Gasolina</text>
+  <text class="k-txt-s" x="76" y="160" font-size="12" text-anchor="end">−$420</text>
+  <rect class="k-gold" x="-52" y="182" width="104" height="14" rx="7" />
+</g>
+
+<!-- Astronauta señalando la cifra (arriba a la izquierda) -->
+<g transform="translate(95 130) rotate(-10)">
+  <g class="flota">
+    <rect class="k-d4" x="-8" y="62" width="46" height="88" rx="15" />
+    <rect class="k-d2" x="0" y="74" width="30" height="12" rx="5" />
+    <rect class="k-cream" x="34" y="168" width="32" height="58" rx="15" transform="rotate(8 50 170)" />
+    <rect class="k-cream" x="74" y="168" width="32" height="58" rx="15" transform="rotate(-10 90 170)" />
+    <rect class="k-gold" x="28" y="214" width="42" height="20" rx="9" transform="rotate(8 50 224)" />
+    <rect class="k-gold" x="72" y="214" width="42" height="20" rx="9" transform="rotate(-10 90 224)" />
+    <rect class="k-cream" x="-6" y="88" width="30" height="72" rx="15" transform="rotate(26 9 94)" />
+    <circle class="k-gold" cx="-22" cy="152" r="13" />
+    <rect class="k-white" x="22" y="70" width="98" height="112" rx="38" />
+    <rect class="k-d3" x="46" y="104" width="50" height="30" rx="9" />
+    <circle class="k-gold" cx="59" cy="119" r="5" />
+    <circle class="k-coral" cx="73" cy="119" r="5" />
+    <circle class="k-teal2" cx="87" cy="119" r="5" />
+    <rect class="k-cream" x="108" y="78" width="30" height="76" rx="15" transform="rotate(-62 123 90)" />
+    <circle class="k-gold" cx="190" cy="126" r="14" />
+    <circle class="k-white" cx="70" cy="46" r="48" />
+    <ellipse class="k-d1" cx="76" cy="46" rx="33" ry="27" />
+    <ellipse class="k-mint" cx="66" cy="37" rx="10" ry="5" transform="rotate(-25 66 37)" opacity="0.7" />
+    <circle class="k-coral" cx="70" cy="-3" r="5" />
+    <path class="k-t-w" d="M70 -3 L70 -14" />
+  </g>
+</g>
+
+<!-- Tarjeta de crédito flotando (izquierda) -->
+<g transform="translate(40 330) rotate(-14)">
+  <g class="flota flota-b">
+    <rect class="k-teal" width="150" height="96" rx="15" />
+    <rect class="k-d1" y="22" width="150" height="15" />
+    <rect class="k-gold" x="18" y="52" width="28" height="21" rx="4" />
+    <text class="k-txt-s" x="18" y="86" font-size="10.5">•••• 4821</text>
+  </g>
+</g>
+
+<!-- Calendario de la quincena (arriba a la derecha) -->
+<g transform="translate(545 95) rotate(8)">
+  <g class="flota flota-c">
+    <rect class="k-d4" width="162" height="140" rx="20" />
+    <text class="k-txt-s" x="18" y="29" font-size="12">Quincena 1–15</text>
+    <rect class="k-gold" x="18" y="42" width="20" height="20" rx="6" />
+    <rect class="k-gold" x="44" y="42" width="20" height="20" rx="6" />
+    <rect class="k-gold" x="70" y="42" width="20" height="20" rx="6" />
+    <rect class="k-gold" x="96" y="42" width="20" height="20" rx="6" />
+    <rect class="k-gold" x="122" y="42" width="20" height="20" rx="6" />
+    <rect class="k-gold" x="18" y="68" width="20" height="20" rx="6" />
+    <rect class="k-gold" x="44" y="68" width="20" height="20" rx="6" />
+    <rect class="k-teal" x="70" y="68" width="20" height="20" rx="6" />
+    <rect class="k-teal2" x="96" y="68" width="20" height="20" rx="6" />
+    <rect class="k-teal2" x="122" y="68" width="20" height="20" rx="6" />
+    <rect class="k-teal2" x="18" y="94" width="20" height="20" rx="6" />
+    <rect class="k-teal2" x="44" y="94" width="20" height="20" rx="6" />
+    <rect class="k-teal2" x="70" y="94" width="20" height="20" rx="6" />
+    <rect class="k-teal2" x="96" y="94" width="20" height="20" rx="6" />
+    <rect class="k-teal2" x="122" y="94" width="20" height="20" rx="6" />
+  </g>
+</g>
+
+<!-- Meta de ahorro (derecha) -->
+<g transform="translate(615 330)">
+  <g class="flota flota-b">
+    <circle class="k-d3" cx="66" cy="66" r="66" />
+    <circle class="k-anillo-pista" cx="66" cy="66" r="46" />
+    <circle class="k-anillo" cx="66" cy="66" r="46" transform="rotate(-90 66 66)" />
+    <text class="k-txt" x="66" y="73" font-size="20" text-anchor="middle">70%</text>
+    <text class="k-txt-s" x="66" y="142" font-size="12" text-anchor="middle">Meta: viaje</text>
+  </g>
+</g>
+
+<!-- Salchicha sentada en un sillón (abajo a la derecha) -->
+<g transform="translate(528 505) rotate(-3)">
+  <rect class="k-teal" x="16" y="8" width="156" height="196" rx="54" />
+  <rect class="k-d4" x="38" y="30" width="112" height="150" rx="40" />
+  <rect class="k-teal2" x="-2" y="134" width="192" height="66" rx="27" />
+  <rect class="k-teal" x="-20" y="106" width="40" height="94" rx="19" />
+  <rect class="k-teal" x="168" y="106" width="40" height="94" rx="19" />
+  <rect class="k-d1" x="10" y="196" width="20" height="34" rx="7" />
+  <rect class="k-d1" x="158" y="196" width="20" height="34" rx="7" />
+  <g transform="rotate(-6 94 114)">
+    <rect class="k-bun2" x="52" y="40" width="84" height="150" rx="42" />
+    <rect class="k-bun" x="48" y="36" width="76" height="152" rx="38" />
+    <rect class="k-coral" x="62" y="22" width="60" height="178" rx="30" />
+    <path class="k-t-m" d="M64 64 q8 -10 16 0 t16 0 t16 0 t10 0" />
+    <path class="k-t-m" d="M64 154 q8 -10 16 0 t16 0 t16 0 t10 0" />
+    <circle class="k-white" cx="82" cy="102" r="10" />
+    <circle class="k-white" cx="106" cy="102" r="10" />
+    <circle class="k-d1" cx="85" cy="104" r="4.5" />
+    <circle class="k-d1" cx="109" cy="104" r="4.5" />
+    <path class="k-t-d" d="M82 126 q12 12 24 0" />
+    <rect class="k-bun2" x="38" y="122" width="34" height="15" rx="7.5" transform="rotate(26 44 129)" />
+    <rect class="k-bun2" x="114" y="116" width="34" height="15" rx="7.5" transform="rotate(-48 140 123)" />
+    <g class="brilla">
+      <circle class="k-gold" cx="156" cy="92" r="13" />
+      <circle class="k-gold2" cx="156" cy="92" r="8" />
+    </g>
+    <rect class="k-bun2" x="68" y="190" width="18" height="34" rx="9" transform="rotate(8 77 192)" />
+    <rect class="k-bun2" x="98" y="190" width="18" height="34" rx="9" transform="rotate(-8 107 192)" />
+    <rect class="k-coral2" x="60" y="218" width="30" height="14" rx="7" />
+    <rect class="k-coral2" x="94" y="218" width="30" height="14" rx="7" />
+  </g>
+</g>
+
+<!-- Monedas flotando -->
+<g transform="translate(330 705)">
+  <g class="brilla brilla-b">
+    <ellipse class="k-gold2" cx="0" cy="12" rx="40" ry="12" />
+    <rect class="k-gold2" x="-40" y="0" width="80" height="12" />
+    <ellipse class="k-gold" cx="0" cy="0" rx="40" ry="12" />
+    <ellipse class="k-gold2" cx="0" cy="-16" rx="40" ry="12" />
+    <rect class="k-gold2" x="-40" y="-16" width="80" height="16" />
+    <ellipse class="k-gold" cx="0" cy="-16" rx="40" ry="12" />
+  </g>
+</g>
+<g transform="translate(250 210)">
+  <g class="flota flota-c">
+    <circle class="k-gold" r="18" />
+    <circle class="k-gold2" r="12" />
+    <text class="k-txt-o" y="5" font-size="16" text-anchor="middle">$</text>
+  </g>
+</g>
+<g transform="translate(470 685)">
+  <g class="flota">
+    <circle class="k-gold" r="13" />
+    <circle class="k-gold2" r="8.5" />
+  </g>
+</g>

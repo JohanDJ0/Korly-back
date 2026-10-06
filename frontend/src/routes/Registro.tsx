@@ -4,10 +4,11 @@ import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
+import { BotonAuth } from '@/components/BotonAuth';
+import { CargandoKorly } from '@/components/CargandoKorly';
 import { constanciaDeAviso } from '@/lib/datos-responsable';
 import { esquemaPasswordNueva } from '@/lib/password';
 import { supabase } from '@/lib/supabase';
@@ -72,29 +73,29 @@ export function Registro() {
   if (cuentaCreada) {
     return (
       <AuthCard titulo="Revisa tu correo" descripcion="Te mandamos un enlace para confirmar tu cuenta antes de poder entrar.">
-        <Button asChild variant="outline" className="h-11 w-full rounded-xl">
-          <Link to="/login">Volver a iniciar sesión</Link>
-        </Button>
+        <BotonAuth to="/login" variante="oscuro">
+          Volver a iniciar sesión
+        </BotonAuth>
       </AuthCard>
     );
   }
 
   return (
-    <AuthCard titulo="Crea tu cuenta" descripcion="Regístrate para empezar a ver cuánto puedes gastar hoy.">
+    <AuthCard titulo="Crea tu cuenta" descripcion="Regístrate para empezar a ver cuánto puedes gastar hoy." sinPieLegal>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Correo</Label>
-          <Input id="email" type="email" autoComplete="email" className="h-11 rounded-xl" {...register('email')} />
+          <Input id="email" type="email" autoComplete="email" className="auth-input" {...register('email')} />
           {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">Contraseña</Label>
-          <Input id="password" type="password" autoComplete="new-password" className="h-11 rounded-xl" {...register('password')} />
+          <Input id="password" type="password" autoComplete="new-password" className="auth-input" {...register('password')} />
           {errors.password && <p className="text-destructive text-sm">{errors.password.message}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="confirmarPassword">Confirma tu contraseña</Label>
-          <Input id="confirmarPassword" type="password" autoComplete="new-password" className="h-11 rounded-xl" {...register('confirmarPassword')} />
+          <Input id="confirmarPassword" type="password" autoComplete="new-password" className="auth-input" {...register('confirmarPassword')} />
           {errors.confirmarPassword && <p className="text-destructive text-sm">{errors.confirmarPassword.message}</p>}
         </div>
         <div className="flex flex-col gap-1.5">
@@ -115,9 +116,10 @@ export function Registro() {
           {errors.aceptaAviso && <p className="text-destructive text-sm">{errors.aceptaAviso.message}</p>}
         </div>
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
-        <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">
+        <BotonAuth type="submit" disabled={isSubmitting}>
+          {isSubmitting && <CargandoKorly tamano={22} etiqueta="Creando cuenta" className="text-[#3b2a00]" />}
           {isSubmitting ? 'Creando cuenta…' : 'Crear cuenta'}
-        </Button>
+        </BotonAuth>
         <p className="text-muted-foreground text-center text-sm">
           ¿Ya tienes cuenta?{' '}
           <Link to="/login" className="text-primary font-medium underline-offset-4 hover:underline">

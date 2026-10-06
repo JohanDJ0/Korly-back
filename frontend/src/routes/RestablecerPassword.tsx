@@ -3,7 +3,8 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
+import { BotonAuth } from '@/components/BotonAuth';
+import { CargandoKorly } from '@/components/CargandoKorly';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
@@ -54,18 +55,19 @@ export function RestablecerPassword() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">Contraseña nueva</Label>
-          <Input id="password" type="password" autoComplete="new-password" autoFocus className="h-11 rounded-xl" {...register('password')} />
+          <Input id="password" type="password" autoComplete="new-password" autoFocus className="auth-input" {...register('password')} />
           {errors.password && <p className="text-destructive text-sm">{errors.password.message}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="confirmarPassword">Confírmala</Label>
-          <Input id="confirmarPassword" type="password" autoComplete="new-password" className="h-11 rounded-xl" {...register('confirmarPassword')} />
+          <Input id="confirmarPassword" type="password" autoComplete="new-password" className="auth-input" {...register('confirmarPassword')} />
           {errors.confirmarPassword && <p className="text-destructive text-sm">{errors.confirmarPassword.message}</p>}
         </div>
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
-        <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">
+        <BotonAuth type="submit" disabled={isSubmitting}>
+          {isSubmitting && <CargandoKorly tamano={22} etiqueta="Guardando" className="text-[#3b2a00]" />}
           {isSubmitting ? 'Guardando…' : 'Guardar contraseña'}
-        </Button>
+        </BotonAuth>
       </form>
     </AuthCard>
   );

@@ -150,7 +150,10 @@ p {
 /* ---------- Héroe ---------- */
 .hero {
   position: relative;
-  overflow: hidden;
+  overflow: clip;
+  min-height: clamp(680px, 46vw, 940px);
+  display: flex;
+  align-items: center;
   background:
     radial-gradient(900px 500px at 85% 20%, rgba(47, 174, 147, 0.22), transparent 60%),
     radial-gradient(700px 420px at 5% 95%, rgba(254, 184, 22, 0.1), transparent 60%),
@@ -159,10 +162,11 @@ p {
   padding-block: 64px 80px;
 }
 .hero-grid {
-  display: grid;
-  grid-template-columns: 1.05fr 0.95fr;
-  align-items: center;
-  gap: 40px;
+  position: relative;
+  z-index: 7;
+}
+.hero-copy {
+  max-width: 520px;
 }
 .eyebrow {
   color: var(--gold);
@@ -211,73 +215,104 @@ p {
   margin-right: 8px;
 }
 
-/* ---------- Dibujo interactivo ---------- */
-.art {
-  position: relative;
-  width: min(100%, 520px);
-  aspect-ratio: 560 / 600;
-  margin-inline: auto;
+/* ---------- Escena ilustrada del héroe ---------- */
+/* escena:inicio */
+/* Escena ilustrada (login de la app y héroe de korly.com.mx). Fuente única: landing/herramientas/escena/, generada con generar-escena.mjs. */
+.arte {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
   touch-action: pan-y;
   cursor: crosshair;
 }
-.art-layer {
+.arte-capa {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
 }
-/* Versión de color: las variables --c-* llenan cada forma. */
-.art-color {
-  --c-bg: #17342d;
-  --c-phone: #0c1a17;
-  --c-screen: #112620;
-  --c-card: #1d4037;
-  --c-row: #17342d;
-  --c-track: #24493f;
+.arte-color {
+  --c-bg: #14302a;
+  --c-d1: #0a1613;
+  --c-d2: #0f241f;
+  --c-d3: #17342d;
+  --c-d4: #1f4a40;
   --c-teal: #167f6c;
   --c-teal2: #47a67c;
+  --c-mint: #9fe3cf;
   --c-gold: #feb816;
   --c-gold2: #f89c1b;
   --c-white: #ffffff;
-  --c-mut: #8fbbae;
-  --c-ring: #47a67c;
-  --c-ring-track: #24493f;
-  --c-soft-teal: rgba(71, 166, 124, 0.22);
-  --c-soft-gold: rgba(254, 184, 22, 0.16);
+  --c-cream: #f3f0e6;
+  --c-bun: #f0bd72;
+  --c-bun2: #d99a4a;
+  --c-coral: #ee6a52;
+  --c-coral2: #c94a36;
+  --c-skin: #f0b38d;
+  --c-skin2: #d9916a;
+  --c-pig: #aab9b4;
+  --c-pig2: #7f948e;
+  --c-soft1: rgba(71, 166, 124, 0.2);
+  --c-soft2: rgba(254, 184, 22, 0.13);
+  --c-soft3: rgba(159, 227, 207, 0.1);
+  --c-anillo: #47a67c;
+  --c-anillo-pista: #24493f;
+  --c-t-d: #0a1613;
+  --c-t-c: #ee6a52;
+  --c-t-w: #ffffff;
+  --c-t-m: #feb816;
+  --c-txt: #ffffff;
+  --c-txt-m: #8fbbae;
+  --c-linea: rgba(255, 255, 255, 0.12);
   --line: none;
   --sw: 0;
 }
-/* Versión de líneas: se ve solo por donde pasa el cursor (máscara hecha en main.js). */
-.art-wire {
+/* Capa de contornos: se ve solo por donde "pasó el cursor" (la máscara la escribe el script en --mascara). */
+.arte-contornos {
   --c-bg: none;
-  --c-phone: none;
-  --c-screen: none;
-  --c-card: none;
-  --c-row: none;
-  --c-track: none;
+  --c-d1: none;
+  --c-d2: none;
+  --c-d3: none;
+  --c-d4: none;
   --c-teal: none;
   --c-teal2: none;
+  --c-mint: none;
   --c-gold: none;
   --c-gold2: none;
   --c-white: none;
-  --c-mut: none;
-  --c-ring: none;
-  --c-ring-track: none;
-  --c-soft-teal: none;
-  --c-soft-gold: none;
+  --c-cream: none;
+  --c-bun: none;
+  --c-bun2: none;
+  --c-coral: none;
+  --c-coral2: none;
+  --c-skin: none;
+  --c-skin2: none;
+  --c-pig: none;
+  --c-pig2: none;
+  --c-soft1: none;
+  --c-soft2: none;
+  --c-soft3: none;
+  --c-anillo: var(--line);
+  --c-anillo-pista: var(--line);
+  --c-t-d: var(--line);
+  --c-t-c: var(--line);
+  --c-t-w: var(--line);
+  --c-t-m: var(--line);
+  --c-txt: none;
+  --c-txt-m: none;
+  --c-linea: var(--line);
   --line: #7fe3cb;
-  --sw: 2.2;
+  --sw: 2.4;
   background:
-    radial-gradient(60% 50% at 30% 25%, rgba(47, 174, 147, 0.45), transparent 70%),
-    radial-gradient(55% 45% at 75% 80%, rgba(254, 184, 22, 0.3), transparent 70%),
+    radial-gradient(60% 50% at 30% 25%, rgba(47, 174, 147, 0.5), transparent 70%),
+    radial-gradient(55% 45% at 75% 80%, rgba(254, 184, 22, 0.32), transparent 70%),
     #0a1613;
-  border-radius: 44px;
-  -webkit-mask-image: linear-gradient(transparent, transparent);
-  mask-image: linear-gradient(transparent, transparent);
-  animation: cambia-color 7s ease-in-out infinite alternate;
+  -webkit-mask-image: var(--mascara, linear-gradient(transparent, transparent));
+  mask-image: var(--mascara, linear-gradient(transparent, transparent));
+  animation: korly-cambia-color 7s ease-in-out infinite alternate;
   pointer-events: none;
 }
-@keyframes cambia-color {
+@keyframes korly-cambia-color {
   from {
     filter: hue-rotate(0deg);
   }
@@ -286,104 +321,282 @@ p {
   }
 }
 
-#korly-art .a-bg,
-.a-bg {
+:is(.arte, .arte-saliente) .k-bg,
+:is(.arte, .arte-saliente) .k-d1,
+:is(.arte, .arte-saliente) .k-d2,
+:is(.arte, .arte-saliente) .k-d3,
+:is(.arte, .arte-saliente) .k-d4,
+:is(.arte, .arte-saliente) .k-teal,
+:is(.arte, .arte-saliente) .k-teal2,
+:is(.arte, .arte-saliente) .k-mint,
+:is(.arte, .arte-saliente) .k-gold,
+:is(.arte, .arte-saliente) .k-gold2,
+:is(.arte, .arte-saliente) .k-white,
+:is(.arte, .arte-saliente) .k-cream,
+:is(.arte, .arte-saliente) .k-bun,
+:is(.arte, .arte-saliente) .k-bun2,
+:is(.arte, .arte-saliente) .k-coral,
+:is(.arte, .arte-saliente) .k-coral2,
+:is(.arte, .arte-saliente) .k-skin,
+:is(.arte, .arte-saliente) .k-skin2,
+:is(.arte, .arte-saliente) .k-pig,
+:is(.arte, .arte-saliente) .k-pig2,
+:is(.arte, .arte-saliente) .k-soft1,
+:is(.arte, .arte-saliente) .k-soft2,
+:is(.arte, .arte-saliente) .k-soft3,
+:is(.arte, .arte-saliente) .k-anillo,
+:is(.arte, .arte-saliente) .k-anillo-pista,
+:is(.arte, .arte-saliente) .k-linea,
+:is(.arte, .arte-saliente) .k-t-d,
+:is(.arte, .arte-saliente) .k-t-c,
+:is(.arte, .arte-saliente) .k-t-w,
+:is(.arte, .arte-saliente) .k-t-m {
+  stroke: var(--line);
+  stroke-width: var(--sw);
+  stroke-linejoin: round;
+}
+:is(.arte, .arte-saliente) .k-bg {
   fill: var(--c-bg);
 }
-.a-bg,
-.a-phone,
-.a-screen,
-.a-card,
-.a-row,
-.a-track,
-.a-teal,
-.a-teal2,
-.a-gold,
-.a-gold2,
-.a-soft-teal,
-.a-soft-gold {
-  stroke: var(--line);
-  stroke-width: var(--sw);
+:is(.arte, .arte-saliente) .k-d1 {
+  fill: var(--c-d1);
 }
-.a-phone {
-  fill: var(--c-phone);
+:is(.arte, .arte-saliente) .k-d2 {
+  fill: var(--c-d2);
 }
-.a-screen {
-  fill: var(--c-screen);
+:is(.arte, .arte-saliente) .k-d3 {
+  fill: var(--c-d3);
 }
-.a-card {
-  fill: var(--c-card);
+:is(.arte, .arte-saliente) .k-d4 {
+  fill: var(--c-d4);
 }
-.a-row {
-  fill: var(--c-row);
-}
-.a-track {
-  fill: var(--c-track);
-}
-.a-teal {
+:is(.arte, .arte-saliente) .k-teal {
   fill: var(--c-teal);
 }
-.a-teal2 {
+:is(.arte, .arte-saliente) .k-teal2 {
   fill: var(--c-teal2);
 }
-.a-gold {
+:is(.arte, .arte-saliente) .k-mint {
+  fill: var(--c-mint);
+}
+:is(.arte, .arte-saliente) .k-gold {
   fill: var(--c-gold);
 }
-.a-gold2 {
+:is(.arte, .arte-saliente) .k-gold2 {
   fill: var(--c-gold2);
 }
-.a-soft-teal {
-  fill: var(--c-soft-teal);
+:is(.arte, .arte-saliente) .k-white {
+  fill: var(--c-white);
 }
-.a-soft-gold {
-  fill: var(--c-soft-gold);
+:is(.arte, .arte-saliente) .k-cream {
+  fill: var(--c-cream);
 }
-.a-line-only {
+:is(.arte, .arte-saliente) .k-bun {
+  fill: var(--c-bun);
+}
+:is(.arte, .arte-saliente) .k-bun2 {
+  fill: var(--c-bun2);
+}
+:is(.arte, .arte-saliente) .k-coral {
+  fill: var(--c-coral);
+}
+:is(.arte, .arte-saliente) .k-coral2 {
+  fill: var(--c-coral2);
+}
+:is(.arte, .arte-saliente) .k-skin {
+  fill: var(--c-skin);
+}
+:is(.arte, .arte-saliente) .k-skin2 {
+  fill: var(--c-skin2);
+}
+:is(.arte, .arte-saliente) .k-pig {
+  fill: var(--c-pig);
+}
+:is(.arte, .arte-saliente) .k-pig2 {
+  fill: var(--c-pig2);
+}
+:is(.arte, .arte-saliente) .k-soft1 {
+  fill: var(--c-soft1);
+}
+:is(.arte, .arte-saliente) .k-soft2 {
+  fill: var(--c-soft2);
+}
+:is(.arte, .arte-saliente) .k-soft3 {
+  fill: var(--c-soft3);
+}
+:is(.arte, .arte-saliente) .k-linea {
+  fill: var(--c-linea);
+}
+:is(.arte, .arte-saliente) .k-anillo,
+:is(.arte, .arte-saliente) .k-anillo-pista {
   fill: none;
-  stroke: var(--line);
-  stroke-width: var(--sw);
+  stroke-width: 12;
 }
-.art-color .a-line-only {
-  fill: rgba(255, 255, 255, 0.1);
+:is(.arte, .arte-saliente) .k-anillo {
+  stroke: var(--c-anillo);
+  stroke-linecap: round;
+  stroke-dasharray: 202 289;
 }
-.a-text,
-.a-text-strong,
-.a-mut {
+:is(.arte, .arte-saliente) .k-anillo-pista {
+  stroke: var(--c-anillo-pista);
+}
+.arte-contornos .k-anillo,
+.arte-contornos .k-anillo-pista {
+  stroke-width: 2.4;
+}
+:is(.arte, .arte-saliente) .k-t-d,
+:is(.arte, .arte-saliente) .k-t-c,
+:is(.arte, .arte-saliente) .k-t-w,
+:is(.arte, .arte-saliente) .k-t-m {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 3.2;
+}
+:is(.arte, .arte-saliente) .k-t-d {
+  stroke: var(--c-t-d);
+}
+:is(.arte, .arte-saliente) .k-t-c {
+  stroke: var(--c-t-c);
+}
+:is(.arte, .arte-saliente) .k-t-w {
+  stroke: var(--c-t-w);
+}
+:is(.arte, .arte-saliente) .k-t-m {
+  stroke: var(--c-t-m);
+  stroke-width: 7;
+}
+.arte-contornos .k-t-m {
+  stroke-width: 3;
+}
+:is(.arte, .arte-saliente) .k-txt,
+:is(.arte, .arte-saliente) .k-txt-m,
+:is(.arte, .arte-saliente) .k-txt-s,
+:is(.arte, .arte-saliente) .k-txt-o {
   font-family: var(--font-display);
   stroke: var(--line);
   stroke-width: calc(var(--sw) * 0.35);
 }
-.a-text {
-  fill: var(--c-white);
-  font-weight: 600;
-}
-.a-text-strong {
-  fill: var(--c-white);
+:is(.arte, .arte-saliente) .k-txt {
+  fill: var(--c-txt);
   font-weight: 800;
 }
-.a-mut {
-  fill: var(--c-mut);
+:is(.arte, .arte-saliente) .k-txt-s {
+  fill: var(--c-txt);
+  font-weight: 600;
+}
+:is(.arte, .arte-saliente) .k-txt-m {
+  fill: var(--c-txt-m);
   font-weight: 500;
 }
-.a-ring-track {
-  fill: none;
-  stroke: var(--c-ring-track);
-  stroke-width: 12;
+:is(.arte, .arte-saliente) .k-txt-o {
+  fill: var(--c-gold2);
+  font-weight: 800;
 }
-.a-ring {
-  fill: none;
-  stroke: var(--c-ring);
-  stroke-width: 12;
-  stroke-linecap: round;
-  stroke-dasharray: 194 276;
+.arte-color .k-txt-o {
+  fill: #7a4a00;
 }
-.art-wire .a-ring-track,
-.art-wire .a-ring {
-  stroke: var(--line);
-  stroke-width: 2;
+
+/* Movimiento suave de los personajes y objetos (se apaga con "reducir movimiento"). */
+:is(.arte, .arte-saliente) .flota {
+  animation: korly-flota 6s ease-in-out infinite;
 }
-.art-wire .a-ring-track {
-  stroke-opacity: 0.4;
+:is(.arte, .arte-saliente) .flota-b {
+  animation-duration: 7.5s;
+  animation-delay: -2s;
+}
+:is(.arte, .arte-saliente) .flota-c {
+  animation-duration: 5s;
+  animation-delay: -3.5s;
+}
+:is(.arte, .arte-saliente) .asoma {
+  animation: korly-asoma 4.5s ease-in-out infinite;
+}
+:is(.arte, .arte-saliente) .brilla {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: korly-brilla 3.2s ease-in-out infinite;
+}
+:is(.arte, .arte-saliente) .brilla-b {
+  animation-delay: -1.4s;
+}
+:is(.arte, .arte-saliente) .llama {
+  transform-box: fill-box;
+  transform-origin: right center;
+  animation: korly-llama 0.35s ease-in-out infinite alternate;
+}
+@keyframes korly-flota {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(1.5deg);
+  }
+}
+@keyframes korly-asoma {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+@keyframes korly-brilla {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+@keyframes korly-llama {
+  from {
+    transform: scaleX(0.85);
+  }
+  to {
+    transform: scaleX(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arte-contornos {
+    animation: none;
+    display: none;
+  }
+  .arte .flota,
+  .arte .flota-b,
+  .arte .flota-c,
+  .arte .asoma,
+  .arte .brilla,
+  .arte .llama {
+    animation: none;
+  }
+}
+/* escena:fin */
+.hero > .arte {
+  inset: 0 0 0 auto;
+  width: 50%;
+}
+.arte-saliente {
+  position: absolute;
+  width: 300px;
+  height: auto;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 6;
+}
+/* Cruzan la raya (la mitad del héroe) hacia el lado del texto; miran hacia allá. */
+.saliente-arriba {
+  top: 6px;
+  width: 270px;
+  left: calc(50% - 190px);
+  transform: scaleX(-1);
+}
+.saliente-abajo {
+  bottom: 22px;
+  left: calc(50% - 125px);
 }
 
 /* ---------- Secciones ---------- */
@@ -651,11 +864,23 @@ p {
 
 /* ---------- Pantallas chicas ---------- */
 @media (max-width: 900px) {
-  .hero-grid {
-    grid-template-columns: 1fr;
+  .hero {
+    display: block;
+    min-height: 0;
+    padding-bottom: 0;
   }
-  .art {
-    width: min(100%, 420px);
+  .hero-copy {
+    max-width: none;
+  }
+  .hero > .arte {
+    position: relative;
+    inset: auto;
+    width: 100%;
+    height: 440px;
+    margin-top: 44px;
+  }
+  .arte-saliente {
+    display: none;
   }
   .main-nav {
     display: none;
@@ -691,10 +916,6 @@ p {
     opacity: 1;
     transform: none;
     transition: none;
-  }
-  .art-wire {
-    animation: none;
-    display: none;
   }
   .btn {
     transition: none;

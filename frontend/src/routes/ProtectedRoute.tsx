@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 
+import { CargandoKorly } from '@/components/CargandoKorly';
 import { ReaceptarAviso } from '@/components/ReaceptarAviso';
 import { Sidebar } from '@/components/Sidebar';
 import { aceptoAvisoVigente } from '@/lib/datos-responsable';
@@ -19,7 +20,7 @@ export function ProtectedRoute() {
   const cargando = useAuthStore((s) => s.cargando);
   const esRecuperacion = useAuthStore((s) => s.esRecuperacion);
 
-  if (cargando) return null;
+  if (cargando) return <CargandoKorly pantallaCompleta />;
   if (esRecuperacion) return <RestablecerPassword />;
   if (!session) return <Navigate to="/login" replace />;
   if (!aceptoAvisoVigente(session.user.user_metadata)) return <ReaceptarAviso />;

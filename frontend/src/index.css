@@ -114,3 +114,564 @@
     @apply font-display;
   }
 }
+
+/* =====================================================================================================
+   Pantallas de acceso (login, registro, olvidé mi contraseña…): siempre en verde oscuro, aunque la app
+   esté en tema claro. `.auth-shell` re-define los tokens de color de sus descendientes, así los
+   componentes de siempre (Label, textos, enlaces) se leen bien sin tocarlos.
+   ===================================================================================================== */
+.auth-shell {
+  --background: #0b1614;
+  --foreground: #f2f7f5;
+  --card: #122420;
+  --primary: #3fc3a6;
+  --primary-foreground: #06201b;
+  --muted: #17302a;
+  --muted-foreground: #8fbbae;
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #feb816;
+  --destructive: #ff9a8a;
+  background:
+    radial-gradient(800px 500px at 100% 0%, rgba(47, 174, 147, 0.14), transparent 60%),
+    radial-gradient(700px 420px at 0% 100%, rgba(254, 184, 22, 0.07), transparent 60%),
+    #0b1614;
+  color: var(--foreground);
+}
+
+/* Campo "hundido": más oscuro que la superficie, con sombra interior arriba (se ve hacia adentro). */
+.auth-input {
+  height: 44px;
+  border-radius: 10px;
+  border: 1px solid #050d0b;
+  background-color: rgba(0, 10, 8, 0.38);
+  box-shadow: inset 0 2px 0 rgba(0, 0, 0, 0.35);
+  color: #f2f7f5;
+  padding-inline: 14px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.auth-input::placeholder {
+  color: #5f8379;
+}
+.auth-input:focus-visible {
+  border-color: #feb816;
+  box-shadow:
+    inset 0 2px 0 rgba(0, 0, 0, 0.35),
+    0 0 0 3px rgba(254, 184, 22, 0.22);
+  outline: none;
+}
+.auth-input[aria-invalid='true'] {
+  border-color: #ff9a8a;
+}
+
+/* Botón "de tecla": la cara se hunde al presionarlo y deja ver el borde grueso de abajo. */
+.btn-3d {
+  --cara: #feb816;
+  --borde: #8a5a00;
+  --tinta: #3b2a00;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 44px;
+  margin-bottom: 4px;
+  padding: 0 18px;
+  border: 0;
+  background: transparent;
+  color: var(--tinta);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.btn-3d::before,
+.btn-3d::after {
+  content: '';
+  position: absolute;
+  border-radius: 10px;
+}
+/* Base: el grosor que se ve debajo de la cara. */
+.btn-3d::before {
+  inset: 4px 0 0;
+  background: var(--borde);
+  box-shadow: 0 4px 0 var(--borde);
+  z-index: -2;
+}
+/* Cara: la parte que se presiona. */
+.btn-3d::after {
+  inset: 0;
+  background: var(--cara);
+  border: 1px solid var(--borde);
+  transform: translateY(-4px);
+  transition:
+    transform 0.12s cubic-bezier(0.8, -0.4, 0.5, 1),
+    filter 0.15s ease;
+  z-index: -1;
+}
+.btn-3d > span {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translateY(-4px);
+  transition: transform 0.12s cubic-bezier(0.8, -0.4, 0.5, 1);
+}
+.btn-3d:hover:not(:disabled)::after {
+  filter: brightness(1.08);
+  transform: translateY(-5px);
+}
+.btn-3d:hover:not(:disabled) > span {
+  transform: translateY(-5px);
+}
+.btn-3d:active:not(:disabled)::after,
+.btn-3d:active:not(:disabled) > span {
+  transform: translateY(0);
+}
+.btn-3d:focus-visible {
+  outline: 3px solid #feb816;
+  outline-offset: 4px;
+  border-radius: 12px;
+}
+.btn-3d:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.btn-3d--oscuro {
+  --cara: #214a40;
+  --borde: #050d0b;
+  --tinta: #f2f7f5;
+}
+/* Sin relieve: para acciones secundarias como "Cerrar sesión". */
+.btn-plano {
+  background: transparent;
+  border: 0;
+  color: #8fbbae;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 10px;
+  border-radius: 10px;
+}
+.btn-plano:hover:not(:disabled) {
+  color: #fff;
+}
+.btn-plano:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Escena ilustrada del login ---------- */
+/* escena:inicio */
+/* Escena ilustrada (login de la app y héroe de korly.com.mx). Fuente única: landing/herramientas/escena/, generada con generar-escena.mjs. */
+.arte {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+.arte-capa {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.arte-color {
+  --c-bg: #14302a;
+  --c-d1: #0a1613;
+  --c-d2: #0f241f;
+  --c-d3: #17342d;
+  --c-d4: #1f4a40;
+  --c-teal: #167f6c;
+  --c-teal2: #47a67c;
+  --c-mint: #9fe3cf;
+  --c-gold: #feb816;
+  --c-gold2: #f89c1b;
+  --c-white: #ffffff;
+  --c-cream: #f3f0e6;
+  --c-bun: #f0bd72;
+  --c-bun2: #d99a4a;
+  --c-coral: #ee6a52;
+  --c-coral2: #c94a36;
+  --c-skin: #f0b38d;
+  --c-skin2: #d9916a;
+  --c-pig: #aab9b4;
+  --c-pig2: #7f948e;
+  --c-soft1: rgba(71, 166, 124, 0.2);
+  --c-soft2: rgba(254, 184, 22, 0.13);
+  --c-soft3: rgba(159, 227, 207, 0.1);
+  --c-anillo: #47a67c;
+  --c-anillo-pista: #24493f;
+  --c-t-d: #0a1613;
+  --c-t-c: #ee6a52;
+  --c-t-w: #ffffff;
+  --c-t-m: #feb816;
+  --c-txt: #ffffff;
+  --c-txt-m: #8fbbae;
+  --c-linea: rgba(255, 255, 255, 0.12);
+  --line: none;
+  --sw: 0;
+}
+/* Capa de contornos: se ve solo por donde "pasó el cursor" (la máscara la escribe el script en --mascara). */
+.arte-contornos {
+  --c-bg: none;
+  --c-d1: none;
+  --c-d2: none;
+  --c-d3: none;
+  --c-d4: none;
+  --c-teal: none;
+  --c-teal2: none;
+  --c-mint: none;
+  --c-gold: none;
+  --c-gold2: none;
+  --c-white: none;
+  --c-cream: none;
+  --c-bun: none;
+  --c-bun2: none;
+  --c-coral: none;
+  --c-coral2: none;
+  --c-skin: none;
+  --c-skin2: none;
+  --c-pig: none;
+  --c-pig2: none;
+  --c-soft1: none;
+  --c-soft2: none;
+  --c-soft3: none;
+  --c-anillo: var(--line);
+  --c-anillo-pista: var(--line);
+  --c-t-d: var(--line);
+  --c-t-c: var(--line);
+  --c-t-w: var(--line);
+  --c-t-m: var(--line);
+  --c-txt: none;
+  --c-txt-m: none;
+  --c-linea: var(--line);
+  --line: #7fe3cb;
+  --sw: 2.4;
+  background:
+    radial-gradient(60% 50% at 30% 25%, rgba(47, 174, 147, 0.5), transparent 70%),
+    radial-gradient(55% 45% at 75% 80%, rgba(254, 184, 22, 0.32), transparent 70%),
+    #0a1613;
+  -webkit-mask-image: var(--mascara, linear-gradient(transparent, transparent));
+  mask-image: var(--mascara, linear-gradient(transparent, transparent));
+  animation: korly-cambia-color 7s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes korly-cambia-color {
+  from {
+    filter: hue-rotate(0deg);
+  }
+  to {
+    filter: hue-rotate(-125deg);
+  }
+}
+
+:is(.arte, .arte-saliente) .k-bg,
+:is(.arte, .arte-saliente) .k-d1,
+:is(.arte, .arte-saliente) .k-d2,
+:is(.arte, .arte-saliente) .k-d3,
+:is(.arte, .arte-saliente) .k-d4,
+:is(.arte, .arte-saliente) .k-teal,
+:is(.arte, .arte-saliente) .k-teal2,
+:is(.arte, .arte-saliente) .k-mint,
+:is(.arte, .arte-saliente) .k-gold,
+:is(.arte, .arte-saliente) .k-gold2,
+:is(.arte, .arte-saliente) .k-white,
+:is(.arte, .arte-saliente) .k-cream,
+:is(.arte, .arte-saliente) .k-bun,
+:is(.arte, .arte-saliente) .k-bun2,
+:is(.arte, .arte-saliente) .k-coral,
+:is(.arte, .arte-saliente) .k-coral2,
+:is(.arte, .arte-saliente) .k-skin,
+:is(.arte, .arte-saliente) .k-skin2,
+:is(.arte, .arte-saliente) .k-pig,
+:is(.arte, .arte-saliente) .k-pig2,
+:is(.arte, .arte-saliente) .k-soft1,
+:is(.arte, .arte-saliente) .k-soft2,
+:is(.arte, .arte-saliente) .k-soft3,
+:is(.arte, .arte-saliente) .k-anillo,
+:is(.arte, .arte-saliente) .k-anillo-pista,
+:is(.arte, .arte-saliente) .k-linea,
+:is(.arte, .arte-saliente) .k-t-d,
+:is(.arte, .arte-saliente) .k-t-c,
+:is(.arte, .arte-saliente) .k-t-w,
+:is(.arte, .arte-saliente) .k-t-m {
+  stroke: var(--line);
+  stroke-width: var(--sw);
+  stroke-linejoin: round;
+}
+:is(.arte, .arte-saliente) .k-bg {
+  fill: var(--c-bg);
+}
+:is(.arte, .arte-saliente) .k-d1 {
+  fill: var(--c-d1);
+}
+:is(.arte, .arte-saliente) .k-d2 {
+  fill: var(--c-d2);
+}
+:is(.arte, .arte-saliente) .k-d3 {
+  fill: var(--c-d3);
+}
+:is(.arte, .arte-saliente) .k-d4 {
+  fill: var(--c-d4);
+}
+:is(.arte, .arte-saliente) .k-teal {
+  fill: var(--c-teal);
+}
+:is(.arte, .arte-saliente) .k-teal2 {
+  fill: var(--c-teal2);
+}
+:is(.arte, .arte-saliente) .k-mint {
+  fill: var(--c-mint);
+}
+:is(.arte, .arte-saliente) .k-gold {
+  fill: var(--c-gold);
+}
+:is(.arte, .arte-saliente) .k-gold2 {
+  fill: var(--c-gold2);
+}
+:is(.arte, .arte-saliente) .k-white {
+  fill: var(--c-white);
+}
+:is(.arte, .arte-saliente) .k-cream {
+  fill: var(--c-cream);
+}
+:is(.arte, .arte-saliente) .k-bun {
+  fill: var(--c-bun);
+}
+:is(.arte, .arte-saliente) .k-bun2 {
+  fill: var(--c-bun2);
+}
+:is(.arte, .arte-saliente) .k-coral {
+  fill: var(--c-coral);
+}
+:is(.arte, .arte-saliente) .k-coral2 {
+  fill: var(--c-coral2);
+}
+:is(.arte, .arte-saliente) .k-skin {
+  fill: var(--c-skin);
+}
+:is(.arte, .arte-saliente) .k-skin2 {
+  fill: var(--c-skin2);
+}
+:is(.arte, .arte-saliente) .k-pig {
+  fill: var(--c-pig);
+}
+:is(.arte, .arte-saliente) .k-pig2 {
+  fill: var(--c-pig2);
+}
+:is(.arte, .arte-saliente) .k-soft1 {
+  fill: var(--c-soft1);
+}
+:is(.arte, .arte-saliente) .k-soft2 {
+  fill: var(--c-soft2);
+}
+:is(.arte, .arte-saliente) .k-soft3 {
+  fill: var(--c-soft3);
+}
+:is(.arte, .arte-saliente) .k-linea {
+  fill: var(--c-linea);
+}
+:is(.arte, .arte-saliente) .k-anillo,
+:is(.arte, .arte-saliente) .k-anillo-pista {
+  fill: none;
+  stroke-width: 12;
+}
+:is(.arte, .arte-saliente) .k-anillo {
+  stroke: var(--c-anillo);
+  stroke-linecap: round;
+  stroke-dasharray: 202 289;
+}
+:is(.arte, .arte-saliente) .k-anillo-pista {
+  stroke: var(--c-anillo-pista);
+}
+.arte-contornos .k-anillo,
+.arte-contornos .k-anillo-pista {
+  stroke-width: 2.4;
+}
+:is(.arte, .arte-saliente) .k-t-d,
+:is(.arte, .arte-saliente) .k-t-c,
+:is(.arte, .arte-saliente) .k-t-w,
+:is(.arte, .arte-saliente) .k-t-m {
+  fill: none;
+  stroke-linecap: round;
+  stroke-width: 3.2;
+}
+:is(.arte, .arte-saliente) .k-t-d {
+  stroke: var(--c-t-d);
+}
+:is(.arte, .arte-saliente) .k-t-c {
+  stroke: var(--c-t-c);
+}
+:is(.arte, .arte-saliente) .k-t-w {
+  stroke: var(--c-t-w);
+}
+:is(.arte, .arte-saliente) .k-t-m {
+  stroke: var(--c-t-m);
+  stroke-width: 7;
+}
+.arte-contornos .k-t-m {
+  stroke-width: 3;
+}
+:is(.arte, .arte-saliente) .k-txt,
+:is(.arte, .arte-saliente) .k-txt-m,
+:is(.arte, .arte-saliente) .k-txt-s,
+:is(.arte, .arte-saliente) .k-txt-o {
+  font-family: var(--font-display);
+  stroke: var(--line);
+  stroke-width: calc(var(--sw) * 0.35);
+}
+:is(.arte, .arte-saliente) .k-txt {
+  fill: var(--c-txt);
+  font-weight: 800;
+}
+:is(.arte, .arte-saliente) .k-txt-s {
+  fill: var(--c-txt);
+  font-weight: 600;
+}
+:is(.arte, .arte-saliente) .k-txt-m {
+  fill: var(--c-txt-m);
+  font-weight: 500;
+}
+:is(.arte, .arte-saliente) .k-txt-o {
+  fill: var(--c-gold2);
+  font-weight: 800;
+}
+.arte-color .k-txt-o {
+  fill: #7a4a00;
+}
+
+/* Movimiento suave de los personajes y objetos (se apaga con "reducir movimiento"). */
+:is(.arte, .arte-saliente) .flota {
+  animation: korly-flota 6s ease-in-out infinite;
+}
+:is(.arte, .arte-saliente) .flota-b {
+  animation-duration: 7.5s;
+  animation-delay: -2s;
+}
+:is(.arte, .arte-saliente) .flota-c {
+  animation-duration: 5s;
+  animation-delay: -3.5s;
+}
+:is(.arte, .arte-saliente) .asoma {
+  animation: korly-asoma 4.5s ease-in-out infinite;
+}
+:is(.arte, .arte-saliente) .brilla {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: korly-brilla 3.2s ease-in-out infinite;
+}
+:is(.arte, .arte-saliente) .brilla-b {
+  animation-delay: -1.4s;
+}
+:is(.arte, .arte-saliente) .llama {
+  transform-box: fill-box;
+  transform-origin: right center;
+  animation: korly-llama 0.35s ease-in-out infinite alternate;
+}
+@keyframes korly-flota {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-12px) rotate(1.5deg);
+  }
+}
+@keyframes korly-asoma {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+@keyframes korly-brilla {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+@keyframes korly-llama {
+  from {
+    transform: scaleX(0.85);
+  }
+  to {
+    transform: scaleX(1.12);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .arte-contornos {
+    animation: none;
+    display: none;
+  }
+  .arte .flota,
+  .arte .flota-b,
+  .arte .flota-c,
+  .arte .asoma,
+  .arte .brilla,
+  .arte .llama {
+    animation: none;
+  }
+}
+/* escena:fin */
+.arte-saliente {
+  position: absolute;
+  width: 300px;
+  height: auto;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 30;
+}
+
+/* ---------- Indicador de carga con la marca ---------- */
+.korly-cargando {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+.korly-cargando__aro {
+  position: absolute;
+  inset: 0;
+  animation: korly-gira 1.1s linear infinite;
+}
+.korly-cargando__icono {
+  border-radius: 22%;
+  animation: korly-respira 1.6s ease-in-out infinite;
+}
+@keyframes korly-gira {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes korly-respira {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(0.9);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .korly-cargando__aro,
+  .korly-cargando__icono {
+    animation: none;
+  }
+  .btn-3d::after,
+  .btn-3d > span {
+    transition: none;
+  }
+}

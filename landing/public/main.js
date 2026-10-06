@@ -32,7 +32,10 @@
   // ---------- Dibujo interactivo ----------
   const contenedor = document.getElementById('art');
   const capa = document.getElementById('art-wire');
-  if (!contenedor || !capa || sinMovimiento) return;
+  const capaColor = document.getElementById('art-color');
+  if (!contenedor || !capa || !capaColor || sinMovimiento) return;
+  // La capa de contornos es una copia de la escena de color (misma escena, sin escribirla dos veces en el HTML).
+  capa.innerHTML = capaColor.innerHTML;
 
   const VIDA_MS = 1300;
   const MAX_MANCHAS = 36;
@@ -48,7 +51,7 @@
   function pintar(ahora) {
     manchas = manchas.filter((m) => ahora - m.nacio < VIDA_MS);
     if (manchas.length === 0) {
-      capa.style.webkitMaskImage = capa.style.maskImage = 'linear-gradient(transparent, transparent)';
+      capa.style.setProperty('--mascara', 'linear-gradient(transparent, transparent)');
       animando = false;
       return;
     }
@@ -60,7 +63,7 @@
         2
       )}) 0%, rgba(0,0,0,${opacidad.toFixed(2)}) 62%, rgba(0,0,0,0) 100%)`;
     });
-    capa.style.webkitMaskImage = capa.style.maskImage = capas.join(',');
+    capa.style.setProperty('--mascara', capas.join(','));
     requestAnimationFrame(pintar);
   }
 

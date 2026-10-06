@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { AuthCard } from '@/components/AuthCard';
-import { Button } from '@/components/ui/button';
+import { BotonAuth } from '@/components/BotonAuth';
+import { CargandoKorly } from '@/components/CargandoKorly';
 import { constanciaDeAviso } from '@/lib/datos-responsable';
 import { supabase } from '@/lib/supabase';
 
@@ -31,7 +32,7 @@ export function ReaceptarAviso() {
   }
 
   return (
-    <AuthCard titulo="Actualizamos nuestros términos y aviso" descripcion="Para seguir usando Korly necesitamos que los leas y los aceptes de nuevo.">
+    <AuthCard titulo="Actualizamos nuestros términos y aviso" descripcion="Para seguir usando Korly necesitamos que los leas y los aceptes de nuevo." sinPieLegal>
       <div className="flex flex-col gap-4">
         <label className="flex items-start gap-2.5 text-[13px] leading-snug">
           <input type="checkbox" className="accent-primary mt-0.5 h-4 w-4 shrink-0" checked={acepta} onChange={(evento) => setAcepta(evento.target.checked)} />
@@ -48,12 +49,13 @@ export function ReaceptarAviso() {
           </span>
         </label>
         {error && <p className="text-destructive text-sm">{error}</p>}
-        <Button className="h-11 rounded-xl" disabled={!acepta || guardando} onClick={() => void aceptar()}>
+        <BotonAuth disabled={!acepta || guardando} onClick={() => void aceptar()}>
+          {guardando && <CargandoKorly tamano={22} etiqueta="Guardando" className="text-[#3b2a00]" />}
           {guardando ? 'Guardando…' : 'Aceptar y continuar'}
-        </Button>
-        <Button variant="ghost" className="h-10 rounded-xl" disabled={guardando} onClick={() => void supabase.auth.signOut()}>
+        </BotonAuth>
+        <BotonAuth variante="plano" disabled={guardando} onClick={() => void supabase.auth.signOut()}>
           Cerrar sesión
-        </Button>
+        </BotonAuth>
       </div>
     </AuthCard>
   );

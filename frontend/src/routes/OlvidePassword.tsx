@@ -4,7 +4,8 @@ import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
+import { BotonAuth } from '@/components/BotonAuth';
+import { CargandoKorly } from '@/components/CargandoKorly';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
@@ -50,9 +51,9 @@ export function OlvidePassword() {
   if (enviado) {
     return (
       <AuthCard titulo="Revisa tu correo" descripcion="Si ese correo tiene una cuenta, te mandamos un enlace para poner una contraseña nueva.">
-        <Button asChild variant="outline" className="h-11 w-full rounded-xl">
-          <Link to="/login">Volver a iniciar sesión</Link>
-        </Button>
+        <BotonAuth to="/login" variante="oscuro">
+          Volver a iniciar sesión
+        </BotonAuth>
       </AuthCard>
     );
   }
@@ -62,13 +63,14 @@ export function OlvidePassword() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Correo</Label>
-          <Input id="email" type="email" autoComplete="email" autoFocus className="h-11 rounded-xl" {...register('email')} />
+          <Input id="email" type="email" autoComplete="email" autoFocus className="auth-input" {...register('email')} />
           {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
         </div>
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
-        <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">
+        <BotonAuth type="submit" disabled={isSubmitting}>
+          {isSubmitting && <CargandoKorly tamano={22} etiqueta="Enviando" className="text-[#3b2a00]" />}
           {isSubmitting ? 'Enviando…' : 'Enviar enlace'}
-        </Button>
+        </BotonAuth>
         <p className="text-muted-foreground text-center text-sm">
           <Link to="/login" className="text-primary font-medium underline-offset-4 hover:underline">
             Volver a iniciar sesión

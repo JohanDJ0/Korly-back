@@ -4,10 +4,11 @@ import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
+import { BotonAuth } from '@/components/BotonAuth';
+import { CargandoKorly } from '@/components/CargandoKorly';
 import { hayAvisoSesionExpirada, limpiarAvisoSesionExpirada } from '@/lib/sesion-expirada';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth-store';
@@ -49,12 +50,12 @@ export function Login() {
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-2">
           <Label htmlFor="email">Correo</Label>
-          <Input id="email" type="email" autoComplete="email" className="h-11 rounded-xl" {...register('email')} />
+          <Input id="email" type="email" autoComplete="email" className="auth-input" {...register('email')} />
           {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="password">Contraseña</Label>
-          <Input id="password" type="password" autoComplete="current-password" className="h-11 rounded-xl" {...register('password')} />
+          <Input id="password" type="password" autoComplete="current-password" className="auth-input" {...register('password')} />
           {errors.password && <p className="text-destructive text-sm">{errors.password.message}</p>}
           <Link to="/olvide-password" className="text-muted-foreground self-end text-xs underline-offset-4 hover:underline">
             ¿Olvidaste tu contraseña?
@@ -66,22 +67,14 @@ export function Login() {
           </p>
         )}
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
-        <Button type="submit" disabled={isSubmitting} className="h-11 rounded-xl">
+        <BotonAuth type="submit" disabled={isSubmitting}>
+          {isSubmitting && <CargandoKorly tamano={22} etiqueta="Entrando" className="text-[#3b2a00]" />}
           {isSubmitting ? 'Entrando…' : 'Entrar'}
-        </Button>
+        </BotonAuth>
         <p className="text-muted-foreground text-center text-sm">
           ¿No tienes cuenta?{' '}
           <Link to="/registro" className="text-primary font-medium underline-offset-4 hover:underline">
             Regístrate
-          </Link>
-        </p>
-        <p className="text-muted-foreground text-center text-xs">
-          <Link to="/privacidad" className="underline-offset-4 hover:underline">
-            Aviso de privacidad
-          </Link>
-          {' · '}
-          <Link to="/terminos" className="underline-offset-4 hover:underline">
-            Términos y condiciones
           </Link>
         </p>
       </form>

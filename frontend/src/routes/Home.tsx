@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActividadReciente } from '@/components/ActividadReciente';
 import { BottomNav } from '@/components/BottomNav';
+import { CargandoKorly } from '@/components/CargandoKorly';
 import { CifraDisponible } from '@/components/CifraDisponible';
 import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
@@ -131,7 +132,7 @@ export function Home() {
             </div>
           )}
 
-          {isLoading && <p className="text-muted-foreground">Cargando…</p>}
+          {isLoading && <CargandoKorly tamano={44} className="text-foreground mx-auto my-8" />}
 
           {errorInesperado && <p className="text-destructive">{error.message}</p>}
 
