@@ -1,9 +1,13 @@
 import { ArrowLeft } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
+import { BotonOcultarMontos } from '@/components/BotonOcultarMontos';
+
 interface PageHeaderProps {
   titulo: string;
   accion?: React.ReactNode;
+  /** Pantallas sin montos (Ajustes, Categorías) no necesitan el ojito de privacidad. */
+  sinOjito?: boolean;
 }
 
 /**
@@ -15,7 +19,7 @@ interface PageHeaderProps {
  * apaga ahí porque lo pone el contenedor de cada página, para alinearse
  * con el sidebar en vez de sumar los dos paddings.
  */
-export function PageHeader({ titulo, accion }: PageHeaderProps) {
+export function PageHeader({ titulo, accion, sinOjito }: PageHeaderProps) {
   return (
     <div className="flex items-center gap-3 px-5 pt-5 pb-2.5 sm:px-0 sm:pt-0 sm:pb-6">
       <Link
@@ -27,6 +31,7 @@ export function PageHeader({ titulo, accion }: PageHeaderProps) {
       </Link>
       <h1 className="font-display flex-1 text-lg font-semibold sm:text-2xl">{titulo}</h1>
       {accion}
+      {!sinOjito && <BotonOcultarMontos className="border-input bg-card text-muted-foreground border" />}
     </div>
   );
 }

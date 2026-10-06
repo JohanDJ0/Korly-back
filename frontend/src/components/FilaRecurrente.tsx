@@ -1,7 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { useActualizarRecurrente } from '@/hooks/use-actualizar-recurrente';
 import type { GastoRecurrente } from '@/hooks/use-recurrentes';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { iconoCategoria } from '@/lib/icono-categoria';
 import { cn } from '@/lib/utils';
 
@@ -16,6 +16,7 @@ function etiquetaFrecuencia(recurrente: GastoRecurrente): string {
 
 /** Pausar/reanudar es el "eliminar" de esta plantilla — nunca hard delete (ver backend/README.md, "Gastos recurrentes"). */
 export function FilaRecurrente({ recurrente }: FilaRecurrenteProps) {
+  const formatearMonto = useFormatearMonto();
   const actualizarRecurrente = useActualizarRecurrente();
   const Icono = iconoCategoria(recurrente.descripcion);
 

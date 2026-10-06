@@ -7,7 +7,7 @@ import { BotonConfirmar } from '@/components/BotonConfirmar';
 import { useEditarIngreso } from '@/hooks/use-editar-ingreso';
 import { useEliminarIngreso } from '@/hooks/use-eliminar-ingreso';
 import type { Ingreso } from '@/hooks/use-ingresos';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 
 interface FilaIngresoProps {
   ingreso: Ingreso;
@@ -15,6 +15,7 @@ interface FilaIngresoProps {
 
 /** Espejo exacto de FilaGasto.tsx — mismo mecanismo de corrección, ver backend/README.md "Editar y eliminar un ingreso". */
 export function FilaIngreso({ ingreso }: FilaIngresoProps) {
+  const formatearMonto = useFormatearMonto();
   const [editando, setEditando] = useState(false);
   const [monto, setMonto] = useState(() => (ingreso.monto.valorMinimo / 100).toString());
   // Hallazgo del pase de QA/UX: un monto inválido no debe fallar en

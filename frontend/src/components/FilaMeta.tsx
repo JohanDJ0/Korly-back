@@ -14,7 +14,7 @@ import type { Meta } from '@/hooks/use-metas';
 import { useMovimientosMeta, type MovimientoMeta } from '@/hooks/use-movimientos-meta';
 import { usePagarMeta } from '@/hooks/use-pagar-meta';
 import { useRetirarMeta } from '@/hooks/use-retirar-meta';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { formatearFechaActividad } from '@/lib/fechas';
 import { cn } from '@/lib/utils';
 
@@ -51,6 +51,7 @@ function etiquetaMovimiento(movimiento: MovimientoMeta): string {
  * Ver backend/README.md, "Metas de ahorro".
  */
 export function FilaMeta({ meta }: FilaMetaProps) {
+  const formatearMonto = useFormatearMonto();
   const [modo, setModo] = useState<Modo>(null);
   const [monto, setMonto] = useState('');
   const [motivo, setMotivo] = useState('');

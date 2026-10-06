@@ -40,7 +40,7 @@ export function Categorias() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col gap-4 pb-8 sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
-      <PageHeader titulo="Categorías" />
+      <PageHeader titulo="Categorías" sinOjito />
 
       <div className="flex flex-col gap-4 px-5 sm:px-0">
         {isLoading && <p className="text-muted-foreground">Cargando…</p>}

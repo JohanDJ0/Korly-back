@@ -17,7 +17,7 @@ import { useSuscripcion } from '@/hooks/use-suscripcion';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { usePeriodos } from '@/hooks/use-periodos';
 import { ApiError } from '@/lib/api';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { formatearFechaHora, formatearRangoFechas } from '@/lib/fechas';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +35,7 @@ type Filtro = 'todo' | 'ingresos' | 'gastos';
  * gasto" en el README del backend), esta pantalla no necesita saberlo.
  */
 export function Historial() {
+  const formatearMonto = useFormatearMonto();
   const { periodoId: periodoIdDeUrl } = useParams<{ periodoId?: string }>();
   const { data: periodoActivo, error: errorPeriodoActivo } = usePeriodoActivo();
   const { data: periodos } = usePeriodos();

@@ -1,6 +1,6 @@
 import { Card, CardContent } from '@/components/ui/card';
 import type { DisponibleOk } from '@/hooks/use-disponible';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 
 interface RecordatorioContextualProps {
   disponible: DisponibleOk;
@@ -40,6 +40,7 @@ interface RecordatorioContextualProps {
  * sin un historial de envíos que todavía no existe.
  */
 export function RecordatorioContextual({ disponible }: RecordatorioContextualProps) {
+  const formatearMonto = useFormatearMonto();
   const yaSeExcedioHoy = disponible.cifraDiaria.valorMinimo < 0;
   if (disponible.huboActividadHoy || yaSeExcedioHoy) return null;
 

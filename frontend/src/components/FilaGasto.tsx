@@ -8,7 +8,7 @@ import { useCategorias } from '@/hooks/use-categorias';
 import { useEditarGasto } from '@/hooks/use-editar-gasto';
 import { useEliminarGasto } from '@/hooks/use-eliminar-gasto';
 import type { Gasto } from '@/hooks/use-gastos';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { iconoCategoria } from '@/lib/icono-categoria';
 
 interface FilaGastoProps {
@@ -24,6 +24,7 @@ interface FilaGastoProps {
  * refetch trae la fila nueva — es el comportamiento correcto, no un bug.
  */
 export function FilaGasto({ gasto }: FilaGastoProps) {
+  const formatearMonto = useFormatearMonto();
   const [editando, setEditando] = useState(false);
   const [monto, setMonto] = useState(() => (gasto.monto.valorMinimo / 100).toString());
   // Precargada con la categoría actual: a diferencia de dejarla vacía,

@@ -10,7 +10,7 @@ import { useMetas } from '@/hooks/use-metas';
 import { usePeriodos } from '@/hooks/use-periodos';
 import { useReabrirPeriodo } from '@/hooks/use-reabrir-periodo';
 import { useResumen } from '@/hooks/use-resumen';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { hoyISO } from '@/lib/fechas';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils';
  * `decisionSobrante: 'pendiente'`.
  */
 export function Resumen() {
+  const formatearMonto = useFormatearMonto();
   const { periodoId } = useParams<{ periodoId: string }>();
   const { data: resumen, isLoading, error } = useResumen(periodoId);
   const { data: metas } = useMetas();

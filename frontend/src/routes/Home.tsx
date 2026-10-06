@@ -18,7 +18,7 @@ import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { formatearRangoFechas, quincenaDeHoy } from '@/lib/fechas';
 
 /**
@@ -39,6 +39,7 @@ import { formatearRangoFechas, quincenaDeHoy } from '@/lib/fechas';
  * idéntico al de antes.
  */
 export function Home() {
+  const formatearMonto = useFormatearMonto();
   const { data, isLoading, error } = useDisponible();
   const { data: periodoActivo } = usePeriodoActivo();
   const { data: resumenPendiente } = useResumenPendiente();

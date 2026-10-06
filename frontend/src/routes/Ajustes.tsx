@@ -40,7 +40,7 @@ export function Ajustes() {
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8">
-      <PageHeader titulo="Ajustes" />
+      <PageHeader titulo="Ajustes" sinOjito />
 
       <div className="flex flex-1 flex-col gap-5.5 px-5 pt-2 pb-4 sm:px-0 sm:pt-0">
         {isLoading && <p className="text-muted-foreground">Cargando…</p>}

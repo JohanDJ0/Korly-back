@@ -1,5 +1,5 @@
 import { useDesglose, type RecurrenteDesglose, type RubroDesglose } from '@/hooks/use-desglose';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { formatearRangoFechas } from '@/lib/fechas';
 import { cn } from '@/lib/utils';
 
@@ -31,6 +31,7 @@ function cuandoSeCobra(recurrente: RecurrenteDesglose) {
  * final (8 o 9 días contra 7), así que el total la favorecería siempre.
  */
 export function DesglosePeriodo({ periodoId }: DesglosePeriodoProps) {
+  const formatearMonto = useFormatearMonto();
   const { data: desglose, isLoading, error } = useDesglose(periodoId);
 
   if (isLoading) return <p className="text-muted-foreground text-sm">Cargando desglose…</p>;

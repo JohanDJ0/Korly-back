@@ -8,7 +8,7 @@ import { useCargosTarjeta } from '@/hooks/use-cargos-tarjeta';
 import { useEliminarCargo } from '@/hooks/use-eliminar-cargo';
 import { useEliminarTarjeta } from '@/hooks/use-eliminar-tarjeta';
 import type { Tarjeta } from '@/hooks/use-tarjetas';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { cn } from '@/lib/utils';
 
 interface FilaTarjetaProps {
@@ -30,6 +30,7 @@ interface FilaTarjetaProps {
  * FormularioCargo (el backend decide, el frontend no adivina).
  */
 export function FilaTarjeta({ tarjeta }: FilaTarjetaProps) {
+  const formatearMonto = useFormatearMonto();
   const [mostrarFormularioCargo, setMostrarFormularioCargo] = useState(false);
   const [mostrarCargos, setMostrarCargos] = useState(false);
   const { data: cargosSinFiltrar, isLoading: cargandoCargos } = useCargosTarjeta(mostrarCargos ? tarjeta.id : undefined);

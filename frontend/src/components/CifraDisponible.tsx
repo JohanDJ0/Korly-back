@@ -1,5 +1,6 @@
+import { BotonOcultarMontos } from '@/components/BotonOcultarMontos';
 import type { DisponibleOk } from '@/hooks/use-disponible';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { cn } from '@/lib/utils';
 
 interface CifraDisponibleProps {
@@ -22,6 +23,7 @@ interface CifraDisponibleProps {
  * `objetivoHoy`/`gastadoHoy` ya significaban antes de este cambio.
  */
 export function CifraDisponible({ disponible }: CifraDisponibleProps) {
+  const formatearMonto = useFormatearMonto();
   const totalNegativo = disponible.disponible.valorMinimo < 0;
   const teExcedisteHoy = disponible.cifraDiaria.valorMinimo < 0;
   const gastadoHoy = disponible.gastadoHoy.valorMinimo;
@@ -30,7 +32,10 @@ export function CifraDisponible({ disponible }: CifraDisponibleProps) {
 
   return (
     <div className="bg-hero text-hero-foreground flex flex-col gap-3.5 rounded-3xl px-5.5 py-6">
-      <p className="text-hero-foreground-muted text-sm font-medium">{teExcedisteHoy ? 'Te excediste hoy por' : 'Puedes gastar hoy'}</p>
+      <div className="flex items-center justify-between">
+        <p className="text-hero-foreground-muted text-sm font-medium">{teExcedisteHoy ? 'Te excediste hoy por' : 'Puedes gastar hoy'}</p>
+        <BotonOcultarMontos className="text-hero-foreground-muted -mt-1.5 -mr-1.5 bg-white/10 hover:bg-white/15" />
+      </div>
       <p className={cn('font-display text-[52px] leading-none font-extrabold tracking-tight tabular-nums', teExcedisteHoy && 'text-red-400')}>
         {formatearMonto(teExcedisteHoy ? { ...disponible.cifraDiaria, valorMinimo: -disponible.cifraDiaria.valorMinimo } : disponible.cifraDiaria)}
       </p>

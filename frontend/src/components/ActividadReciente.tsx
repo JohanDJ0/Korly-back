@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 
 import { useCategorias } from '@/hooks/use-categorias';
 import { useGastos } from '@/hooks/use-gastos';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { formatearFechaActividad } from '@/lib/fechas';
 import { iconoCategoria } from '@/lib/icono-categoria';
 
@@ -20,6 +20,7 @@ interface ActividadRecienteProps {
  * (ver FilaGasto.tsx, "Corregido").
  */
 export function ActividadReciente({ periodoId }: ActividadRecienteProps) {
+  const formatearMonto = useFormatearMonto();
   const { data } = useGastos(periodoId);
   const { data: categorias } = useCategorias();
 

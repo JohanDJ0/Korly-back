@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { SelectorCategoriaChips } from '@/components/SelectorCategoriaChips';
 import { useDisponible } from '@/hooks/use-disponible';
 import { useRegistrarGasto } from '@/hooks/use-registrar-gasto';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { hoyISO } from '@/lib/fechas';
 
 const esquemaGasto = z.object({
@@ -46,6 +46,7 @@ interface FormularioGastoProps {
  * en ese caso, se pide un segundo toque explícito. El flujo normal sigue siendo un solo toque.
  */
 export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProps) {
+  const formatearMonto = useFormatearMonto();
   const registrarGasto = useRegistrarGasto();
   const { data: disponible } = useDisponible();
   const [categoriaId, setCategoriaId] = useState('');

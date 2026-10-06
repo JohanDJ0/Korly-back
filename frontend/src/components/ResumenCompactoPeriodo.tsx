@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 
 import { useDesglose } from '@/hooks/use-desglose';
-import { formatearMonto } from '@/lib/dinero';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { cn } from '@/lib/utils';
 
 interface ResumenCompactoPeriodoProps {
@@ -23,6 +23,7 @@ const MAX_CATEGORIAS = 3;
  * pasaron (`diasTranscurridos`), igual que el desglose completo.
  */
 export function ResumenCompactoPeriodo({ periodoId }: ResumenCompactoPeriodoProps) {
+  const formatearMonto = useFormatearMonto();
   const { data: desglose } = useDesglose(periodoId);
 
   // Sin datos (cargando/error) o sin ningún gasto todavía: nada que mostrar.
