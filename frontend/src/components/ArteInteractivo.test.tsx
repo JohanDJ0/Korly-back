@@ -1,4 +1,5 @@
 import { act, render, screen } from '@testing-library/react';
+import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ArteInteractivo, mascaraDeManchas } from '@/components/ArteInteractivo';
@@ -29,6 +30,12 @@ describe('mascaraDeManchas', () => {
 
     expect(mascara.match(/radial-gradient/g)).toHaveLength(5);
   });
+
+  it('para una capa que empieza en otro lugar de la zona, recorre las manchas a su posición', () => {
+    const mascara = mascaraDeManchas([{ x: 300, y: 200, radio: 120, nacio: 1000 }], 1520, 250, 50);
+
+    expect(mascara).toContain('at 50.0px 150.0px');
+  });
 });
 
 describe('ArteInteractivo', () => {
@@ -46,8 +53,10 @@ describe('ArteInteractivo', () => {
 
     const arte = screen.getByTestId('arte-interactivo');
     expect(arte).toHaveAttribute('aria-hidden', 'true');
+    const [color, contornos] = arte.querySelectorAll('svg.arte-capa');
     expect(arte.querySelectorAll('svg.arte-capa')).toHaveLength(2);
-    expect(arte.querySelectorAll('.k-txt').length).toBeGreaterThanOrEqual(8); // la escena está dos veces
+    expect(color.querySelectorAll('[class^="k-"]').length).toBeGreaterThan(100);
+    expect(contornos.querySelectorAll('[class^="k-"]')).toHaveLength(color.querySelectorAll('[class^="k-"]').length);
   });
 
   it('al pasar el cursor, la capa de contornos recibe una máscara con manchas', () => {
@@ -105,6 +114,56 @@ describe('ArteInteractivo', () => {
     });
 
     expect(contornos.style.getPropertyValue('--mascara')).toBe(MASCARA_VACIA);
+  });
+
+  it('con una zona, las figuras que se salen de la imagen también reciben la máscara al pasar el cursor', () => {
+    function Zona() {
+      const zona = useRef<HTMLDivElement>(null);
+      return (
+        <div ref={zona} data-testid="zona">
+          <ArteInteractivo zona={zona} />
+          <svg className="arte-saliente arte-contornos" data-testid="saliente" />
+        </div>
+      );
+    }
+    render(<Zona />);
+    const rect = (left: number, top: number, width: number, height: number) => () =>
+      ({ left, top, width, height, right: left + width, bottom: top + height, x: left, y: top, toJSON: () => ({}) }) as DOMRect;
+    screen.getByTestId('zona').getBoundingClientRect = rect(0, 0, 1200, 800);
+    screen.getByTestId('arte-interactivo').getBoundingClientRect = rect(0, 0, 600, 800);
+    screen.getByTestId('saliente').getBoundingClientRect = rect(500, 40, 300, 200);
+    Object.defineProperty(screen.getByTestId('arte-interactivo'), 'clientWidth', { value: 600, configurable: true });
+
+    act(() => {
+      // encima de la paloma, del lado del formulario (fuera del dibujo)
+      screen.getByTestId('zona').dispatchEvent(new MouseEvent('pointermove', { clientX: 700, clientY: 100, bubbles: true }));
+      vi.advanceTimersByTime(60);
+    });
+
+    expect(screen.getByTestId('saliente').style.getPropertyValue('--mascara')).toContain('at 200.0px 60.0px');
+  });
+
+  it('con una zona, el cursor fuera del dibujo y de las figuras no destapa nada', () => {
+    function Zona() {
+      const zona = useRef<HTMLDivElement>(null);
+      return (
+        <div ref={zona} data-testid="zona">
+          <ArteInteractivo zona={zona} />
+        </div>
+      );
+    }
+    render(<Zona />);
+    screen.getByTestId('zona').getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 1200, height: 800, right: 1200, bottom: 800, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+    screen.getByTestId('arte-interactivo').getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 600, height: 800, right: 600, bottom: 800, x: 0, y: 0, toJSON: () => ({}) }) as DOMRect;
+
+    act(() => {
+      screen.getByTestId('zona').dispatchEvent(new MouseEvent('pointermove', { clientX: 1000, clientY: 400, bubbles: true }));
+      vi.advanceTimersByTime(60);
+    });
+
+    expect(screen.getByTestId('arte-contornos').style.getPropertyValue('--mascara')).toBe('');
   });
 
   it('con "reducir movimiento" no se anima nada', () => {

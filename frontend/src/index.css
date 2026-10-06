@@ -268,13 +268,23 @@
 
 /* ---------- Escena ilustrada del login ---------- */
 /* escena:inicio */
-/* Escena ilustrada (login de la app y héroe de korly.com.mx). Fuente única: landing/herramientas/escena/, generada con generar-escena.mjs. */
+/* Escena ilustrada (login de la app y héroe de korly.com.mx). ARCHIVO GENERADO por dibujar-escena.mjs. */
 .arte {
   position: absolute;
   inset: 0;
   overflow: hidden;
   touch-action: pan-y;
   cursor: crosshair;
+}
+/* Grano fino encima de todo, como de ilustración impresa. */
+.arte::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: soft-light;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.55 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23g)'/%3E%3C/svg%3E");
 }
 .arte-capa {
   position: absolute;
@@ -288,72 +298,92 @@
   --c-d2: #0f241f;
   --c-d3: #17342d;
   --c-d4: #1f4a40;
+  --c-d5: #28594d;
   --c-teal: #167f6c;
   --c-teal2: #47a67c;
+  --c-teal3: #2e9478;
   --c-mint: #9fe3cf;
+  --c-mint2: #c9f2e5;
+  --c-glass: #bfe9dd;
   --c-gold: #feb816;
   --c-gold2: #f89c1b;
+  --c-gold3: #ffd66b;
   --c-white: #ffffff;
   --c-cream: #f3f0e6;
-  --c-bun: #f0bd72;
-  --c-bun2: #d99a4a;
+  --c-gray: #c9d3cf;
+  --c-gray2: #93a39e;
   --c-coral: #ee6a52;
   --c-coral2: #c94a36;
+  --c-pink: #f59bb4;
+  --c-pink2: #d9708f;
+  --c-pink3: #fcd0dc;
   --c-skin: #f0b38d;
-  --c-skin2: #d9916a;
   --c-pig: #aab9b4;
   --c-pig2: #7f948e;
+  --c-pig3: #d9e2de;
   --c-soft1: rgba(71, 166, 124, 0.2);
   --c-soft2: rgba(254, 184, 22, 0.13);
   --c-soft3: rgba(159, 227, 207, 0.1);
-  --c-anillo: #47a67c;
-  --c-anillo-pista: #24493f;
   --c-t-d: #0a1613;
   --c-t-c: #ee6a52;
   --c-t-w: #ffffff;
   --c-t-m: #feb816;
+  --c-t-g: #93a39e;
+  --c-t-p: #d9708f;
+  --c-t-n: #7f948e;
+  --c-t-l: rgba(10, 22, 19, 0.22);
   --c-txt: #ffffff;
   --c-txt-m: #8fbbae;
-  --c-linea: rgba(255, 255, 255, 0.12);
   --line: none;
   --sw: 0;
 }
-/* Capa de contornos: se ve solo por donde "pasó el cursor" (la máscara la escribe el script en --mascara). */
+/* Capa de contornos: se ve solo por donde "pasó el cursor" (la máscara la escribe el script en --mascara). Los rellenos
+   son opacos del color del fondo (no "none"): así cada figura tapa las líneas de lo que tiene detrás. */
 .arte-contornos {
+  --c-oculto: #0b1a16;
   --c-bg: none;
-  --c-d1: none;
-  --c-d2: none;
-  --c-d3: none;
-  --c-d4: none;
-  --c-teal: none;
-  --c-teal2: none;
-  --c-mint: none;
-  --c-gold: none;
-  --c-gold2: none;
-  --c-white: none;
-  --c-cream: none;
-  --c-bun: none;
-  --c-bun2: none;
-  --c-coral: none;
-  --c-coral2: none;
-  --c-skin: none;
-  --c-skin2: none;
-  --c-pig: none;
-  --c-pig2: none;
+  --c-d1: var(--c-oculto);
+  --c-d2: var(--c-oculto);
+  --c-d3: var(--c-oculto);
+  --c-d4: var(--c-oculto);
+  --c-d5: var(--c-oculto);
+  --c-teal: var(--c-oculto);
+  --c-teal2: var(--c-oculto);
+  --c-teal3: var(--c-oculto);
+  --c-mint: var(--c-oculto);
+  --c-mint2: var(--c-oculto);
+  --c-glass: var(--c-oculto);
+  --c-gold: var(--c-oculto);
+  --c-gold2: var(--c-oculto);
+  --c-gold3: var(--c-oculto);
+  --c-white: var(--c-oculto);
+  --c-cream: var(--c-oculto);
+  --c-gray: var(--c-oculto);
+  --c-gray2: var(--c-oculto);
+  --c-coral: var(--c-oculto);
+  --c-coral2: var(--c-oculto);
+  --c-pink: var(--c-oculto);
+  --c-pink2: var(--c-oculto);
+  --c-pink3: var(--c-oculto);
+  --c-skin: var(--c-oculto);
+  --c-pig: var(--c-oculto);
+  --c-pig2: var(--c-oculto);
+  --c-pig3: var(--c-oculto);
   --c-soft1: none;
   --c-soft2: none;
   --c-soft3: none;
-  --c-anillo: var(--line);
-  --c-anillo-pista: var(--line);
   --c-t-d: var(--line);
   --c-t-c: var(--line);
   --c-t-w: var(--line);
   --c-t-m: var(--line);
+  --c-t-g: var(--line);
+  --c-t-p: var(--line);
+  --c-t-n: var(--line);
+  --c-t-l: none;
   --c-txt: none;
   --c-txt-m: none;
-  --c-linea: var(--line);
   --line: #7fe3cb;
-  --sw: 2.4;
+  --sw: 1.8;
   background:
     radial-gradient(60% 50% at 30% 25%, rgba(47, 174, 147, 0.5), transparent 70%),
     radial-gradient(55% 45% at 75% 80%, rgba(254, 184, 22, 0.32), transparent 70%),
@@ -363,6 +393,11 @@
   animation: korly-cambia-color 7s ease-in-out infinite alternate;
   pointer-events: none;
 }
+/* Las figuras que se salen de la imagen tienen su propia copia de contornos (misma máscara, recorrida a su posición):
+   sin fondo, solo la figura en contornos. */
+.arte-saliente.arte-contornos {
+  background: none;
+}
 @keyframes korly-cambia-color {
   from {
     filter: hue-rotate(0deg);
@@ -371,37 +406,37 @@
     filter: hue-rotate(-125deg);
   }
 }
-
 :is(.arte, .arte-saliente) .k-bg,
 :is(.arte, .arte-saliente) .k-d1,
 :is(.arte, .arte-saliente) .k-d2,
 :is(.arte, .arte-saliente) .k-d3,
 :is(.arte, .arte-saliente) .k-d4,
+:is(.arte, .arte-saliente) .k-d5,
 :is(.arte, .arte-saliente) .k-teal,
 :is(.arte, .arte-saliente) .k-teal2,
+:is(.arte, .arte-saliente) .k-teal3,
 :is(.arte, .arte-saliente) .k-mint,
+:is(.arte, .arte-saliente) .k-mint2,
+:is(.arte, .arte-saliente) .k-glass,
 :is(.arte, .arte-saliente) .k-gold,
 :is(.arte, .arte-saliente) .k-gold2,
+:is(.arte, .arte-saliente) .k-gold3,
 :is(.arte, .arte-saliente) .k-white,
 :is(.arte, .arte-saliente) .k-cream,
-:is(.arte, .arte-saliente) .k-bun,
-:is(.arte, .arte-saliente) .k-bun2,
+:is(.arte, .arte-saliente) .k-gray,
+:is(.arte, .arte-saliente) .k-gray2,
 :is(.arte, .arte-saliente) .k-coral,
 :is(.arte, .arte-saliente) .k-coral2,
+:is(.arte, .arte-saliente) .k-pink,
+:is(.arte, .arte-saliente) .k-pink2,
+:is(.arte, .arte-saliente) .k-pink3,
 :is(.arte, .arte-saliente) .k-skin,
-:is(.arte, .arte-saliente) .k-skin2,
 :is(.arte, .arte-saliente) .k-pig,
 :is(.arte, .arte-saliente) .k-pig2,
+:is(.arte, .arte-saliente) .k-pig3,
 :is(.arte, .arte-saliente) .k-soft1,
 :is(.arte, .arte-saliente) .k-soft2,
-:is(.arte, .arte-saliente) .k-soft3,
-:is(.arte, .arte-saliente) .k-anillo,
-:is(.arte, .arte-saliente) .k-anillo-pista,
-:is(.arte, .arte-saliente) .k-linea,
-:is(.arte, .arte-saliente) .k-t-d,
-:is(.arte, .arte-saliente) .k-t-c,
-:is(.arte, .arte-saliente) .k-t-w,
-:is(.arte, .arte-saliente) .k-t-m {
+:is(.arte, .arte-saliente) .k-soft3 {
   stroke: var(--line);
   stroke-width: var(--sw);
   stroke-linejoin: round;
@@ -421,14 +456,26 @@
 :is(.arte, .arte-saliente) .k-d4 {
   fill: var(--c-d4);
 }
+:is(.arte, .arte-saliente) .k-d5 {
+  fill: var(--c-d5);
+}
 :is(.arte, .arte-saliente) .k-teal {
   fill: var(--c-teal);
 }
 :is(.arte, .arte-saliente) .k-teal2 {
   fill: var(--c-teal2);
 }
+:is(.arte, .arte-saliente) .k-teal3 {
+  fill: var(--c-teal3);
+}
 :is(.arte, .arte-saliente) .k-mint {
   fill: var(--c-mint);
+}
+:is(.arte, .arte-saliente) .k-mint2 {
+  fill: var(--c-mint2);
+}
+:is(.arte, .arte-saliente) .k-glass {
+  fill: var(--c-glass);
 }
 :is(.arte, .arte-saliente) .k-gold {
   fill: var(--c-gold);
@@ -436,17 +483,20 @@
 :is(.arte, .arte-saliente) .k-gold2 {
   fill: var(--c-gold2);
 }
+:is(.arte, .arte-saliente) .k-gold3 {
+  fill: var(--c-gold3);
+}
 :is(.arte, .arte-saliente) .k-white {
   fill: var(--c-white);
 }
 :is(.arte, .arte-saliente) .k-cream {
   fill: var(--c-cream);
 }
-:is(.arte, .arte-saliente) .k-bun {
-  fill: var(--c-bun);
+:is(.arte, .arte-saliente) .k-gray {
+  fill: var(--c-gray);
 }
-:is(.arte, .arte-saliente) .k-bun2 {
-  fill: var(--c-bun2);
+:is(.arte, .arte-saliente) .k-gray2 {
+  fill: var(--c-gray2);
 }
 :is(.arte, .arte-saliente) .k-coral {
   fill: var(--c-coral);
@@ -454,17 +504,26 @@
 :is(.arte, .arte-saliente) .k-coral2 {
   fill: var(--c-coral2);
 }
+:is(.arte, .arte-saliente) .k-pink {
+  fill: var(--c-pink);
+}
+:is(.arte, .arte-saliente) .k-pink2 {
+  fill: var(--c-pink2);
+}
+:is(.arte, .arte-saliente) .k-pink3 {
+  fill: var(--c-pink3);
+}
 :is(.arte, .arte-saliente) .k-skin {
   fill: var(--c-skin);
-}
-:is(.arte, .arte-saliente) .k-skin2 {
-  fill: var(--c-skin2);
 }
 :is(.arte, .arte-saliente) .k-pig {
   fill: var(--c-pig);
 }
 :is(.arte, .arte-saliente) .k-pig2 {
   fill: var(--c-pig2);
+}
+:is(.arte, .arte-saliente) .k-pig3 {
+  fill: var(--c-pig3);
 }
 :is(.arte, .arte-saliente) .k-soft1 {
   fill: var(--c-soft1);
@@ -475,33 +534,11 @@
 :is(.arte, .arte-saliente) .k-soft3 {
   fill: var(--c-soft3);
 }
-:is(.arte, .arte-saliente) .k-linea {
-  fill: var(--c-linea);
-}
-:is(.arte, .arte-saliente) .k-anillo,
-:is(.arte, .arte-saliente) .k-anillo-pista {
-  fill: none;
-  stroke-width: 12;
-}
-:is(.arte, .arte-saliente) .k-anillo {
-  stroke: var(--c-anillo);
-  stroke-linecap: round;
-  stroke-dasharray: 202 289;
-}
-:is(.arte, .arte-saliente) .k-anillo-pista {
-  stroke: var(--c-anillo-pista);
-}
-.arte-contornos .k-anillo,
-.arte-contornos .k-anillo-pista {
-  stroke-width: 2.4;
-}
-:is(.arte, .arte-saliente) .k-t-d,
-:is(.arte, .arte-saliente) .k-t-c,
-:is(.arte, .arte-saliente) .k-t-w,
-:is(.arte, .arte-saliente) .k-t-m {
+:is(.arte, .arte-saliente) [class^='k-t-'] {
   fill: none;
   stroke-linecap: round;
-  stroke-width: 3.2;
+  stroke-linejoin: round;
+  stroke-width: 3;
 }
 :is(.arte, .arte-saliente) .k-t-d {
   stroke: var(--c-t-d);
@@ -514,10 +551,31 @@
 }
 :is(.arte, .arte-saliente) .k-t-m {
   stroke: var(--c-t-m);
-  stroke-width: 7;
+  stroke-width: 4;
 }
-.arte-contornos .k-t-m {
-  stroke-width: 3;
+:is(.arte, .arte-saliente) .k-t-m2 {
+  fill: none;
+  stroke: var(--c-t-m);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+}
+:is(.arte, .arte-saliente) .k-t-g {
+  stroke: var(--c-t-g);
+  stroke-width: 6;
+}
+:is(.arte, .arte-saliente) .k-t-p {
+  stroke: var(--c-t-p);
+}
+:is(.arte, .arte-saliente) .k-t-n {
+  stroke: var(--c-t-n);
+  stroke-width: 2;
+}
+:is(.arte, .arte-saliente) .k-t-l {
+  stroke: var(--c-t-l);
+  stroke-width: 1.5;
+}
+.arte-contornos [class^='k-t-'] {
+  stroke-width: 1.8;
 }
 :is(.arte, .arte-saliente) .k-txt,
 :is(.arte, .arte-saliente) .k-txt-m,
@@ -540,14 +598,14 @@
   font-weight: 500;
 }
 :is(.arte, .arte-saliente) .k-txt-o {
-  fill: var(--c-gold2);
+  fill: #7a4a00;
   font-weight: 800;
 }
-.arte-color .k-txt-o {
-  fill: #7a4a00;
+.arte-contornos .k-txt-o {
+  fill: none;
 }
 
-/* Movimiento suave de los personajes y objetos (se apaga con "reducir movimiento"). */
+/* Movimiento suave de personajes y objetos (se apaga con "reducir movimiento"). */
 :is(.arte, .arte-saliente) .flota {
   animation: korly-flota 6s ease-in-out infinite;
 }
@@ -558,9 +616,6 @@
 :is(.arte, .arte-saliente) .flota-c {
   animation-duration: 5s;
   animation-delay: -3.5s;
-}
-:is(.arte, .arte-saliente) .asoma {
-  animation: korly-asoma 4.5s ease-in-out infinite;
 }
 :is(.arte, .arte-saliente) .brilla {
   transform-box: fill-box;
@@ -575,6 +630,11 @@
   transform-origin: right center;
   animation: korly-llama 0.35s ease-in-out infinite alternate;
 }
+:is(.arte, .arte-saliente) .llama-abajo {
+  transform-box: fill-box;
+  transform-origin: center top;
+  animation: korly-llama-abajo 0.3s ease-in-out infinite alternate;
+}
 @keyframes korly-flota {
   0%,
   100% {
@@ -582,15 +642,6 @@
   }
   50% {
     transform: translateY(-12px) rotate(1.5deg);
-  }
-}
-@keyframes korly-asoma {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-14px);
   }
 }
 @keyframes korly-brilla {
@@ -610,18 +661,21 @@
     transform: scaleX(1.12);
   }
 }
+@keyframes korly-llama-abajo {
+  from {
+    transform: scaleY(0.85);
+  }
+  to {
+    transform: scaleY(1.15);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   .arte-contornos {
     animation: none;
     display: none;
   }
-  .arte .flota,
-  .arte .flota-b,
-  .arte .flota-c,
-  .arte .asoma,
-  .arte .brilla,
-  .arte .llama {
+  :is(.arte, .arte-saliente) :is(.flota, .flota-b, .flota-c, .brilla, .llama, .llama-abajo) {
     animation: none;
   }
 }

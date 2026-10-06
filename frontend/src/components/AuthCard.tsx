@@ -1,3 +1,4 @@
+import { Fragment, useRef } from 'react';
 import { Link } from 'react-router-dom';
 
 import { ArteInteractivo } from '@/components/ArteInteractivo';
@@ -19,20 +20,26 @@ interface AuthCardProps {
  * para que las cinco pantallas no cambien al rediseñarla.
  */
 export function AuthCard({ titulo, descripcion, children, sinPieLegal }: AuthCardProps) {
+  const pantalla = useRef<HTMLDivElement>(null);
   return (
-    <div className="auth-shell relative grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
+    <div ref={pantalla} className="auth-shell relative grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-[#0f201c] lg:block">
-        <ArteInteractivo />
+        <ArteInteractivo zona={pantalla} />
       </aside>
 
-      {/* Lo que se sale de la imagen: cruza la raya (51.2 % = 1.05 / 2.05 del ancho) hacia el lado del formulario. */}
+      {/* Lo que se sale de la imagen: cruza la raya (51.2 % = 1.05 / 2.05 del ancho) hacia el lado del formulario. Cada
+          figura va dos veces, a color y en contornos encima, para que también cambie al pasar el cursor. */}
       <div className="pointer-events-none absolute inset-y-0 left-[51.2%] z-30 hidden w-0 lg:block" aria-hidden="true" data-testid="arte-salientes">
-        <svg className="arte-saliente arte-color" style={{ top: '5%', left: -190 }} viewBox="0 0 320 200" focusable="false">
-          <SalienteArriba />
-        </svg>
-        <svg className="arte-saliente arte-color" style={{ bottom: '4%', left: -125 }} viewBox="0 0 320 170" focusable="false">
-          <SalienteAbajo />
-        </svg>
+        {(['arte-color', 'arte-contornos'] as const).map((capa) => (
+          <Fragment key={capa}>
+            <svg className={`arte-saliente ${capa}`} style={{ top: '5%', left: -190 }} viewBox="0 0 320 200" focusable="false">
+              <SalienteArriba />
+            </svg>
+            <svg className={`arte-saliente ${capa}`} style={{ bottom: '4%', left: -125 }} viewBox="0 0 320 170" focusable="false">
+              <SalienteAbajo />
+            </svg>
+          </Fragment>
+        ))}
       </div>
 
       <div className="flex min-h-dvh flex-col bg-[#15302a]">

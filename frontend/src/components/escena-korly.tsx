@@ -8,199 +8,355 @@ export function EscenaKorly() {
       <rect className="k-bg" x="0" y="0" width="800" height="800" />
       <circle className="k-soft1" cx="150" cy="170" r="200" />
       <circle className="k-soft2" cx="680" cy="690" r="240" />
-      <circle className="k-soft3" cx="650" cy="130" r="130" />
-
-      <path className="k-gold" transform="translate(70 70) scale(1.5)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-white" transform="translate(300 60)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-gold" transform="translate(470 120) scale(0.8)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-mint" transform="translate(745 330) scale(1.2)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-white" transform="translate(40 380)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-gold" transform="translate(405 740) scale(1.3)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-white" transform="translate(760 560) scale(0.9)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-mint" transform="translate(220 745)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <circle className="k-white" cx="190" cy="40" r="3" />
-      <circle className="k-mint" cx="560" cy="60" r="4" />
-      <circle className="k-white" cx="720" cy="190" r="3" />
-      <circle className="k-gold" cx="30" cy="250" r="4" />
-      <circle className="k-white" cx="150" cy="700" r="3" />
-      <circle className="k-mint" cx="690" cy="760" r="4" />
-      <circle className="k-white" cx="610" cy="470" r="2.5" />
-
-      <g transform="translate(22 560)">
-        <g className="asoma">
-          <circle className="k-skin" cx="172" cy="-40" r="26" />
-          <path className="k-d1" d="M147 -46 q3 -30 27 -30 q24 0 27 28 q-14 -14 -30 -12 q-14 2 -24 14z" />
-          <circle className="k-d1" cx="164" cy="-38" r="2.8" />
-          <circle className="k-d1" cx="182" cy="-38" r="2.8" />
-          <path className="k-t-d" d="M165 -26 q8 8 17 0" />
-          <rect className="k-gold2" x="142" y="-16" width="62" height="70" rx="24" />
-          <rect className="k-skin2" x="205" y="-14" width="20" height="84" rx="10" transform="rotate(190 215 -4)" />
-          <circle className="k-skin" cx="230" cy="-88" r="11" />
-          <g className="brilla">
-            <circle className="k-gold" cx="230" cy="-114" r="17" />
-            <circle className="k-gold2" cx="230" cy="-114" r="11" />
-            <text className="k-txt-o" x="230" y="-109" fontSize="15" textAnchor="middle">$</text>
-          </g>
-          <rect className="k-skin2" x="120" y="-4" width="20" height="54" rx="10" transform="rotate(34 130 4)" />
-        </g>
-        <rect className="k-d4" x="0" y="130" width="262" height="52" rx="9" />
-        <rect className="k-teal" x="44" y="86" width="218" height="50" rx="9" />
-        <rect className="k-teal2" x="92" y="42" width="170" height="50" rx="9" />
-        <rect className="k-mint" x="138" y="0" width="124" height="48" rx="9" />
-        <rect className="k-white" x="138" y="0" width="124" height="7" rx="3" opacity="0.35" />
-        <rect className="k-white" x="92" y="42" width="170" height="6" rx="3" opacity="0.2" />
-        <rect className="k-white" x="44" y="86" width="218" height="6" rx="3" opacity="0.18" />
+      <circle className="k-soft3" cx="660" cy="140" r="140" />
+      <path className="k-gold" transform="translate(70 60) scale(1.4)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-white" transform="translate(290 40) scale(1)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-mint" transform="translate(760 300) scale(1.1)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-white" transform="translate(40 330) scale(0.9)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-gold" transform="translate(420 760) scale(1.2)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-white" transform="translate(765 560) scale(0.8)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-mint" transform="translate(200 760) scale(1)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-gold" transform="translate(560 40) scale(0.7)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <circle className="k-white" cx="190" cy="30" r="2.5" />
+      <circle className="k-mint" cx="520" cy="90" r="3" />
+      <circle className="k-white" cx="735" cy="210" r="2.5" />
+      <circle className="k-gold" cx="25" cy="240" r="3.5" />
+      <circle className="k-white" cx="140" cy="690" r="2.5" />
+      <circle className="k-mint" cx="700" cy="760" r="3.5" />
+      <circle className="k-white" cx="640" cy="470" r="2" />
+      <circle className="k-mint" cx="95" cy="470" r="2.5" />
+      <circle className="k-white" cx="330" cy="110" r="2" />
+      <polygon className="k-d2" points="101.9,450 413.7,630 373.7,700 303.7,670 191.9,510 131.9,474" />
+      <polygon className="k-d1" points="413.7,630 699.4,465 673.4,495 609.4,531 443.7,690 373.7,700" />
+      <polygon className="k-d3" points="373.7,700 403.7,755 343.7,696" />
+      <polygon className="k-d4" points="101.9,416 413.7,596 413.7,630 101.9,450" />
+      <polygon className="k-d3" points="699.4,431 413.7,596 413.7,630 699.4,465" />
+      <polygon className="k-teal2" points="387.7,251 699.4,431 413.7,596 101.9,416" />
+      <polygon className="k-teal3" points="101.9,416 413.7,596 413.7,602 101.9,422" />
+      <polygon className="k-teal" points="699.4,431 413.7,596 413.7,602 699.4,437" />
+      <polyline className="k-t-l" points="396.3,266 127.9,421" />
+      <polyline className="k-t-l" points="444.8,294 176.4,449" />
+      <polyline className="k-t-l" points="493.3,322 224.9,477" />
+      <polyline className="k-t-l" points="541.8,350 273.4,505" />
+      <polyline className="k-t-l" points="590.3,378 321.9,533" />
+      <polyline className="k-t-l" points="638.8,406 370.4,561" />
+      <g className="flota flota-b"><polygon className="k-teal" points="131.3,627 153.9,640 153.9,666 131.3,653" />
+      <polygon className="k-d4" points="176.4,627 153.9,640 153.9,666 176.4,653" />
+      <polygon className="k-teal2" points="153.9,614 176.4,627 153.9,640 131.3,627" /></g>
+      <g className="flota"><polygon className="k-teal2" points="389.4,726 405,735 405,753 389.4,744" />
+      <polygon className="k-teal" points="420.6,726 405,735 405,753 420.6,744" />
+      <polygon className="k-mint" points="405,717 420.6,726 405,735 389.4,726" /></g>
+      <g className="flota flota-c"><polygon className="k-gold" points="82.8,439 101.9,450 101.9,472 82.8,461" />
+      <polygon className="k-gold2" points="120.9,439 101.9,450 101.9,472 120.9,461" />
+      <polygon className="k-gold3" points="101.9,428 120.9,439 101.9,450 82.8,439" /></g>
+      <g className="flota flota-b"><polygon className="k-pink" points="728.9,502 742.7,510 742.7,526 728.9,518" />
+      <polygon className="k-pink2" points="756.6,502 742.7,510 742.7,526 756.6,518" />
+      <polygon className="k-pink3" points="742.7,494 756.6,502 742.7,510 728.9,502" /></g>
+      <polygon className="k-teal2" points="327.1,116 457,191 457,441 327.1,366" />
+      <polygon className="k-teal" points="560.9,131 457,191 457,441 560.9,381" />
+      <polygon className="k-mint" points="431,56 560.9,131 457,191 327.1,116" />
+      <polygon className="k-mint2" points="327.1,116 457,191 457,201 327.1,126" />
+      <polygon className="k-teal3" points="560.9,131 457,191 457,201 560.9,141" />
+      <polygon className="k-d2" points="337.4,324.1 358.1,336.1 358.1,360.1 337.4,348.1" />
+      <polygon className="k-d4" points="339,327.1 356.3,337.1 356.3,357.1 339,347.1" />
+      <polygon className="k-d5" points="338.9,327.2 344.1,330.2 344.1,350.2 338.9,347.2" />
+      <polygon className="k-d2" points="337.4,290.1 358.1,302.1 358.1,326.1 337.4,314.1" />
+      <polygon className="k-gold3" points="339,293.1 356.3,303.1 356.3,323.1 339,313.1" />
+      <polygon className="k-gold" points="338.9,306.2 356.2,316.2 356.2,323.2 338.9,313.2" />
+      <polygon className="k-d2" points="337.4,256.1 358.1,268.1 358.1,292.1 337.4,280.1" />
+      <polygon className="k-d4" points="339,259.1 356.3,269.1 356.3,289.1 339,279.1" />
+      <polygon className="k-d5" points="338.9,259.2 344.1,262.2 344.1,282.2 338.9,279.2" />
+      <polygon className="k-d2" points="337.4,222.1 358.1,234.1 358.1,258.1 337.4,246.1" />
+      <polygon className="k-d4" points="339,225.1 356.3,235.1 356.3,255.1 339,245.1" />
+      <polygon className="k-d5" points="338.9,225.2 344.1,228.2 344.1,248.2 338.9,245.2" />
+      <polygon className="k-d2" points="337.4,188.1 358.1,200.1 358.1,224.1 337.4,212.1" />
+      <polygon className="k-gold3" points="339,191.1 356.3,201.1 356.3,221.1 339,211.1" />
+      <polygon className="k-gold" points="338.9,204.1 356.2,214.2 356.2,221.2 338.9,211.2" />
+      <polygon className="k-d2" points="337.4,154.1 358.1,166.1 358.1,190.1 337.4,178.1" />
+      <polygon className="k-d4" points="339,157.1 356.3,167.1 356.3,187.1 339,177.1" />
+      <polygon className="k-d5" points="338.9,157.1 344.1,160.1 344.1,180.1 338.9,177.1" />
+      <polygon className="k-d2" points="366.8,341.1 387.6,353.1 387.6,377.1 366.8,365.1" />
+      <polygon className="k-d4" points="368.5,344.1 385.8,354.1 385.8,374.1 368.5,364.1" />
+      <polygon className="k-d5" points="368.4,344.2 373.6,347.2 373.6,367.2 368.4,364.2" />
+      <polygon className="k-d2" points="366.8,307.1 387.6,319.1 387.6,343.1 366.8,331.1" />
+      <polygon className="k-gold3" points="368.5,310.1 385.8,320.1 385.8,340.1 368.5,330.1" />
+      <polygon className="k-gold" points="368.4,323.2 385.7,333.2 385.7,340.2 368.4,330.2" />
+      <polygon className="k-d2" points="366.8,273.1 387.6,285.1 387.6,309.1 366.8,297.1" />
+      <polygon className="k-d4" points="368.5,276.1 385.8,286.1 385.8,306.1 368.5,296.1" />
+      <polygon className="k-d5" points="368.4,276.2 373.6,279.2 373.6,299.2 368.4,296.2" />
+      <polygon className="k-d2" points="366.8,239.1 387.6,251.1 387.6,275.1 366.8,263.1" />
+      <polygon className="k-gold3" points="368.5,242.1 385.8,252.1 385.8,272.1 368.5,262.1" />
+      <polygon className="k-gold" points="368.4,255.2 385.7,265.2 385.7,272.2 368.4,262.2" />
+      <polygon className="k-d2" points="366.8,205.1 387.6,217.1 387.6,241.1 366.8,229.1" />
+      <polygon className="k-d4" points="368.5,208.1 385.8,218.1 385.8,238.1 368.5,228.1" />
+      <polygon className="k-d5" points="368.4,208.2 373.6,211.2 373.6,231.2 368.4,228.2" />
+      <polygon className="k-d2" points="366.8,171.1 387.6,183.1 387.6,207.1 366.8,195.1" />
+      <polygon className="k-d4" points="368.5,174.1 385.8,184.1 385.8,204.1 368.5,194.1" />
+      <polygon className="k-d5" points="368.4,174.1 373.6,177.1 373.6,197.1 368.4,194.1" />
+      <polygon className="k-d2" points="396.3,358.1 417,370.1 417,394.1 396.3,382.1" />
+      <polygon className="k-gold3" points="397.9,361.1 415.2,371.1 415.2,391.1 397.9,381.1" />
+      <polygon className="k-gold" points="397.8,374.2 415.1,384.2 415.1,391.2 397.8,381.2" />
+      <polygon className="k-d2" points="396.3,324.1 417,336.1 417,360.1 396.3,348.1" />
+      <polygon className="k-d4" points="397.9,327.1 415.2,337.1 415.2,357.1 397.9,347.1" />
+      <polygon className="k-d5" points="397.8,327.2 403,330.2 403,350.2 397.8,347.2" />
+      <polygon className="k-d2" points="396.3,290.1 417,302.1 417,326.1 396.3,314.1" />
+      <polygon className="k-d4" points="397.9,293.1 415.2,303.1 415.2,323.1 397.9,313.1" />
+      <polygon className="k-d5" points="397.8,293.2 403,296.2 403,316.2 397.8,313.2" />
+      <polygon className="k-d2" points="396.3,256.1 417,268.1 417,292.1 396.3,280.1" />
+      <polygon className="k-d4" points="397.9,259.1 415.2,269.1 415.2,289.1 397.9,279.1" />
+      <polygon className="k-d5" points="397.8,259.2 403,262.2 403,282.2 397.8,279.2" />
+      <polygon className="k-d2" points="396.3,222.1 417,234.1 417,258.1 396.3,246.1" />
+      <polygon className="k-d4" points="397.9,225.1 415.2,235.1 415.2,255.1 397.9,245.1" />
+      <polygon className="k-d5" points="397.8,225.2 403,228.2 403,248.2 397.8,245.2" />
+      <polygon className="k-d2" points="396.3,188.1 417,200.1 417,224.1 396.3,212.1" />
+      <polygon className="k-gold3" points="397.9,191.1 415.2,201.1 415.2,221.1 397.9,211.1" />
+      <polygon className="k-gold" points="397.8,204.1 415.1,214.2 415.1,221.2 397.8,211.2" />
+      <polygon className="k-d2" points="425.7,375.1 446.5,387.1 446.5,411.1 425.7,399.1" />
+      <polygon className="k-d4" points="427.3,378.1 444.7,388.1 444.7,408.1 427.3,398.1" />
+      <polygon className="k-d5" points="427.3,378.2 432.5,381.2 432.5,401.2 427.3,398.2" />
+      <polygon className="k-d2" points="425.7,341.1 446.5,353.1 446.5,377.1 425.7,365.1" />
+      <polygon className="k-d4" points="427.3,344.1 444.7,354.1 444.7,374.1 427.3,364.1" />
+      <polygon className="k-d5" points="427.3,344.2 432.5,347.2 432.5,367.2 427.3,364.2" />
+      <polygon className="k-d2" points="425.7,307.1 446.5,319.1 446.5,343.1 425.7,331.1" />
+      <polygon className="k-gold3" points="427.3,310.1 444.7,320.1 444.7,340.1 427.3,330.1" />
+      <polygon className="k-gold" points="427.3,323.2 444.6,333.2 444.6,340.2 427.3,330.2" />
+      <polygon className="k-d2" points="425.7,273.1 446.5,285.1 446.5,309.1 425.7,297.1" />
+      <polygon className="k-d4" points="427.3,276.1 444.7,286.1 444.7,306.1 427.3,296.1" />
+      <polygon className="k-d5" points="427.3,276.2 432.5,279.2 432.5,299.2 427.3,296.2" />
+      <polygon className="k-d2" points="425.7,239.1 446.5,251.1 446.5,275.1 425.7,263.1" />
+      <polygon className="k-d4" points="427.3,242.1 444.7,252.1 444.7,272.1 427.3,262.1" />
+      <polygon className="k-d5" points="427.3,242.2 432.5,245.2 432.5,265.2 427.3,262.2" />
+      <polygon className="k-d2" points="425.7,205.1 446.5,217.1 446.5,241.1 425.7,229.1" />
+      <polygon className="k-gold3" points="427.3,208.1 444.7,218.1 444.7,238.1 427.3,228.1" />
+      <polygon className="k-gold" points="427.3,221.2 444.6,231.2 444.6,238.2 427.3,228.2" />
+      <polygon className="k-d1" points="378.8,362.1 401.4,375.1 401.4,409.1 378.8,396.1" />
+      <polygon className="k-d3" points="380.5,365.2 399.5,376.2 399.5,406.2 380.5,395.2" />
+      <polygon className="k-d1" points="561.1,143.1 457.1,203.1 457.1,359.1 561.1,299.1" />
+      <polygon className="k-d3" points="556,152.2 462.5,206.2 462.5,350.2 556,296.2" />
+      <polygon className="k-d1" points="543.7,309.1 538.5,312.1 538.5,354.1 543.7,351.1" />
+      <polygon className="k-d1" points="479.6,346.1 474.4,349.1 474.4,391.1 479.6,388.1" />
+      <g transform="matrix(0.8660254 -0.5 0 1 462.6 206.3)">
+        <text className="k-txt-m" x="9" y="20" fontSize="9">Puedes gastar hoy</text>
+        <text className="k-txt" x="9" y="50" fontSize="30">$475</text>
+        <rect className="k-d4" x="9" y="58" width="90" height="6" rx="3" />
+        <rect className="k-gold" x="9" y="58" width="32.4" height="6" rx="3" />
+        <text className="k-txt-m" x="9" y="77" fontSize="7">por día · 12 días más</text>
+        <rect className="k-d2" x="9" y="86" width="90" height="17" rx="5" />
+        <circle className="k-teal2" cx="18" cy="94.5" r="3.5" />
+        <text className="k-txt-s" x="26" y="97.5" fontSize="7.5">Súper</text>
+        <text className="k-txt-s" x="95" y="97.5" fontSize="7.5" textAnchor="end">−$280</text>
+        <rect className="k-d2" x="9" y="107" width="90" height="17" rx="5" />
+        <circle className="k-gold" cx="18" cy="115.5" r="3.5" />
+        <text className="k-txt-s" x="26" y="118.5" fontSize="7.5">Café</text>
+        <text className="k-txt-s" x="95" y="118.5" fontSize="7.5" textAnchor="end">−$55</text>
       </g>
-
-      <g transform="translate(400 400) rotate(-6)">
-        <rect className="k-d1" x="-124" y="-222" width="248" height="444" rx="40" />
-        <rect className="k-d3" x="-110" y="-208" width="220" height="416" rx="30" />
-        <text className="k-txt-m" x="-90" y="-156" fontSize="14">Puedes gastar hoy</text>
-        <text className="k-txt" x="-90" y="-102" fontSize="56">$475</text>
-        <rect className="k-d4" x="-90" y="-80" width="180" height="9" rx="4.5" />
-        <rect className="k-gold" x="-90" y="-80" width="62" height="9" rx="4.5" />
-        <text className="k-txt-m" x="-90" y="-50" fontSize="11.5">por día, durante 12 días más</text>
-        <rect className="k-linea" x="-90" y="-34" width="180" height="1.2" />
-        <text className="k-txt-m" x="-90" y="-10" fontSize="10.5">Disponible total</text>
-        <text className="k-txt" x="-90" y="16" fontSize="19">$5,700</text>
-        <text className="k-txt-m" x="90" y="-10" fontSize="10.5" textAnchor="end">Días restantes</text>
-        <text className="k-txt" x="90" y="16" fontSize="19" textAnchor="end">12</text>
-        <rect className="k-d2" x="-90" y="40" width="180" height="40" rx="12" />
-        <circle className="k-teal2" cx="-70" cy="60" r="7.5" />
-        <text className="k-txt-s" x="-54" y="64" fontSize="12">Súper</text>
-        <text className="k-txt-s" x="76" y="64" fontSize="12" textAnchor="end">−$280</text>
-        <rect className="k-d2" x="-90" y="88" width="180" height="40" rx="12" />
-        <circle className="k-gold" cx="-70" cy="108" r="7.5" />
-        <text className="k-txt-s" x="-54" y="112" fontSize="12">Café</text>
-        <text className="k-txt-s" x="76" y="112" fontSize="12" textAnchor="end">−$55</text>
-        <rect className="k-d2" x="-90" y="136" width="180" height="40" rx="12" />
-        <circle className="k-teal" cx="-70" cy="156" r="7.5" />
-        <text className="k-txt-s" x="-54" y="160" fontSize="12">Gasolina</text>
-        <text className="k-txt-s" x="76" y="160" fontSize="12" textAnchor="end">−$420</text>
-        <rect className="k-gold" x="-52" y="182" width="104" height="14" rx="7" />
-      </g>
-
-      <g transform="translate(95 130) rotate(-10)">
-        <g className="flota">
-          <rect className="k-d4" x="-8" y="62" width="46" height="88" rx="15" />
-          <rect className="k-d2" x="0" y="74" width="30" height="12" rx="5" />
-          <rect className="k-cream" x="34" y="168" width="32" height="58" rx="15" transform="rotate(8 50 170)" />
-          <rect className="k-cream" x="74" y="168" width="32" height="58" rx="15" transform="rotate(-10 90 170)" />
-          <rect className="k-gold" x="28" y="214" width="42" height="20" rx="9" transform="rotate(8 50 224)" />
-          <rect className="k-gold" x="72" y="214" width="42" height="20" rx="9" transform="rotate(-10 90 224)" />
-          <rect className="k-cream" x="-6" y="88" width="30" height="72" rx="15" transform="rotate(26 9 94)" />
-          <circle className="k-gold" cx="-22" cy="152" r="13" />
-          <rect className="k-white" x="22" y="70" width="98" height="112" rx="38" />
-          <rect className="k-d3" x="46" y="104" width="50" height="30" rx="9" />
-          <circle className="k-gold" cx="59" cy="119" r="5" />
-          <circle className="k-coral" cx="73" cy="119" r="5" />
-          <circle className="k-teal2" cx="87" cy="119" r="5" />
-          <rect className="k-cream" x="108" y="78" width="30" height="76" rx="15" transform="rotate(-62 123 90)" />
-          <circle className="k-gold" cx="190" cy="126" r="14" />
-          <circle className="k-white" cx="70" cy="46" r="48" />
-          <ellipse className="k-d1" cx="76" cy="46" rx="33" ry="27" />
-          <ellipse className="k-mint" cx="66" cy="37" rx="10" ry="5" transform="rotate(-25 66 37)" opacity="0.7" />
-          <circle className="k-coral" cx="70" cy="-3" r="5" />
-          <path className="k-t-w" d="M70 -3 L70 -14" />
-        </g>
-      </g>
-
-      <g transform="translate(40 330) rotate(-14)">
-        <g className="flota flota-b">
-          <rect className="k-teal" width="150" height="96" rx="15" />
-          <rect className="k-d1" y="22" width="150" height="15" />
-          <rect className="k-gold" x="18" y="52" width="28" height="21" rx="4" />
-          <text className="k-txt-s" x="18" y="86" fontSize="10.5">•••• 4821</text>
-        </g>
-      </g>
-
-      <g transform="translate(545 95) rotate(8)">
-        <g className="flota flota-c">
-          <rect className="k-d4" width="162" height="140" rx="20" />
-          <text className="k-txt-s" x="18" y="29" fontSize="12">Quincena 1–15</text>
-          <rect className="k-gold" x="18" y="42" width="20" height="20" rx="6" />
-          <rect className="k-gold" x="44" y="42" width="20" height="20" rx="6" />
-          <rect className="k-gold" x="70" y="42" width="20" height="20" rx="6" />
-          <rect className="k-gold" x="96" y="42" width="20" height="20" rx="6" />
-          <rect className="k-gold" x="122" y="42" width="20" height="20" rx="6" />
-          <rect className="k-gold" x="18" y="68" width="20" height="20" rx="6" />
-          <rect className="k-gold" x="44" y="68" width="20" height="20" rx="6" />
-          <rect className="k-teal" x="70" y="68" width="20" height="20" rx="6" />
-          <rect className="k-teal2" x="96" y="68" width="20" height="20" rx="6" />
-          <rect className="k-teal2" x="122" y="68" width="20" height="20" rx="6" />
-          <rect className="k-teal2" x="18" y="94" width="20" height="20" rx="6" />
-          <rect className="k-teal2" x="44" y="94" width="20" height="20" rx="6" />
-          <rect className="k-teal2" x="70" y="94" width="20" height="20" rx="6" />
-          <rect className="k-teal2" x="96" y="94" width="20" height="20" rx="6" />
-          <rect className="k-teal2" x="122" y="94" width="20" height="20" rx="6" />
-        </g>
-      </g>
-
-      <g transform="translate(615 330)">
-        <g className="flota flota-b">
-          <circle className="k-d3" cx="66" cy="66" r="66" />
-          <circle className="k-anillo-pista" cx="66" cy="66" r="46" />
-          <circle className="k-anillo" cx="66" cy="66" r="46" transform="rotate(-90 66 66)" />
-          <text className="k-txt" x="66" y="73" fontSize="20" textAnchor="middle">70%</text>
-          <text className="k-txt-s" x="66" y="142" fontSize="12" textAnchor="middle">Meta: viaje</text>
-        </g>
-      </g>
-
-      <g transform="translate(528 505) rotate(-3)">
-        <rect className="k-teal" x="16" y="8" width="156" height="196" rx="54" />
-        <rect className="k-d4" x="38" y="30" width="112" height="150" rx="40" />
-        <rect className="k-teal2" x="-2" y="134" width="192" height="66" rx="27" />
-        <rect className="k-teal" x="-20" y="106" width="40" height="94" rx="19" />
-        <rect className="k-teal" x="168" y="106" width="40" height="94" rx="19" />
-        <rect className="k-d1" x="10" y="196" width="20" height="34" rx="7" />
-        <rect className="k-d1" x="158" y="196" width="20" height="34" rx="7" />
-        <g transform="rotate(-6 94 114)">
-          <rect className="k-bun2" x="52" y="40" width="84" height="150" rx="42" />
-          <rect className="k-bun" x="48" y="36" width="76" height="152" rx="38" />
-          <rect className="k-coral" x="62" y="22" width="60" height="178" rx="30" />
-          <path className="k-t-m" d="M64 64 q8 -10 16 0 t16 0 t16 0 t10 0" />
-          <path className="k-t-m" d="M64 154 q8 -10 16 0 t16 0 t16 0 t10 0" />
-          <circle className="k-white" cx="82" cy="102" r="10" />
-          <circle className="k-white" cx="106" cy="102" r="10" />
-          <circle className="k-d1" cx="85" cy="104" r="4.5" />
-          <circle className="k-d1" cx="109" cy="104" r="4.5" />
-          <path className="k-t-d" d="M82 126 q12 12 24 0" />
-          <rect className="k-bun2" x="38" y="122" width="34" height="15" rx="7.5" transform="rotate(26 44 129)" />
-          <rect className="k-bun2" x="114" y="116" width="34" height="15" rx="7.5" transform="rotate(-48 140 123)" />
-          <g className="brilla">
-            <circle className="k-gold" cx="156" cy="92" r="13" />
-            <circle className="k-gold2" cx="156" cy="92" r="8" />
-          </g>
-          <rect className="k-bun2" x="68" y="190" width="18" height="34" rx="9" transform="rotate(8 77 192)" />
-          <rect className="k-bun2" x="98" y="190" width="18" height="34" rx="9" transform="rotate(-8 107 192)" />
-          <rect className="k-coral2" x="60" y="218" width="30" height="14" rx="7" />
-          <rect className="k-coral2" x="94" y="218" width="30" height="14" rx="7" />
-        </g>
-      </g>
-
-      <g transform="translate(330 705)">
+      <g><polygon className="k-gray2" points="463.9,377 476,384 476,404 463.9,397" />
+      <polygon className="k-gray2" points="498.5,371 476,384 476,404 498.5,391" />
+      <polygon className="k-gray" points="486.4,364 498.5,371 476,384 463.9,377" /></g>
+      <polyline className="k-t-d" points="552.7,140.3 552.7,356.3" />
+      <polygon className="k-gray2" points="406.7,50 432.7,65 432.7,99 406.7,84" />
+      <polygon className="k-d5" points="458.7,50 432.7,65 432.7,99 458.7,84" />
+      <polygon className="k-gray" points="432.7,35 458.7,50 432.7,65 406.7,50" />
+      <polygon className="k-d4" points="432.7,35 458.7,50 432.7,65 406.7,50" />
+      <polyline className="k-t-w" points="517.6,126 517.6,56" />
+      <circle className="k-coral" cx="517.6" cy="54" r="4.5" />
+      <g transform="translate(444.8 136)">
         <g className="brilla brilla-b">
-          <ellipse className="k-gold2" cx="0" cy="12" rx="40" ry="12" />
-          <rect className="k-gold2" x="-40" y="0" width="80" height="12" />
-          <ellipse className="k-gold" cx="0" cy="0" rx="40" ry="12" />
-          <ellipse className="k-gold2" cx="0" cy="-16" rx="40" ry="12" />
-          <rect className="k-gold2" x="-40" y="-16" width="80" height="16" />
-          <ellipse className="k-gold" cx="0" cy="-16" rx="40" ry="12" />
+          <circle className="k-gold" cx="6" cy="-112" r="9" /><circle className="k-gold2" cx="6" cy="-112" r="5.5" />
+          <circle className="k-gold" cx="2" cy="-86" r="9" /><circle className="k-gold2" cx="2" cy="-86" r="5.5" />
         </g>
+        <ellipse className="k-d2" cx="0" cy="2" rx="40" ry="10" />
+        <rect className="k-pink2" x="-24" y="-16" width="11" height="18" rx="5" />
+        <rect className="k-pink2" x="14" y="-16" width="11" height="18" rx="5" />
+        <ellipse className="k-pink" cx="0" cy="-36" rx="40" ry="31" />
+        <path className="k-pink2" d="M-38 -30 C-36 -10 -10 -4 10 -6 C28 -8 38 -18 40 -34 C38 -8 18 -4 0 -4 C-20 -4 -36 -12 -38 -30Z" />
+        <ellipse className="k-pink3" cx="-14" cy="-54" rx="13" ry="6" transform="rotate(-18 -14 -54)" />
+        <path className="k-pink2" d="M-20 -62 L-28 -80 L-8 -66Z" />
+        <path className="k-pink2" d="M8 -66 L20 -82 L22 -62Z" />
+        <rect className="k-d1" x="-10" y="-68" width="22" height="5" rx="2.5" />
+        <ellipse className="k-pink2" cx="34" cy="-36" rx="12" ry="10" />
+        <circle className="k-d2" cx="31" cy="-37" r="2.2" /><circle className="k-d2" cx="38" cy="-37" r="2.2" />
+        <rect className="k-d1" x="10" y="-52" width="28" height="9" rx="4.5" />
+        <path className="k-t-d" d="M10 -48 L-2 -50" />
+        <circle className="k-pink3" cx="20" cy="-30" r="5" />
+        <path className="k-t-p" d="M-40 -36 c-10 -4 -12 -14 -4 -16 c6 -1 6 8 -2 8" />
+        <rect className="k-pink2" x="-30" y="-12" width="10" height="14" rx="4" />
+        <rect className="k-pink2" x="20" y="-12" width="10" height="14" rx="4" />
       </g>
-      <g transform="translate(250 210)">
-        <g className="flota flota-c">
-          <circle className="k-gold" r="18" />
-          <circle className="k-gold2" r="12" />
-          <text className="k-txt-o" y="5" fontSize="16" textAnchor="middle">$</text>
+      <polygon className="k-d4" points="153.9,236 231.8,281 231.8,441 153.9,396" />
+      <polygon className="k-d3" points="318.4,231 231.8,281 231.8,441 318.4,391" />
+      <polygon className="k-d5" points="240.5,186 318.4,231 231.8,281 153.9,236" />
+      <polygon className="k-teal3" points="153.9,236 231.8,281 231.8,289 153.9,244" />
+      <polygon className="k-d2" points="162.4,359.1 178,368.1 178,390.1 162.4,381.1" />
+      <polygon className="k-gold3" points="164.1,362.1 176.2,369.1 176.2,387.1 164.1,380.1" />
+      <polygon className="k-gold" points="164,373.8 176.1,380.8 176.1,387.2 164,380.2" />
+      <polygon className="k-d2" points="162.4,327.1 178,336.1 178,358.1 162.4,349.1" />
+      <polygon className="k-d4" points="164.1,330.1 176.2,337.1 176.2,355.1 164.1,348.1" />
+      <polygon className="k-d5" points="164,330.2 167.6,332.3 167.6,350.3 164,348.2" />
+      <polygon className="k-d2" points="162.4,295.1 178,304.1 178,326.1 162.4,317.1" />
+      <polygon className="k-d4" points="164.1,298.1 176.2,305.1 176.2,323.1 164.1,316.1" />
+      <polygon className="k-d5" points="164,298.2 167.6,300.3 167.6,318.3 164,316.2" />
+      <polygon className="k-d2" points="162.4,263.1 178,272.1 178,294.1 162.4,285.1" />
+      <polygon className="k-gold3" points="164.1,266.1 176.2,273.1 176.2,291.1 164.1,284.1" />
+      <polygon className="k-gold" points="164,277.8 176.1,284.8 176.1,291.2 164,284.2" />
+      <polygon className="k-d2" points="184.9,372.1 200.5,381.1 200.5,403.1 184.9,394.1" />
+      <polygon className="k-d4" points="186.6,375.1 198.7,382.1 198.7,400.1 186.6,393.1" />
+      <polygon className="k-d5" points="186.5,375.2 190.1,377.3 190.1,395.3 186.5,393.2" />
+      <polygon className="k-d2" points="184.9,340.1 200.5,349.1 200.5,371.1 184.9,362.1" />
+      <polygon className="k-d4" points="186.6,343.1 198.7,350.1 198.7,368.1 186.6,361.1" />
+      <polygon className="k-d5" points="186.5,343.2 190.1,345.3 190.1,363.3 186.5,361.2" />
+      <polygon className="k-d2" points="184.9,308.1 200.5,317.1 200.5,339.1 184.9,330.1" />
+      <polygon className="k-gold3" points="186.6,311.1 198.7,318.1 198.7,336.1 186.6,329.1" />
+      <polygon className="k-gold" points="186.5,322.8 198.6,329.8 198.6,336.2 186.5,329.2" />
+      <polygon className="k-d2" points="184.9,276.1 200.5,285.1 200.5,307.1 184.9,298.1" />
+      <polygon className="k-d4" points="186.6,279.1 198.7,286.1 198.7,304.1 186.6,297.1" />
+      <polygon className="k-d5" points="186.5,279.2 190.1,281.3 190.1,299.3 186.5,297.2" />
+      <polygon className="k-d2" points="207.5,385.1 223,394.1 223,416.1 207.5,407.1" />
+      <polygon className="k-d4" points="209.1,388.1 221.2,395.1 221.2,413.1 209.1,406.1" />
+      <polygon className="k-d5" points="209,388.2 212.7,390.3 212.7,408.3 209,406.2" />
+      <polygon className="k-d2" points="207.5,353.1 223,362.1 223,384.1 207.5,375.1" />
+      <polygon className="k-gold3" points="209.1,356.1 221.2,363.1 221.2,381.1 209.1,374.1" />
+      <polygon className="k-gold" points="209,367.8 221.1,374.8 221.1,381.2 209,374.2" />
+      <polygon className="k-d2" points="207.5,321.1 223,330.1 223,352.1 207.5,343.1" />
+      <polygon className="k-d4" points="209.1,324.1 221.2,331.1 221.2,349.1 209.1,342.1" />
+      <polygon className="k-d5" points="209,324.2 212.7,326.3 212.7,344.3 209,342.2" />
+      <polygon className="k-d2" points="207.5,289.1 223,298.1 223,320.1 207.5,311.1" />
+      <polygon className="k-gold3" points="209.1,292.1 221.2,299.1 221.2,317.1 209.1,310.1" />
+      <polygon className="k-gold" points="209,303.8 221.1,310.8 221.1,317.2 209,310.2" />
+      <polygon className="k-d1" points="306.4,258.1 244.1,294.1 244.1,364.1 306.4,328.1" />
+      <polygon className="k-d2" points="303.2,264.2 247.7,296.2 247.7,358.2 303.2,326.2" />
+      <g transform="matrix(0.8660254 -0.5 0 1 247.8 296.3)">
+        <polyline className="k-t-m" points="6,48 16,38 24,44 34,24 42,32 52,14 58,20" />
+        <polyline className="k-t-c" points="6,56 16,52 26,54 36,46 46,50 58,40" />
+      </g>
+      <g transform="translate(231.8 231)">
+        <path className="k-teal2" d="M-6 -4 C-24 -20 -20 -40 -8 -46 C-4 -30 0 -18 -6 -4Z" />
+        <path className="k-teal" d="M2 -4 C10 -26 26 -34 34 -30 C24 -18 14 -8 2 -4Z" />
+        <path className="k-mint" d="M-2 -6 C-4 -30 4 -50 12 -54 C14 -36 8 -20 -2 -6Z" />
+        <path className="k-coral" d="M-12 -2 L12 -2 L8 14 L-8 14Z" />
+        <rect className="k-coral2" x="-13" y="-4" width="26" height="5" rx="2" />
+      </g>
+      <polygon className="k-teal2" points="289,498 301.9,505.5 301.9,525.5 289,518" />
+      <polygon className="k-teal" points="331.4,488.5 301.9,505.5 301.9,525.5 331.4,508.5" />
+      <polygon className="k-mint" points="318.4,481 331.4,488.5 301.9,505.5 289,498" />
+      <polygon className="k-teal2" points="276,470.5 289,478 289,518 276,510.5" />
+      <polygon className="k-teal" points="318.4,461 289,478 289,518 318.4,501" />
+      <polygon className="k-mint" points="305.4,453.5 318.4,461 289,478 276,470.5" />
+      <polygon className="k-teal2" points="263,443 276,450.5 276,510.5 263,503" />
+      <polygon className="k-teal" points="305.4,433.5 276,450.5 276,510.5 305.4,493.5" />
+      <polygon className="k-mint" points="292.4,426 305.4,433.5 276,450.5 263,443" />
+      <polygon className="k-teal2" points="250,415.5 263,423 263,503 250,495.5" />
+      <polygon className="k-teal" points="292.4,406 263,423 263,503 292.4,486" />
+      <polygon className="k-mint" points="279.4,398.5 292.4,406 263,423 250,415.5" />
+      <polygon className="k-teal2" points="237,388 250,395.5 250,495.5 237,488" />
+      <polygon className="k-teal" points="279.4,378.5 250,395.5 250,495.5 279.4,478.5" />
+      <polygon className="k-mint" points="266.4,371 279.4,378.5 250,395.5 237,388" />
+      <polygon className="k-teal2" points="224,360.5 237,368 237,488 224,480.5" />
+      <polygon className="k-teal" points="266.4,351 237,368 237,488 266.4,471" />
+      <polygon className="k-mint" points="253.4,343.5 266.4,351 237,368 224,360.5" />
+      <polygon className="k-teal2" points="211,333 224,340.5 224,480.5 211,473" />
+      <polygon className="k-teal" points="253.4,323.5 224,340.5 224,480.5 253.4,463.5" />
+      <polygon className="k-mint" points="240.5,316 253.4,323.5 224,340.5 211,333" />
+      <g transform="translate(269.9 431)">
+        <path className="k-gold2" d="M-28 0 C-30 -18 -10 -26 8 -24 C24 -22 30 -10 28 0Z" />
+        <path className="k-gold" d="M-20 -4 C-20 -16 -4 -22 10 -20 C20 -18 24 -10 22 -4Z" />
+        <circle className="k-gold2" cx="22" cy="-16" r="11" />
+        <path className="k-gold2" d="M14 -24 L16 -34 L22 -26Z" /><path className="k-gold2" d="M26 -26 L32 -34 L32 -22Z" />
+        <path className="k-t-d" d="M18 -16 q3 2 6 0 M24 -14 q2 2 4 0" />
+        <path className="k-t-n" d="M-28 -2 C-40 -6 -40 -18 -30 -18" />
+        <text className="k-txt-s" x="34" y="-34" fontSize="9">z</text><text className="k-txt-s" x="42" y="-44" fontSize="7">z</text>
+      </g>
+      <polygon className="k-pink" points="370.4,457 439.6,497 439.6,561 370.4,521" />
+      <polygon className="k-pink2" points="500.3,462 439.6,497 439.6,561 500.3,526" />
+      <polygon className="k-cream" points="431,422 500.3,462 439.6,497 370.4,457" />
+      <polygon className="k-coral" points="366.9,453 382.1,461.8 366.5,482.8 351.3,474" />
+      <polygon className="k-cream" points="382.1,461.8 397.4,470.6 381.8,491.6 366.5,482.8" />
+      <polygon className="k-coral" points="397.4,470.6 412.6,479.4 397,500.4 381.8,491.6" />
+      <polygon className="k-cream" points="412.6,479.4 427.9,488.2 412.3,509.2 397,500.4" />
+      <polygon className="k-coral" points="427.9,488.2 443.1,497 427.5,518 412.3,509.2" />
+      <polygon className="k-d2" points="378.8,486.1 430.8,516.1 430.8,546.1 378.8,516.1" />
+      <polygon className="k-gold3" points="380.5,489.2 429,517.2 429,543.2 380.5,515.2" />
+      <g transform="matrix(0.8660254 0.5 0 1 396 502.2)"><text className="k-txt-o" x="0" y="16" fontSize="18">$</text></g>
+      <polygon className="k-gold" points="490,480.1 450.2,503.1 450.2,533.1 490,510.1" />
+      <g transform="matrix(0.8660254 -0.5 0 1 450.4 503.2)"><text className="k-txt-o" x="23" y="21" fontSize="15" textAnchor="middle">K</text></g>
+      <g transform="translate(145.2 421)">
+        <rect className="k-d1" x="-2" y="-60" width="4" height="60" />
+        <rect className="k-d1" x="-7" y="-66" width="14" height="8" rx="2" />
+        <circle className="k-gold3" cx="0" cy="-70" r="7" /><circle className="k-gold" cx="0" cy="-70" r="3.5" />
+      </g>
+      <g className="flota flota-b"><g transform="translate(215 265)">
+        <polygon className="k-d2" points="349.6,367 405,399 387,445 369.6,397" />
+        <polygon className="k-d1" points="405,399 460.4,367 444.4,393 387,445" />
+        <polygon className="k-d4" points="349.6,353 405,385 405,399 349.6,367" />
+      <polygon className="k-d3" points="460.4,353 405,385 405,399 460.4,367" />
+      <polygon className="k-teal2" points="405,321 460.4,353 405,385 349.6,353" />
+        <polygon className="k-gray2" points="411.9,341 425.8,349 425.8,359 411.9,351" />
+      <polygon className="k-d5" points="439.6,341 425.8,349 425.8,359 439.6,351" />
+      <polygon className="k-gray" points="425.8,333 439.6,341 425.8,349 411.9,341" />
+        <polyline className="k-t-w" points="401.5,341 401.5,251" />
+        <path className="k-gold" d="M401.5 253 l40 8 l-8 12 l8 12 l-40 -6Z" />
+        <path className="k-gold2" d="M401.5 273 l40 6 l-8 -6 l8 -6 l-40 -2Z" opacity="0.7" />
+        <text className="k-txt-o" x="417.5" y="268" fontSize="9" textAnchor="middle">META</text>
+        <circle className="k-gold3" cx="401.5" cy="249" r="3.5" />
+        <g transform="translate(398.1 365)">
+          <path className="k-teal" d="M0 0 C-12 -6 -12 -22 0 -26 C12 -22 12 -6 0 0Z" />
+          <path className="k-mint" d="M-2 -4 C-8 -10 -6 -20 0 -22 C0 -14 0 -8 -2 -4Z" />
         </g>
-      </g>
-      <g transform="translate(470 685)">
-        <g className="flota">
-          <circle className="k-gold" r="13" />
-          <circle className="k-gold2" r="8.5" />
+      </g></g>
+      <g transform="translate(574 236) scale(0.76)">
+      <g className="flota">
+        <g className="llama-abajo">
+          <path className="k-gold2" d="M30 176 C24 206 34 226 44 236 C52 218 56 200 50 176Z" />
+          <path className="k-gold3" d="M34 178 C32 198 38 210 44 218 C48 204 50 192 46 178Z" />
         </g>
+        <rect className="k-gray2" x="18" y="92" width="48" height="90" rx="14" />
+        <rect className="k-gray" x="22" y="96" width="40" height="80" rx="11" />
+        <rect className="k-d3" x="28" y="174" width="26" height="10" rx="4" />
+        <rect className="k-coral" x="28" y="110" width="28" height="8" rx="4" />
+        <path className="k-gray" d="M66 196 C62 220 66 238 74 250 L96 246 C92 230 92 214 96 196Z" />
+        <path className="k-gold2" d="M70 246 C70 258 80 264 98 262 C104 262 106 254 102 246Z" />
+        <rect className="k-d2" x="70" y="258" width="34" height="6" rx="3" />
+        <path className="k-white" d="M50 112 C46 92 62 78 92 78 C124 78 142 94 140 120 L136 196 C134 212 120 220 94 220 C66 220 54 210 54 192Z" />
+        <path className="k-gray" d="M120 84 C136 92 142 106 140 122 L136 196 C134 210 124 218 106 220 C120 206 124 186 122 160 C120 132 124 106 120 84Z" />
+        <rect className="k-gray" x="58" y="182" width="78" height="14" rx="6" />
+        <rect className="k-gold" x="88" y="183" width="14" height="12" rx="3" />
+        <rect className="k-d3" x="70" y="120" width="52" height="36" rx="8" />
+        <rect className="k-d1" x="76" y="126" width="22" height="12" rx="3" />
+        <polyline className="k-t-m2" points="78,134 82,130 86,134 90,128 96,132" />
+        <circle className="k-coral" cx="106" cy="131" r="4.5" /><circle className="k-gold" cx="116" cy="131" r="4.5" />
+        <rect className="k-teal2" x="76" y="144" width="40" height="6" rx="3" />
+        <path className="k-t-g" d="M60 150 C40 156 38 176 54 186" />
+        <path className="k-white" d="M104 204 C110 228 124 244 140 254 L154 238 C140 228 132 214 130 198Z" />
+        <path className="k-gray" d="M120 222 C128 234 138 244 148 248 L154 238 C142 230 134 220 130 206Z" />
+        <path className="k-gold2" d="M138 252 C142 266 156 270 170 262 C176 258 174 248 166 242 L150 238Z" />
+        <rect className="k-d2" x="146" y="258" width="28" height="6" rx="3" transform="rotate(-28 160 261)" />
+        <path className="k-gray" d="M58 120 C40 128 30 146 30 166 L46 170 C46 152 54 140 66 134Z" />
+        <circle className="k-gold2" cx="37" cy="172" r="11" />
+        <path className="k-white" d="M128 116 C150 120 164 134 168 150 L152 158 C148 146 140 138 126 136Z" />
+        <path className="k-gray" d="M150 130 C160 138 166 146 168 150 L156 156 C154 148 150 140 144 134Z" />
+        <path className="k-gold2" d="M150 156 C152 168 160 176 170 176 C176 176 180 170 178 164 L170 148Z" />
+        <path className="k-gold2" d="M172 170 L196 190 C200 194 196 200 190 196 L168 178Z" />
+        <circle className="k-white" cx="96" cy="54" r="50" />
+        <path className="k-gray" d="M136 26 C152 46 150 78 128 96 C112 106 90 108 72 100 C102 102 132 86 136 56 C138 44 138 34 136 26Z" />
+        <circle className="k-gray" cx="96" cy="54" r="40" />
+        <circle className="k-d1" cx="100" cy="56" r="36" />
+        <path className="k-teal" d="M72 74 C76 88 92 94 110 90 C124 86 132 74 134 62 C126 82 104 90 86 84 C78 82 74 78 72 74Z" />
+        <path className="k-mint" d="M78 34 C86 26 100 24 110 28 C100 28 90 32 84 40Z" />
+        <rect className="k-gold" x="108" y="62" width="14" height="8" rx="2" transform="rotate(-20 115 66)" />
+        <circle className="k-white" cx="116" cy="40" r="4" /><circle className="k-white" cx="124" cy="48" r="2" />
+        <circle className="k-coral" cx="96" cy="2" r="6" />
+        <path className="k-t-w" d="M96 4 L96 -10" />
+        <circle className="k-gold" cx="62" cy="56" r="7" />
+        <text className="k-txt-o" x="62" y="60" fontSize="9" textAnchor="middle">K</text>
       </g>
+      </g>
+      <g transform="translate(330 712)"><g className="brilla">
+        <ellipse className="k-gold2" cx="0" cy="12" rx="38" ry="12" /><rect className="k-gold2" x="-38" y="0" width="76" height="12" /><ellipse className="k-gold" cx="0" cy="0" rx="38" ry="12" />
+        <ellipse className="k-gold2" cx="0" cy="-16" rx="38" ry="12" /><rect className="k-gold2" x="-38" y="-16" width="76" height="16" /><ellipse className="k-gold" cx="0" cy="-16" rx="38" ry="12" />
+        <ellipse className="k-gold3" cx="-10" cy="-19" rx="14" ry="4" />
+      </g></g>
+      <g transform="translate(200 175)"><g className="flota flota-c"><circle className="k-gold" r="17" /><circle className="k-gold2" r="11" /><text className="k-txt-o" y="5" fontSize="15" textAnchor="middle">$</text></g></g>
+      <g transform="translate(745 150)"><g className="flota"><circle className="k-gold" r="13" /><circle className="k-gold2" r="8" /></g></g>
     </>
   );
 }
@@ -209,33 +365,46 @@ export function EscenaKorly() {
 export function SalienteArriba() {
   return (
     <>
-      <g transform="translate(190 100)">
+      <g transform="translate(190 104)">
         <g className="llama">
-          <path className="k-gold2" d="M-30 20 C-70 2 -112 18 -140 44 C-110 46 -78 58 -30 40Z" />
-          <path className="k-gold" d="M-34 26 C-62 18 -92 28 -112 42 C-88 42 -62 48 -34 38Z" />
+          <path className="k-coral" d="M-34 18 C-74 0 -118 14 -150 42 C-116 46 -82 58 -34 40Z" />
+          <path className="k-gold2" d="M-34 22 C-66 10 -100 20 -126 40 C-98 42 -70 50 -34 36Z" />
+          <path className="k-gold3" d="M-34 26 C-56 20 -80 28 -98 38 C-76 40 -56 44 -34 34Z" />
         </g>
-        <circle className="k-cream" cx="-152" cy="54" r="10" opacity="0.85" />
-        <circle className="k-cream" cx="-178" cy="62" r="7" opacity="0.7" />
-        <circle className="k-cream" cx="-198" cy="66" r="5" opacity="0.55" />
+        <circle className="k-cream" cx="-160" cy="52" r="10" opacity="0.85" /><circle className="k-cream" cx="-184" cy="60" r="7" opacity="0.7" /><circle className="k-cream" cx="-202" cy="64" r="4.5" opacity="0.55" />
+        <path className="k-t-w" d="M-120 -6 L-80 -6 M-140 8 L-100 8" opacity="0.6" />
         <g className="flota">
-          <rect className="k-coral" x="-26" y="-14" width="30" height="52" rx="10" />
-          <rect className="k-coral2" x="-22" y="34" width="22" height="14" rx="5" />
-          <rect className="k-d1" x="-20" y="-4" width="18" height="6" rx="3" />
-          <path className="k-pig2" d="M-8 6 L-48 -10 L-38 14 L-52 30 L-6 28Z" />
-          <ellipse className="k-pig" cx="30" cy="8" rx="56" ry="36" />
-          <path className="k-pig2" d="M-4 4 C14 -34 56 -44 84 -30 C70 -2 40 22 2 24Z" />
-          <circle className="k-pig" cx="86" cy="-20" r="22" />
-          <ellipse className="k-teal" cx="72" cy="-4" rx="15" ry="11" transform="rotate(-20 72 -4)" />
-          <circle className="k-d1" cx="96" cy="-24" r="9" />
-          <circle className="k-mint" cx="94" cy="-26" r="3.2" />
-          <path className="k-t-w" d="M78 -26 L72 -28" />
-          <path className="k-gold" d="M106 -20 L130 -13 L106 -5Z" />
-          <path className="k-t-c" d="M20 40 l-8 14 M38 42 l-4 14" />
+          <path className="k-pig2" d="M-4 6 L-50 -12 L-44 6 L-60 16 L-42 22 L-54 34 L-4 28Z" />
+          <path className="k-pig" d="M-6 10 L-40 0 L-34 12 L-48 20 L-6 24Z" />
+          <rect className="k-coral2" x="-30" y="-18" width="36" height="58" rx="12" />
+          <rect className="k-coral" x="-26" y="-14" width="28" height="50" rx="10" />
+          <path className="k-gold2" d="M-30 0 L-42 -8 L-42 10Z" /><path className="k-gold2" d="M-30 26 L-42 20 L-42 36Z" />
+          <rect className="k-gray2" x="-22" y="34" width="20" height="12" rx="4" />
+          <rect className="k-pink3" x="-20" y="-8" width="6" height="30" rx="3" />
+          <ellipse className="k-pig2" cx="32" cy="10" rx="58" ry="37" />
+          <ellipse className="k-pig" cx="34" cy="6" rx="54" ry="33" />
+          <path className="k-pig3" d="M50 30 C70 32 86 22 90 8 C88 26 72 40 50 38Z" />
+          <path className="k-t-d" d="M-2 -18 C10 -6 10 20 -2 34" />
+          <path className="k-pig2" d="M-6 2 C10 -40 58 -54 92 -38 C80 -6 46 20 0 24Z" />
+          <path className="k-pig" d="M2 0 C18 -30 56 -42 84 -32 C70 -10 42 10 4 16Z" />
+          <path className="k-t-n" d="M20 -6 C34 -18 50 -24 66 -26 M24 4 C40 -6 56 -12 72 -14" />
+          <path className="k-teal" d="M66 -14 C76 -26 92 -26 100 -14 C98 2 84 10 70 6Z" />
+          <path className="k-pink" d="M74 -2 C82 -10 94 -10 100 -4 C96 6 84 10 76 6Z" />
+          <circle className="k-pig" cx="92" cy="-24" r="22" />
+          <circle className="k-pig2" cx="86" cy="-20" r="10" opacity="0.5" />
+          <path className="k-t-d" d="M72 -30 C82 -38 98 -38 110 -32" />
+          <circle className="k-d1" cx="102" cy="-28" r="10" />
+          <circle className="k-mint" cx="102" cy="-28" r="6.5" />
+          <circle className="k-white" cx="99" cy="-31" r="2.2" />
+          <path className="k-cream" d="M110 -24 C114 -27 118 -26 118 -23Z" />
+          <path className="k-gold2" d="M112 -22 L136 -15 L112 -8Z" />
+          <path className="k-gold" d="M112 -22 L136 -15 L112 -15Z" />
+          <path className="k-t-c" d="M22 42 l-8 16 l-6 2 M22 42 l-8 16 l2 6 M40 44 l-4 16 l-6 2 M40 44 l-4 16 l3 6" />
         </g>
       </g>
-      <path className="k-gold" transform="translate(60 40) scale(1.1)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-white" transform="translate(292 36) scale(0.9)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <circle className="k-mint" cx="270" cy="168" r="4" />
+      <path className="k-gold" transform="translate(52 36) scale(1.1)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-white" transform="translate(296 30) scale(0.85)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <circle className="k-mint" cx="276" cy="170" r="4" />
     </>
   );
 }
@@ -244,20 +413,16 @@ export function SalienteArriba() {
 export function SalienteAbajo() {
   return (
     <>
-      <g transform="translate(110 80)">
-        <g className="brilla">
-          <circle className="k-gold" r="22" />
-          <circle className="k-gold2" r="15" />
-          <text className="k-txt-o" y="6" fontSize="19" textAnchor="middle">$</text>
-        </g>
-      </g>
-      <path className="k-gold" transform="translate(190 50) scale(1.6)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-white" transform="translate(240 112)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-mint" transform="translate(60 138) scale(0.9)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <path className="k-gold" transform="translate(290 70) scale(0.8)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-      <circle className="k-white" cx="160" cy="130" r="3" />
-      <circle className="k-mint" cx="30" cy="40" r="4" />
-      <circle className="k-gold" cx="220" cy="24" r="3" />
+      <g transform="translate(110 82)"><g className="brilla">
+        <circle className="k-gold" r="23" /><circle className="k-gold2" r="16" /><ellipse className="k-gold3" cx="-7" cy="-9" rx="8" ry="4" />
+        <text className="k-txt-o" y="7" fontSize="20" textAnchor="middle">$</text>
+      </g></g>
+      <g transform="translate(212 58)"><g className="flota flota-b"><polygon className="k-pink3" points="0,-16 14,-8 0,0 -14,-8" /><polygon className="k-pink" points="-14,-8 0,0 0,16 -14,8" /><polygon className="k-pink2" points="0,0 14,-8 14,8 0,16" /></g></g>
+      <path className="k-gold" transform="translate(190 130) scale(1.4)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-white" transform="translate(250 112) scale(0.9)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-mint" transform="translate(56 140) scale(0.9)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <path className="k-gold" transform="translate(296 66) scale(0.8)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+      <circle className="k-white" cx="160" cy="146" r="3" /><circle className="k-mint" cx="28" cy="40" r="4" /><circle className="k-gold" cx="232" cy="24" r="3" />
     </>
   );
 }

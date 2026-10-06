@@ -31,6 +31,14 @@ describe('AuthCard (pantalla de acceso)', () => {
     expect(container.querySelector('.auth-shell')).not.toBeNull();
   });
 
+  it('las figuras que se salen de la imagen van a color y en contornos, para que también cambien con el cursor', () => {
+    const { container } = montar();
+
+    const salientes = container.querySelector('[data-testid="arte-salientes"]')!;
+    expect(salientes.querySelectorAll('svg.arte-saliente.arte-color')).toHaveLength(2);
+    expect(salientes.querySelectorAll('svg.arte-saliente.arte-contornos')).toHaveLength(2);
+  });
+
   it('al pie enlaza el aviso de privacidad y los términos', () => {
     montar();
 

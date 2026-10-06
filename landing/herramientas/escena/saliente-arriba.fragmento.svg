@@ -1,28 +1,50 @@
-<!-- Paloma con mochila propulsora que cruza la raya entre las dos mitades (viewBox 0 0 320 200). Mira a la derecha; la landing la voltea. -->
-<g transform="translate(190 100)">
+<!-- Paloma con mochila propulsora (viewBox 0 0 320 200); mira a la derecha. ARCHIVO GENERADO por dibujar-escena.mjs: no editar a mano. -->
+<g transform="translate(190 104)">
   <g class="llama">
-    <path class="k-gold2" d="M-30 20 C-70 2 -112 18 -140 44 C-110 46 -78 58 -30 40Z" />
-    <path class="k-gold" d="M-34 26 C-62 18 -92 28 -112 42 C-88 42 -62 48 -34 38Z" />
+    <path class="k-coral" d="M-34 18 C-74 0 -118 14 -150 42 C-116 46 -82 58 -34 40Z" />
+    <path class="k-gold2" d="M-34 22 C-66 10 -100 20 -126 40 C-98 42 -70 50 -34 36Z" />
+    <path class="k-gold3" d="M-34 26 C-56 20 -80 28 -98 38 C-76 40 -56 44 -34 34Z" />
   </g>
-  <circle class="k-cream" cx="-152" cy="54" r="10" opacity="0.85" />
-  <circle class="k-cream" cx="-178" cy="62" r="7" opacity="0.7" />
-  <circle class="k-cream" cx="-198" cy="66" r="5" opacity="0.55" />
+  <circle class="k-cream" cx="-160" cy="52" r="10" opacity="0.85" /><circle class="k-cream" cx="-184" cy="60" r="7" opacity="0.7" /><circle class="k-cream" cx="-202" cy="64" r="4.5" opacity="0.55" />
+  <path class="k-t-w" d="M-120 -6 L-80 -6 M-140 8 L-100 8" opacity="0.6" />
   <g class="flota">
-    <rect class="k-coral" x="-26" y="-14" width="30" height="52" rx="10" />
-    <rect class="k-coral2" x="-22" y="34" width="22" height="14" rx="5" />
-    <rect class="k-d1" x="-20" y="-4" width="18" height="6" rx="3" />
-    <path class="k-pig2" d="M-8 6 L-48 -10 L-38 14 L-52 30 L-6 28Z" />
-    <ellipse class="k-pig" cx="30" cy="8" rx="56" ry="36" />
-    <path class="k-pig2" d="M-4 4 C14 -34 56 -44 84 -30 C70 -2 40 22 2 24Z" />
-    <circle class="k-pig" cx="86" cy="-20" r="22" />
-    <ellipse class="k-teal" cx="72" cy="-4" rx="15" ry="11" transform="rotate(-20 72 -4)" />
-    <circle class="k-d1" cx="96" cy="-24" r="9" />
-    <circle class="k-mint" cx="94" cy="-26" r="3.2" />
-    <path class="k-t-w" d="M78 -26 L72 -28" />
-    <path class="k-gold" d="M106 -20 L130 -13 L106 -5Z" />
-    <path class="k-t-c" d="M20 40 l-8 14 M38 42 l-4 14" />
+    <!-- cola -->
+    <path class="k-pig2" d="M-4 6 L-50 -12 L-44 6 L-60 16 L-42 22 L-54 34 L-4 28Z" />
+    <path class="k-pig" d="M-6 10 L-40 0 L-34 12 L-48 20 L-6 24Z" />
+    <!-- mochila -->
+    <rect class="k-coral2" x="-30" y="-18" width="36" height="58" rx="12" />
+    <rect class="k-coral" x="-26" y="-14" width="28" height="50" rx="10" />
+    <path class="k-gold2" d="M-30 0 L-42 -8 L-42 10Z" /><path class="k-gold2" d="M-30 26 L-42 20 L-42 36Z" />
+    <rect class="k-gray2" x="-22" y="34" width="20" height="12" rx="4" />
+    <rect class="k-pink3" x="-20" y="-8" width="6" height="30" rx="3" />
+    <!-- cuerpo -->
+    <ellipse class="k-pig2" cx="32" cy="10" rx="58" ry="37" />
+    <ellipse class="k-pig" cx="34" cy="6" rx="54" ry="33" />
+    <path class="k-pig3" d="M50 30 C70 32 86 22 90 8 C88 26 72 40 50 38Z" />
+    <!-- cinchas -->
+    <path class="k-t-d" d="M-2 -18 C10 -6 10 20 -2 34" />
+    <!-- ala en capas -->
+    <path class="k-pig2" d="M-6 2 C10 -40 58 -54 92 -38 C80 -6 46 20 0 24Z" />
+    <path class="k-pig" d="M2 0 C18 -30 56 -42 84 -32 C70 -10 42 10 4 16Z" />
+    <path class="k-t-n" d="M20 -6 C34 -18 50 -24 66 -26 M24 4 C40 -6 56 -12 72 -14" />
+    <!-- cuello tornasol y cabeza -->
+    <path class="k-teal" d="M66 -14 C76 -26 92 -26 100 -14 C98 2 84 10 70 6Z" />
+    <path class="k-pink" d="M74 -2 C82 -10 94 -10 100 -4 C96 6 84 10 76 6Z" />
+    <circle class="k-pig" cx="92" cy="-24" r="22" />
+    <circle class="k-pig2" cx="86" cy="-20" r="10" opacity="0.5" />
+    <!-- goggles -->
+    <path class="k-t-d" d="M72 -30 C82 -38 98 -38 110 -32" />
+    <circle class="k-d1" cx="102" cy="-28" r="10" />
+    <circle class="k-mint" cx="102" cy="-28" r="6.5" />
+    <circle class="k-white" cx="99" cy="-31" r="2.2" />
+    <!-- pico -->
+    <path class="k-cream" d="M110 -24 C114 -27 118 -26 118 -23Z" />
+    <path class="k-gold2" d="M112 -22 L136 -15 L112 -8Z" />
+    <path class="k-gold" d="M112 -22 L136 -15 L112 -15Z" />
+    <!-- patas -->
+    <path class="k-t-c" d="M22 42 l-8 16 l-6 2 M22 42 l-8 16 l2 6 M40 44 l-4 16 l-6 2 M40 44 l-4 16 l3 6" />
   </g>
 </g>
-<path class="k-gold" transform="translate(60 40) scale(1.1)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-<path class="k-white" transform="translate(292 36) scale(0.9)" d="M0 -10 L2.5 -2.5 L10 0 L2.5 2.5 L0 10 L-2.5 2.5 L-10 0 L-2.5 -2.5Z" />
-<circle class="k-mint" cx="270" cy="168" r="4" />
+<path class="k-gold" transform="translate(52 36) scale(1.1)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+<path class="k-white" transform="translate(296 30) scale(0.85)" d="M0 -10 C1 -3 3 -1 10 0 C3 1 1 3 0 10 C-1 3 -3 1 -10 0 C-3 -1 -1 -3 0 -10Z" />
+<circle class="k-mint" cx="276" cy="170" r="4" />
