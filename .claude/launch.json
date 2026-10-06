@@ -12,6 +12,12 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["--prefix", "backend", "run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "landing",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["--yes", "serve", "landing", "-l", "4173", "--no-clipboard"],
+      "port": 4173
     }
   ]
 }

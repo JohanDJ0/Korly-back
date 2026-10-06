@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Korly — Control de gastos por quincena: sabe cuánto puedes gastar hoy</title>
+    <meta
+      name="description"
+      content="Korly es una app gratis para controlar tus gastos por quincena. Te dice con una sola cifra cuánto puedes gastar hoy, sin conectar tu banco. Hecha para México."
+    />
+    <link rel="canonical" href="https://korly.com.mx/" />
+    <meta name="theme-color" content="#122420" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="Korly" />
+    <meta property="og:title" content="Korly — Sabe cuánto puedes gastar hoy" />
+    <meta property="og:description" content="Controla tus gastos por quincena con una sola cifra. Gratis, sin conectar tu banco, hecha para México." />
+    <meta property="og:url" content="https://korly.com.mx/" />
+    <meta property="og:image" content="https://korly.com.mx/assets/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Korly: la cifra de cuánto puedes gastar hoy" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Korly — Sabe cuánto puedes gastar hoy" />
+    <meta name="twitter:description" content="Controla tus gastos por quincena con una sola cifra. Gratis, sin conectar tu banco." />
+    <meta name="twitter:image" content="https://korly.com.mx/assets/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "name": "Korly",
+            "url": "https://korly.com.mx/",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "es-MX",
+            "description": "App web gratuita para controlar tus gastos por quincena: te dice cuánto puedes gastar hoy sin conectar tu banco.",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "MXN" }
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "¿Korly cuesta algo?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. Korly es gratis hoy. Más adelante habrá un plan Pro opcional con funciones extra; lo que ya usas en el plan gratuito no se cobra." }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Tengo que conectar mi banco?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. Korly no se conecta con tu banco ni te pide números de tarjeta o de cuenta. Solo conoce lo que tú anotas." }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Qué es la quincena de calendario?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Korly cuenta tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Así la cifra de cada día se calcula contra el fin real de tu quincena." }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Qué pasa con mis datos?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No vendemos tus datos ni los usamos para publicidad. Puedes descargarlos o borrar tu cuenta cuando quieras, y hay un ojito para ocultar tus montos en público." }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Sirve para empresas?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Hoy Korly es para uso personal. No tiene funciones para negocios." }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+
+  <body>
+    <!-- Dibujo compartido por las dos capas del héroe (versión de color y versión de líneas) -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+      <symbol id="korly-art" viewBox="0 0 560 600">
+        <rect class="a-bg" x="20" y="20" width="520" height="560" rx="44" />
+        <clipPath id="art-clip"><rect x="20" y="20" width="520" height="560" rx="44" /></clipPath>
+        <g clip-path="url(#art-clip)">
+          <circle class="a-soft-teal" cx="130" cy="150" r="96" />
+          <circle class="a-soft-gold" cx="448" cy="470" r="118" />
+        </g>
+
+        <!-- Tarjeta de crédito -->
+        <g transform="translate(36 262) rotate(-9)">
+          <rect class="a-teal" width="140" height="90" rx="14" />
+          <rect class="a-phone" y="20" width="140" height="14" />
+          <rect class="a-gold" x="16" y="48" width="26" height="19" rx="4" />
+          <text class="a-text" x="16" y="80" font-size="10">•••• 4821</text>
+        </g>
+
+        <!-- Teléfono con la cifra del día -->
+        <rect class="a-phone" x="168" y="66" width="236" height="452" rx="36" />
+        <rect class="a-screen" x="182" y="80" width="208" height="424" rx="26" />
+        <text class="a-mut" x="204" y="126" font-size="13">Puedes gastar hoy</text>
+        <text class="a-text-strong" x="204" y="178" font-size="44">$475</text>
+        <rect class="a-track" x="204" y="198" width="164" height="8" rx="4" />
+        <rect class="a-gold" x="204" y="198" width="58" height="8" rx="4" />
+        <text class="a-mut" x="204" y="228" font-size="11">por día, durante 12 días más</text>
+        <rect class="a-line-only" x="204" y="246" width="164" height="1" />
+        <text class="a-mut" x="204" y="272" font-size="10">Disponible total</text>
+        <text class="a-text-strong" x="204" y="296" font-size="18">$5,700</text>
+        <text class="a-mut" x="368" y="272" font-size="10" text-anchor="end">Días restantes</text>
+        <text class="a-text-strong" x="368" y="296" font-size="18" text-anchor="end">12</text>
+
+        <rect class="a-row" x="204" y="322" width="164" height="38" rx="11" />
+        <circle class="a-teal2" cx="222" cy="341" r="7" />
+        <text class="a-text" x="238" y="345" font-size="11">Súper</text>
+        <text class="a-text" x="356" y="345" font-size="11" text-anchor="end">−$280</text>
+        <rect class="a-row" x="204" y="368" width="164" height="38" rx="11" />
+        <circle class="a-gold" cx="222" cy="387" r="7" />
+        <text class="a-text" x="238" y="391" font-size="11">Café</text>
+        <text class="a-text" x="356" y="391" font-size="11" text-anchor="end">−$55</text>
+        <rect class="a-row" x="204" y="414" width="164" height="38" rx="11" />
+        <circle class="a-teal" cx="222" cy="433" r="7" />
+        <text class="a-text" x="238" y="437" font-size="11">Gasolina</text>
+        <text class="a-text" x="356" y="437" font-size="11" text-anchor="end">−$420</text>
+        <rect class="a-gold" x="226" y="468" width="120" height="22" rx="11" />
+
+        <!-- Calendario de la quincena -->
+        <g transform="translate(372 56) rotate(7)">
+          <rect class="a-card" width="148" height="128" rx="18" />
+          <text class="a-text" x="16" y="26" font-size="11">Quincena 1–15</text>
+          <rect class="a-gold" x="16" y="38" width="18" height="18" rx="5" />
+          <rect class="a-gold" x="40" y="38" width="18" height="18" rx="5" />
+          <rect class="a-gold" x="64" y="38" width="18" height="18" rx="5" />
+          <rect class="a-gold" x="88" y="38" width="18" height="18" rx="5" />
+          <rect class="a-gold" x="112" y="38" width="18" height="18" rx="5" />
+          <rect class="a-gold" x="16" y="62" width="18" height="18" rx="5" />
+          <rect class="a-gold" x="40" y="62" width="18" height="18" rx="5" />
+          <rect class="a-teal" x="64" y="62" width="18" height="18" rx="5" />
+          <rect class="a-teal2" x="88" y="62" width="18" height="18" rx="5" />
+          <rect class="a-teal2" x="112" y="62" width="18" height="18" rx="5" />
+          <rect class="a-teal2" x="16" y="86" width="18" height="18" rx="5" />
+          <rect class="a-teal2" x="40" y="86" width="18" height="18" rx="5" />
+          <rect class="a-teal2" x="64" y="86" width="18" height="18" rx="5" />
+          <rect class="a-teal2" x="88" y="86" width="18" height="18" rx="5" />
+          <rect class="a-teal2" x="112" y="86" width="18" height="18" rx="5" />
+        </g>
+
+        <!-- Monedas -->
+        <g transform="translate(58 438)">
+          <rect class="a-gold2" x="14" y="76" width="92" height="20" />
+          <ellipse class="a-gold" cx="60" cy="96" rx="46" ry="13" />
+          <rect class="a-gold2" x="14" y="56" width="92" height="20" />
+          <ellipse class="a-gold" cx="60" cy="76" rx="46" ry="13" />
+          <rect class="a-gold2" x="14" y="36" width="92" height="20" />
+          <ellipse class="a-gold" cx="60" cy="56" rx="46" ry="13" />
+          <ellipse class="a-gold2" cx="60" cy="36" rx="46" ry="13" />
+        </g>
+
+        <!-- Meta de ahorro -->
+        <g transform="translate(404 396)">
+          <circle class="a-ring-track" cx="62" cy="62" r="44" />
+          <circle class="a-ring" cx="62" cy="62" r="44" transform="rotate(-90 62 62)" />
+          <text class="a-text-strong" x="62" y="68" font-size="18" text-anchor="middle">70%</text>
+          <text class="a-text" x="62" y="132" font-size="11" text-anchor="middle">Meta: viaje</text>
+        </g>
+
+        <!-- Destellos -->
+        <path class="a-gold" d="M92 70 l5 14 14 5 -14 5 -5 14 -5 -14 -14 -5 14 -5z" />
+        <path class="a-text-strong" d="M488 300 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3z" />
+        <path class="a-gold" d="M462 560 l4 11 11 4 -11 4 -4 11 -4 -11 -11 -4 11 -4z" />
+      </symbol>
+    </svg>
+
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a href="/" class="brand" aria-label="Korly, inicio">
+          <img src="/assets/icon.svg" alt="" width="40" height="40" /><span class="brand-name">Korly</span>
+        </a>
+        <nav class="main-nav" aria-label="Principal">
+          <a href="#como-funciona">Cómo funciona</a>
+          <a href="#beneficios">Beneficios</a>
+          <a href="#planes">Planes</a>
+          <a href="#preguntas">Preguntas</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-ghost" href="https://app.korly.com.mx/login">Iniciar sesión</a>
+          <a class="btn btn-gold" href="https://app.korly.com.mx/registro">Crear cuenta</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="wrap hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">Control de gastos por quincena</p>
+            <h1>Sabe cuánto puedes <span class="hl">gastar hoy</span>.</h1>
+            <p class="lead">
+              Korly te dice, con una sola cifra, cuánto puedes gastar cada día hasta tu siguiente quincena. Sin conectar tu banco y sin hojas de cálculo.
+            </p>
+            <div class="cta-row">
+              <a class="btn btn-gold btn-lg" href="https://app.korly.com.mx/registro">Crear cuenta gratis</a>
+              <a class="btn btn-outline btn-lg" href="https://app.korly.com.mx/login">Ya tengo cuenta</a>
+            </div>
+            <ul class="hero-points">
+              <li>Gratis</li>
+              <li>Sin conectar tu banco</li>
+              <li>Hecha para México</li>
+            </ul>
+          </div>
+
+          <div class="art" id="art" aria-hidden="true">
+            <svg class="art-layer art-color" viewBox="0 0 560 600" focusable="false"><use href="#korly-art" /></svg>
+            <svg class="art-layer art-wire" id="art-wire" viewBox="0 0 560 600" focusable="false"><use href="#korly-art" /></svg>
+          </div>
+        </div>
+      </section>
+
+      <section class="section problem reveal">
+        <div class="wrap narrow center">
+          <h2>¿Llegas a la quincena sin saber en qué se fue?</h2>
+          <p>
+            Anotar en una libreta, en las notas del celular o en Excel cansa, y al final del periodo nadie sabe cuánto le queda. Korly lo hace al revés: tú le dices
+            cuánto recibiste y él te va diciendo, día con día, cuánto te toca gastar.
+          </p>
+        </div>
+      </section>
+
+      <section class="section" id="como-funciona">
+        <div class="wrap">
+          <h2 class="center reveal">Así de simple</h2>
+          <ol class="steps">
+            <li class="step reveal">
+              <span class="step-n">1</span>
+              <h3>Dile cuánto recibiste</h3>
+              <p>Registras tu ingreso de la quincena. Es lo único que Korly necesita para empezar.</p>
+            </li>
+            <li class="step reveal">
+              <span class="step-n">2</span>
+              <h3>Mira tu cifra del día</h3>
+              <p>Ves cuánto puedes gastar hoy, cuánto tienes disponible y cuántos días te faltan. Una cifra, sin tablas.</p>
+            </li>
+            <li class="step reveal">
+              <span class="step-n">3</span>
+              <h3>Anota tus gastos</h3>
+              <p>Registras lo que gastas en segundos, y si se te olvida, Korly te lo recuerda por correo en la noche.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="section alt" id="beneficios">
+        <div class="wrap">
+          <h2 class="center reveal">Pensada para tu quincena</h2>
+          <p class="sub center reveal">Lo que Korly hace por ti, sin complicarte.</p>
+          <div class="grid">
+            <article class="card reveal">
+              <h3>Una cifra, no una hoja de cálculo</h3>
+              <p>«Puedes gastar hoy» es lo que importa. Sin categorías obligatorias ni presupuestos por sobres que armar antes de empezar.</p>
+            </article>
+            <article class="card reveal">
+              <h3>Hecha para México</h3>
+              <p>Quincenas de calendario (del 1 al 15 y del 16 a fin de mes), pesos mexicanos y compras a meses sin intereses.</p>
+            </article>
+            <article class="card reveal">
+              <h3>Recordatorio que informa, no regaña</h3>
+              <p>Si no anotaste nada, te llega un correo con tu cifra del día. Es opcional y lo apagas cuando quieras.</p>
+            </article>
+            <article class="card reveal">
+              <h3>Tarjetas y meses sin intereses</h3>
+              <p>Registra tus compras a plazos y ve cuánto te toca pagar cada quincena, para que no te sorprendan.</p>
+            </article>
+            <article class="card reveal">
+              <h3>Gastos que se repiten, solos</h3>
+              <p>Da de alta tu renta o tus suscripciones una vez y Korly las descuenta de cada quincena por ti.</p>
+            </article>
+            <article class="card reveal">
+              <h3>Metas de ahorro</h3>
+              <p>Aparta dinero para un viaje o un fondo de emergencia, y decide qué hacer con lo que te sobra al cerrar la quincena.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section privacy" id="privacidad">
+        <div class="wrap privacy-grid">
+          <div class="reveal">
+            <h2>Tu dinero es cosa tuya</h2>
+            <p class="sub-left">Korly guarda solo lo que tú escribes, y tú mandas sobre eso.</p>
+          </div>
+          <ul class="checks reveal">
+            <li><strong>Sin conectar tu banco</strong> ni pedirte números de tarjeta o de cuenta.</li>
+            <li><strong>Un ojito para ocultar tus montos</strong> cuando estás en público, como en la app de tu banco.</li>
+            <li><strong>No vendemos tus datos</strong> ni los usamos para publicidad.</li>
+            <li><strong>Descárgalos o borra tu cuenta</strong> cuando quieras, desde la propia app.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="section alt" id="planes">
+        <div class="wrap">
+          <h2 class="center reveal">Gratis para empezar</h2>
+          <p class="sub center reveal">Korly es gratis hoy. Después llegará un plan Pro opcional, y lo que ya usas no se vuelve de pago.</p>
+          <div class="plans">
+            <article class="plan reveal">
+              <h3>Plan gratuito</h3>
+              <p class="plan-tag">Hoy</p>
+              <ul class="checks small">
+                <li>Tu cifra del día y tus quincenas</li>
+                <li>Gastos, ingresos y categorías</li>
+                <li>Recordatorio por correo</li>
+                <li>Tarjetas, meses sin intereses y gastos recurrentes</li>
+                <li>Hasta 2 metas de ahorro</li>
+                <li>Historial de 12 meses</li>
+              </ul>
+              <a class="btn btn-gold" href="https://app.korly.com.mx/registro">Crear cuenta gratis</a>
+            </article>
+            <article class="plan plan-pro reveal">
+              <h3>Korly Pro</h3>
+              <p class="plan-tag">Próximamente</p>
+              <ul class="checks small">
+                <li>Compartir con tu pareja o familia (en camino)</li>
+                <li>Metas en común (en camino)</li>
+                <li>Alertas cuando vas gastando más rápido de lo que alcanza</li>
+                <li>Metas sin límite e historial completo</li>
+                <li>Exportar a CSV</li>
+              </ul>
+              <p class="note">Todavía sin fecha ni precio. Crea tu cuenta y, en Ajustes, pide que te avisemos.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="preguntas">
+        <div class="wrap narrow">
+          <h2 class="center reveal">Preguntas frecuentes</h2>
+          <div class="faq reveal">
+            <details>
+              <summary>¿Korly cuesta algo?</summary>
+              <p>No. Korly es gratis hoy. Más adelante habrá un plan Pro opcional con funciones extra; lo que ya usas en el plan gratuito no se cobra.</p>
+            </details>
+            <details>
+              <summary>¿Tengo que conectar mi banco?</summary>
+              <p>No. Korly no se conecta con tu banco ni te pide números de tarjeta o de cuenta. Solo conoce lo que tú anotas.</p>
+            </details>
+            <details>
+              <summary>¿Qué es la quincena de calendario?</summary>
+              <p>
+                Korly cuenta tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Así la cifra de cada día se calcula contra el fin real
+                de tu quincena.
+              </p>
+            </details>
+            <details>
+              <summary>¿Funciona en el celular?</summary>
+              <p>Sí. Korly es una app web que se adapta al celular y a la computadora: solo entras desde el navegador, sin instalar nada.</p>
+            </details>
+            <details>
+              <summary>¿Qué pasa con mis datos?</summary>
+              <p>
+                No vendemos tus datos ni los usamos para publicidad. Puedes descargarlos o borrar tu cuenta cuando quieras. Todo está explicado en el
+                <a href="https://app.korly.com.mx/privacidad">Aviso de privacidad</a>.
+              </p>
+            </details>
+            <details>
+              <summary>¿Sirve para empresas?</summary>
+              <p>Hoy Korly es para uso personal. No tiene funciones para negocios.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <section class="final">
+        <div class="wrap narrow center reveal">
+          <h2>Empieza hoy tu quincena con una cifra clara</h2>
+          <p>Crear tu cuenta toma menos de un minuto.</p>
+          <div class="cta-row center-row">
+            <a class="btn btn-gold btn-lg" href="https://app.korly.com.mx/registro">Crear cuenta gratis</a>
+            <a class="btn btn-outline btn-lg" href="https://app.korly.com.mx/login">Iniciar sesión</a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <span class="brand brand-small"><img src="/assets/icon.svg" alt="" width="32" height="32" /><span class="brand-name">Korly</span></span>
+        <nav aria-label="Legal y contacto">
+          <a href="https://app.korly.com.mx/privacidad">Aviso de privacidad</a>
+          <a href="https://app.korly.com.mx/terminos">Términos y condiciones</a>
+          <a href="mailto:soporte@korly.com.mx">soporte@korly.com.mx</a>
+        </nav>
+        <p>© 2026 Korly</p>
+      </div>
+    </footer>
+
+    <script src="/main.js" defer></script>
+  </body>
+</html>

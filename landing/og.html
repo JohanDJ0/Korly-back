@@ -1,0 +1,41 @@
+<!doctype html>
+<!-- Fuente de assets/og-image.png (1200x630). Se regenera con Chrome sin ventana; no se publica en el sitio (ver landing/README.md). -->
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="robots" content="noindex" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+    <style>
+      html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+      .og { width: 1200px; height: 630px; display: grid; grid-template-columns: 1.1fr 0.9fr; align-items: center; gap: 10px; padding: 0 70px;
+        background: radial-gradient(700px 420px at 85% 25%, rgba(47,174,147,.28), transparent 60%), radial-gradient(600px 380px at 0% 100%, rgba(254,184,22,.14), transparent 60%), #122420; color: #fff; }
+      .og-brand { margin-bottom: 38px; } .og-brand .brand-name { font-size: 40px; }
+      .og h1 { font-size: 78px; font-weight: 800; line-height: 1.04; }
+      .og p { margin-top: 26px; font-size: 28px; color: #cfe6df; font-family: 'Work Sans', sans-serif; }
+      .og .art { width: 100%; aspect-ratio: 560/600; cursor: default; }
+      .og .art-wire { display: none; }
+    </style>
+  </head>
+  <body>
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+      <symbol id="korly-art" viewBox="0 0 560 600"></symbol>
+    </svg>
+    <div class="og">
+      <div>
+        <div class="brand og-brand"><img src="/assets/icon.svg" alt="" width="64" height="64" /><span class="brand-name">Korly</span></div>
+        <h1>Sabe cuánto puedes <span class="hl">gastar hoy</span>.</h1>
+        <p>Control de gastos por quincena. Gratis, sin conectar tu banco.</p>
+      </div>
+      <div class="art"><svg class="art-layer art-color" viewBox="0 0 560 600"><use href="#korly-art" /></svg></div>
+    </div>
+    <script>
+      // Reutiliza el dibujo de index.html para no mantenerlo dos veces.
+      fetch('/index.html').then((r) => r.text()).then((html) => {
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        document.getElementById('korly-art').innerHTML = doc.getElementById('korly-art').innerHTML;
+        document.title = 'listo';
+      });
+    </script>
+  </body>
+</html>
