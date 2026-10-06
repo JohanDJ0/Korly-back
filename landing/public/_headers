@@ -4,11 +4,7 @@
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
 
+# El CSS y el JS no llevan versión en el nombre: que el navegador los revalide siempre (por defecto Cloudflare ya lo hace)
+# en vez de guardarlos una hora y mostrar una página nueva con estilos viejos.
 /assets/*
-  Cache-Control: public, max-age=31536000, immutable
-
-/styles.css
-  Cache-Control: public, max-age=3600
-
-/main.js
   Cache-Control: public, max-age=3600

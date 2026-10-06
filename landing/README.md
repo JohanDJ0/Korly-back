@@ -45,6 +45,8 @@ Gratis y permite uso comercial. El dominio ya está en Cloudflare. Se publica co
 2. Cada vez que cambie algo: `npx wrangler deploy --config landing/wrangler.jsonc`
 3. Una sola vez, en [Google Search Console](https://search.google.com/search-console): agregar `korly.com.mx` (verificación por DNS), enviar `https://korly.com.mx/sitemap.xml` y pedir la indexación de la página principal.
 
+**Versión de los archivos:** `index.html` carga `styles.css?v=…` y `main.js?v=…`. Si alguien visitó la página antes, su navegador puede tener guardada una versión vieja del CSS o del JS; al cambiarlos, hay que cambiar ese `v=` en `index.html` (los archivos se revalidan solos, pero así se evita ver una página nueva con estilos viejos).
+
 **Cuidado:** nunca correr `wrangler` sin `--config landing/wrangler.jsonc` desde la raíz del repositorio. Sin ese archivo, Wrangler adivina una configuración y puede publicar una carpeta equivocada (por ejemplo `frontend/`, con su `.env`). Ya pasó una vez el 2026-10-06: durante unos minutos quedó publicada `frontend/` con su `.env` (solo variables `VITE_*` públicas por diseño, sin llaves secretas); se borró en cuanto se vio.
 
 ## Reglas para el texto
