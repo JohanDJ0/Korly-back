@@ -1,6 +1,8 @@
 import { Navigate, Outlet } from 'react-router-dom';
 
+import { ReaceptarAviso } from '@/components/ReaceptarAviso';
 import { Sidebar } from '@/components/Sidebar';
+import { aceptoAvisoVigente } from '@/lib/datos-responsable';
 import { RestablecerPassword } from '@/routes/RestablecerPassword';
 import { useAuthStore } from '@/stores/auth-store';
 
@@ -20,6 +22,7 @@ export function ProtectedRoute() {
   if (cargando) return null;
   if (esRecuperacion) return <RestablecerPassword />;
   if (!session) return <Navigate to="/login" replace />;
+  if (!aceptoAvisoVigente(session.user.user_metadata)) return <ReaceptarAviso />;
 
   return (
     <div className="sm:flex">

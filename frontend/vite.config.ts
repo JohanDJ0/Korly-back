@@ -21,6 +21,10 @@ export default defineConfig({
       VITE_API_BASE_URL: 'http://api.prueba.local/v1',
       VITE_SUPABASE_URL: 'https://supabase.prueba.local',
       VITE_SUPABASE_ANON_KEY: 'clave-de-prueba',
+      // Vacías a propósito: Vitest también lee frontend/.env, y los datos reales del responsable no deben decidir si una prueba pasa.
+      VITE_RESPONSABLE_NOMBRE: '',
+      VITE_RESPONSABLE_DOMICILIO: '',
+      VITE_RESPONSABLE_JURISDICCION: '',
     },
     css: false,
   },

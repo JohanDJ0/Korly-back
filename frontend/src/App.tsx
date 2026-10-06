@@ -16,6 +16,7 @@ import { Recurrentes } from '@/routes/Recurrentes';
 import { Registro } from '@/routes/Registro';
 import { Resumen } from '@/routes/Resumen';
 import { Tarjetas } from '@/routes/Tarjetas';
+import { Terminos } from '@/routes/Terminos';
 
 export function App() {
   return (
@@ -26,6 +27,7 @@ export function App() {
           <Route path="/registro" element={<Registro />} />
           <Route path="/olvide-password" element={<OlvidePassword />} />
           <Route path="/privacidad" element={<Privacidad />} />
+          <Route path="/terminos" element={<Terminos />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Home />} />
             <Route path="/historial" element={<Historial />} />

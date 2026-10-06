@@ -7,12 +7,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
+import { esquemaPasswordNueva } from '@/lib/password';
 import { supabase } from '@/lib/supabase';
 import { limpiarRecuperacion } from '@/stores/auth-store';
 
 const esquemaRestablecer = z
   .object({
-    password: z.string().min(6, 'La contraseña necesita al menos 6 caracteres'),
+    password: esquemaPasswordNueva,
     confirmarPassword: z.string().min(1, 'Confirma tu contraseña'),
   })
   .refine((datos) => datos.password === datos.confirmarPassword, {

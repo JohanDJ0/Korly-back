@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronRight, Download, LogOut, Repeat, ShieldCheck, Tag } from 'lucide-react';
+import { Bell, ChevronRight, Download, FileText, LogOut, Repeat, ShieldCheck, Tag } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
+import { CambiarCorreo } from '@/components/CambiarCorreo';
+import { CambiarPassword } from '@/components/CambiarPassword';
 import { CerrarPeriodo } from '@/components/CerrarPeriodo';
 import { EliminarCuenta } from '@/components/EliminarCuenta';
 import { PageHeader } from '@/components/PageHeader';
@@ -90,6 +92,14 @@ export function Ajustes() {
         )}
 
         <section className="flex flex-col gap-2.5">
+          <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">SEGURIDAD</h2>
+          <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3.5">
+            <CambiarPassword />
+            <CambiarCorreo />
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-2.5">
           <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">DATOS</h2>
           <div className="border-border bg-card flex flex-col divide-y rounded-2xl border">
             <Link to="/categorias" className="flex items-center gap-3 p-3.5">
@@ -122,6 +132,13 @@ export function Ajustes() {
                 <ShieldCheck size={17} className="text-secondary-foreground" />
               </div>
               <span className="flex-1 text-[14px] font-medium">Aviso de privacidad</span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </Link>
+            <Link to="/terminos" className="flex items-center gap-3">
+              <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-[11px]">
+                <FileText size={17} className="text-secondary-foreground" />
+              </div>
+              <span className="flex-1 text-[14px] font-medium">Términos y condiciones</span>
               <ChevronRight size={16} className="text-muted-foreground" />
             </Link>
             <Button variant="outline" className="h-10 w-full rounded-xl" onClick={() => descargarDatos.mutate()} disabled={descargarDatos.isPending}>

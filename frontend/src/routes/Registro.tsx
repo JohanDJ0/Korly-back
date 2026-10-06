@@ -8,17 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
-import { VERSION_AVISO_PRIVACIDAD } from '@/lib/datos-responsable';
+import { constanciaDeAviso } from '@/lib/datos-responsable';
+import { esquemaPasswordNueva } from '@/lib/password';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/auth-store';
 
 const esquemaRegistro = z
   .object({
     email: z.string().email('Correo inválido'),
-    password: z.string().min(6, 'La contraseña necesita al menos 6 caracteres'),
+    password: esquemaPasswordNueva,
     confirmarPassword: z.string().min(1, 'Confirma tu contraseña'),
     // Datos financieros = patrimoniales: consentimiento expreso, no tácito.
-    aceptaAviso: z.boolean().refine((acepta) => acepta, { message: 'Debes aceptar el aviso de privacidad para crear tu cuenta' }),
+    aceptaAviso: z.boolean().refine((acepta) => acepta, { message: 'Debes aceptar los términos y el aviso de privacidad para crear tu cuenta' }),
   })
   .refine((datos) => datos.password === datos.confirmarPassword, {
     message: 'Las contraseñas no coinciden',
@@ -53,7 +54,7 @@ export function Registro() {
     const { data, error } = await supabase.auth.signUp({
       email: datos.email,
       password: datos.password,
-      options: { data: { aviso_privacidad_version: VERSION_AVISO_PRIVACIDAD, aviso_privacidad_aceptado_en: new Date().toISOString() } },
+      options: { data: constanciaDeAviso() },
     });
     if (error) {
       setErrorGeneral(error.message);
@@ -100,7 +101,11 @@ export function Registro() {
           <label className="flex items-start gap-2.5 text-[13px] leading-snug">
             <input type="checkbox" className="accent-primary mt-0.5 h-4 w-4 shrink-0" {...register('aceptaAviso')} />
             <span>
-              He leído y acepto el{' '}
+              He leído y acepto los{' '}
+              <Link to="/terminos" target="_blank" className="text-primary font-medium underline-offset-4 hover:underline">
+                Términos y condiciones
+              </Link>{' '}
+              y el{' '}
               <Link to="/privacidad" target="_blank" className="text-primary font-medium underline-offset-4 hover:underline">
                 Aviso de privacidad
               </Link>

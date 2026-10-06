@@ -79,6 +79,10 @@ export function Login() {
           <Link to="/privacidad" className="underline-offset-4 hover:underline">
             Aviso de privacidad
           </Link>
+          {' · '}
+          <Link to="/terminos" className="underline-offset-4 hover:underline">
+            Términos y condiciones
+          </Link>
         </p>
       </form>
     </AuthCard>

@@ -53,6 +53,10 @@ Los dos casos son distintos:
 
 **Recomendación:** un ADR nuevo (ADR-011) antes de escribir código, que decida el "espacio compartido" y resuelva los aportes entre tenants. Hasta entonces, ambas ventajas son solo intención de producto. Documento maestro y `CLAUDE.md` las marcan como fuera del MVP ("finanzas compartidas": no implementar sin discusión previa).
 
+## Privacidad del "Avísame"
+
+Es una **finalidad voluntaria** del aviso de privacidad (sección 3): solo se usa el correo, una vez, para avisar que Pro existe, y el usuario puede retirar la petición en Ajustes → Plan. No usar la lista para ninguna otra comunicación sin cambiar el aviso (y volver a pedir aceptación, `VERSION_AVISO_PRIVACIDAD`).
+
 ## Cómo se mide el interés
 
 El botón "Avísame" guarda `tenants.aviso_pro_solicitado_en`; `npm run metricas` muestra cuántos usuarios lo pidieron. Esa cifra, junto con la activación y la retención, es lo que decide cuándo activar el cobro y qué construir primero.
