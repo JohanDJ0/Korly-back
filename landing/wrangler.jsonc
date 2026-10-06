@@ -1,0 +1,12 @@
+{
+  // Página principal de Korly (korly.com.mx): solo archivos estáticos, sin código de servidor.
+  // Se publica con `npx wrangler deploy --config landing/wrangler.jsonc` (ver landing/README.md).
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "korly-landing",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./public",
+    "not_found_handling": "404-page"
+  },
+  "routes": [{ "pattern": "korly.com.mx", "custom_domain": true }]
+}

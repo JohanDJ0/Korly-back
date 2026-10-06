@@ -1,5 +1,4 @@
 User-agent: *
 Allow: /
-Disallow: /og.html
 
 Sitemap: https://korly.com.mx/sitemap.xml

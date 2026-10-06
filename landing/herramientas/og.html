@@ -1,11 +1,11 @@
 <!doctype html>
-<!-- Fuente de assets/og-image.png (1200x630). Se regenera con Chrome sin ventana; no se publica en el sitio (ver landing/README.md). -->
+<!-- Fuente de public/assets/og-image.png (1200x630). Se regenera con Chrome sin ventana (ver landing/README.md); no forma parte del sitio publicado. -->
 <html lang="es-MX">
   <head>
     <meta charset="UTF-8" />
     <meta name="robots" content="noindex" />
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/public/styles.css" />
     <style>
       html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
       .og { width: 1200px; height: 630px; display: grid; grid-template-columns: 1.1fr 0.9fr; align-items: center; gap: 10px; padding: 0 70px;
@@ -23,7 +23,7 @@
     </svg>
     <div class="og">
       <div>
-        <div class="brand og-brand"><img src="/assets/icon.svg" alt="" width="64" height="64" /><span class="brand-name">Korly</span></div>
+        <div class="brand og-brand"><img src="/public/assets/icon.svg" alt="" width="64" height="64" /><span class="brand-name">Korly</span></div>
         <h1>Sabe cuánto puedes <span class="hl">gastar hoy</span>.</h1>
         <p>Control de gastos por quincena. Gratis, sin conectar tu banco.</p>
       </div>
@@ -31,7 +31,7 @@
     </div>
     <script>
       // Reutiliza el dibujo de index.html para no mantenerlo dos veces.
-      fetch('/index.html').then((r) => r.text()).then((html) => {
+      fetch('/public/index.html').then((r) => r.text()).then((html) => {
         const doc = new DOMParser().parseFromString(html, 'text/html');
         document.getElementById('korly-art').innerHTML = doc.getElementById('korly-art').innerHTML;
         document.title = 'listo';

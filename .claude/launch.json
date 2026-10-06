@@ -16,7 +16,7 @@
     {
       "name": "landing",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "landing", "-l", "4173", "--no-clipboard"],
+      "runtimeArgs": ["--yes", "serve", "landing/public", "-l", "4173", "--no-clipboard"],
       "port": 4173
     }
   ]
