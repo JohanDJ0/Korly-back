@@ -1,12 +1,19 @@
 {
-  // Página principal de Korly (korly.com.mx): solo archivos estáticos, sin código de servidor.
-  // Se publica con `npx wrangler deploy --config landing/wrangler.jsonc` (ver landing/README.md).
+  // Página principal de Korly (korly.com.mx): archivos estáticos de public/ y un Worker mínimo que redirige www al dominio principal.
+  // Se publica con `npx wrangler deploy --config landing/wrangler.jsonc` (ver landing/README.md). Nunca sin --config.
   "$schema": "../node_modules/wrangler/config-schema.json",
   "name": "korly-landing",
+  "main": "./worker.js",
   "compatibility_date": "2026-10-01",
   "assets": {
     "directory": "./public",
-    "not_found_handling": "404-page"
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    // El código solo corre en la raíz (donde importa la redirección de www); los demás archivos se sirven directo.
+    "run_worker_first": ["/", "/index.html"]
   },
-  "routes": [{ "pattern": "korly.com.mx", "custom_domain": true }]
+  "routes": [
+    { "pattern": "korly.com.mx", "custom_domain": true },
+    { "pattern": "www.korly.com.mx", "custom_domain": true }
+  ]
 }

@@ -15,6 +15,7 @@ Estructura (solo lo que está en `public/` se publica; lo demás es configuraci�
 | `public/robots.txt`, `sitemap.xml`, `_headers`, `404.html` | Buscadores, cabeceras de seguridad y caché, y página de error |
 | `herramientas/og.html` | Fuente de la imagen de compartir (no se publica) |
 | `wrangler.jsonc` | Configuración de publicación en Cloudflare (no se publica) |
+| `worker.js` | Único código de servidor: redirige `www.korly.com.mx` a `korly.com.mx` (no se publica como archivo) |
 
 ## Ver en local
 
@@ -36,12 +37,11 @@ Si se cambia el dibujo, hay que regenerar la imagen de compartir (con `npx serve
 
 ## Publicar (Cloudflare)
 
-Gratis y permite uso comercial. El dominio ya está en Cloudflare. Se publica como un Worker de «solo archivos estáticos» (Cloudflare está uniendo Pages con Workers; sin código de servidor), con `korly.com.mx` declarado como dominio personalizado en `wrangler.jsonc`: el propio despliegue crea el registro DNS y el certificado.
+Gratis y permite uso comercial. El dominio ya está en Cloudflare. Se publica como un Worker de archivos estáticos (Cloudflare está uniendo Pages con Workers) con un código mínimo, `worker.js`, que manda `www.korly.com.mx` a `korly.com.mx`. Los dos dominios están declarados como dominios personalizados en `wrangler.jsonc`: el propio despliegue crea los registros DNS y los certificados.
 
 1. Una sola vez: `npx wrangler login` (abre el navegador para autorizar).
 2. Cada vez que cambie algo: `npx wrangler deploy --config landing/wrangler.jsonc`
-3. `www.korly.com.mx` → redirigir a `korly.com.mx` con una regla de redirección en el panel de Cloudflare (Reglas → Reglas de redirección).
-4. Una sola vez, en [Google Search Console](https://search.google.com/search-console): agregar `korly.com.mx` (verificación por DNS), enviar `https://korly.com.mx/sitemap.xml` y pedir la indexación de la página principal.
+3. Una sola vez, en [Google Search Console](https://search.google.com/search-console): agregar `korly.com.mx` (verificación por DNS), enviar `https://korly.com.mx/sitemap.xml` y pedir la indexación de la página principal.
 
 **Cuidado:** nunca correr `wrangler` sin `--config landing/wrangler.jsonc` desde la raíz del repositorio. Sin ese archivo, Wrangler adivina una configuración y puede publicar una carpeta equivocada (por ejemplo `frontend/`, con su `.env`). Ya pasó una vez el 2026-10-06: durante unos minutos quedó publicada `frontend/` con su `.env` (solo variables `VITE_*` públicas por diseño, sin llaves secretas); se borró en cuanto se vio.
 
