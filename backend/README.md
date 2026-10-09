@@ -2437,6 +2437,45 @@ Tests: `test/unidad/metricas.test.ts` (casos exactos de embudo, ventana de 24 h,
 mediana, constancia, retención y zona horaria) y
 `test/integracion/metricas.test.ts` (consultas contra Postgres real).
 
+## Respaldos de la base de datos
+
+Supabase Free **no hace respaldos automáticos**, así que los respaldos son manuales y cifrados (decisión del 2026-10-06; el aviso de privacidad promete conservar las copias **como máximo 30 días**).
+
+```bash
+npm run respaldo                       # crea el respaldo, lo verifica y borra los de más de 30 días
+npm run respaldo:probar -- "<archivo>" # prueba de restauración en un Postgres desechable de tu máquina
+npm run respaldo:restaurar -- "<archivo>" --destino=postgresql://...   # restauración real (ver abajo)
+```
+
+**Qué hace `npm run respaldo`** (`scripts/respaldo.ts`, lógica en `src/modulos/respaldos/`):
+
+1. Se conecta con `DATABASE_URL` (la conexión de administración del `.env`, que apunta a producción) en **solo lectura** y dentro de una transacción `repeatable read`: todas las tablas salen del mismo instante, aunque la app siga recibiendo gastos mientras corre.
+2. Vuelca **todas las tablas de `public`** (se descubren solas: una tabla nueva queda respaldada sin tocar nada) más `auth.users` y `auth.identities` de Supabase Auth (correos y hashes de contraseña; sin ellos los usuarios no podrían entrar tras una recuperación). No incluye sesiones ni tokens, y la estructura sale de las migraciones, no del respaldo. Las filas viajan como el JSON de Postgres, sin pasar por `number` de JavaScript: los `bigint` de los montos no pierden precisión.
+3. Lo comprime y lo cifra con **AES-256-GCM**; la llave sale de **una contraseña que escribes tú** (scrypt, 64 MiB). La contraseña no se guarda en ningún lado: **si la pierdes, el respaldo no se puede abrir**. Guárdala en tu gestor de contraseñas. GCM además detecta cualquier byte alterado.
+4. **Lo verifica**: vuelve a leer el archivo, lo descifra y comprueba que cada tabla trae las filas que se volcaron. Si no se puede abrir de vuelta, lo borra y el comando falla.
+5. **Rota**: borra los respaldos de más de 30 días (la fecha sale del nombre, `korly-AAAAMMDDTHHMMSSZ.korlybak` en UTC, no de la fecha del archivo; los archivos que no son respaldos de Korly no se tocan).
+
+Carpeta: `~/Respaldos-Korly` por omisión; se cambia con `--carpeta=` o `KORLY_RESPALDOS_DIR`. **Se niega a usar una carpeta dentro del repositorio** (y `*.korlybak` está en `.gitignore`). La contraseña se pide sin mostrarla; para automatizar se puede pasar en `KORLY_RESPALDO_CLAVE` (queda en el entorno de ese proceso: no lo hagas en una máquina compartida).
+
+**Ritmo sugerido:** una vez por semana, y siempre antes de una migración. La rotación **solo ocurre cuando corres el comando**: si dejas de hacer respaldos, los que ya existen siguen envejeciendo y pasan de 30 días (el aviso promete borrarlos). Si decides parar, corre `npm run respaldo -- --solo-rotar` hasta que no quede ninguno vencido (ojo: puede dejarte sin ninguno).
+
+### La prueba de restauración
+
+`npm run respaldo:probar -- "<archivo>"` abre un respaldo real, levanta un Postgres desechable (el mismo `embedded-postgres` de `test:local`, en UTF-8 como Supabase), le aplica las migraciones del repositorio, restaura, y compara fila por fila los conteos de cada tabla; además vuelve a comprobar que **cada movimiento del ledger suma cero**. No toca Supabase. Un respaldo que nunca se probó no es un respaldo: corre esto con el primer respaldo real y de vez en cuando con uno nuevo.
+
+Límite honesto: las tablas de Supabase Auth se recrean ahí sin sus llaves ni restricciones, así que se prueba que sus filas se leen y se cargan, **no que Supabase las acepte** en un proyecto nuevo (no está probado contra Supabase real).
+
+### Recuperar de verdad (si se pierde la base)
+
+1. Crea un proyecto de Supabase nuevo y el rol `app_backend` (sección 4).
+2. Aplica la estructura **solo a esa base nueva**, sin tocar el `.env` de producción: en PowerShell, `$env:DATABASE_URL='postgresql://...nuevo...'; npm run db:migrate` (dotenv no pisa una variable que ya está definida).
+3. `npm run respaldo:restaurar -- "<archivo>" --destino=postgresql://...nuevo...`. Pide la contraseña, muestra qué va a cargar y te hace **escribir el servidor y la base de destino** para confirmar. El destino siempre se escribe a mano (nunca usa `DATABASE_URL` por omisión) y, si coincide con `DATABASE_URL`, pide además `RESTAURAR EN PRODUCCION`. Rechaza tablas con datos o columnas que falten, y es una sola transacción: queda todo o no queda nada.
+4. Lo que **no** viaja en el respaldo y hay que reconfigurar: ajustes de Supabase Auth (Site URL, URLs de redirección, SMTP de Resend, plantillas de correo), las variables de Railway y Vercel (`DATABASE_URL`, `APP_DATABASE_URL`, `SUPABASE_*`) y Stripe.
+
+La carga desactiva los triggers de la sesión (`session_replication_role = replica`): los del ledger rechazan cambios y validan cada escritura nueva, y aquí se reinsertan filas ya validadas. Se necesita el rol administrador (`postgres`). Los triggers siguen instalados para todo lo que ocurra después (hay una prueba que lo comprueba).
+
+Pruebas: `test/unidad/respaldo-*.test.ts` (cifrado, archivo alterado o cortado, rotación a 30 días) y `test/integracion/respaldo-restauracion.test.ts` (mecánica con tablas de prueba y restauración de la estructura real de Korly con su ledger).
+
 ## CORS
 
 `@fastify/cors` se registra en `src/app.ts`, con origen configurable
