@@ -56,3 +56,11 @@ Gratis y permite uso comercial. El dominio ya está en Cloudflare. Se publica co
 - **Solo uso personal.** No se promete nada para empresas: esa versión no existe (`docs/documento-maestro-v2.md`, Business está condicionado a tener demanda).
 - **Enlaces legales:** el aviso de privacidad y los términos viven en la app (`app.korly.com.mx/privacidad` y `/terminos`), con nombre y domicilio del responsable; esta página no los repite.
 - **Sin analítica ni cookies de seguimiento**, como dice el aviso de privacidad. Si algún día se agrega medición, debe ser sin cookies (por ejemplo Cloudflare Web Analytics) y el aviso debe decirlo.
+
+## Google Search Console
+
+La propiedad `https://korly.com.mx/` (tipo «Prefijo de la URL») se verificó el 2026-10-09 con la etiqueta
+`<meta name="google-site-verification" …>` del `<head>` de `public/index.html`. **No la quites**: si desaparece, Google pierde
+la verificación. Se eligió la etiqueta y no el archivo `googleXXXX.html` porque Cloudflare redirige (307) cualquier
+`*.html` a su versión sin extensión y Google pide que ese archivo responda 200. El mapa del sitio es `public/sitemap.xml`
+(enviado en Search Console); si agregas páginas a la landing, súmalas ahí.
