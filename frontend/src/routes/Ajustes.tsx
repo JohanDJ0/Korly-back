@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
+import { BotonComentarios } from '@/components/BotonComentarios';
 import { CambiarCorreo } from '@/components/CambiarCorreo';
 import { CambiarPassword } from '@/components/CambiarPassword';
 import { CerrarPeriodo } from '@/components/CerrarPeriodo';
@@ -122,6 +123,12 @@ export function Ajustes() {
           <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">PERIODO</h2>
           <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3.5">
             <CerrarPeriodo />
+          </div>
+        </section>
+        <section className="flex flex-col gap-2.5">
+          <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">AYUDA</h2>
+          <div className="border-border bg-card rounded-2xl border p-3.5">
+            <BotonComentarios />
           </div>
         </section>
         <section className="flex flex-col gap-2.5">

@@ -72,6 +72,8 @@ const CODIGO_A_STATUS: Record<string, number> = {
   SIN_SUSCRIPCION: 409,
   // Checkout/portal con `COBROS_HABILITADOS` apagado (Korly Pro "próximamente"). 403 como FUNCION_PRO: el request es válido, lo que falta es que la función exista para este usuario.
   COBROS_NO_DISPONIBLES: 403,
+  // modulos/comentarios/: sin proveedor de correo configurado no hay a dónde mandar el comentario; se avisa en vez de aparentar que se envió.
+  COMENTARIOS_NO_DISPONIBLES: 503,
 };
 
 /**

@@ -44,6 +44,11 @@ function construirSecciones(): SeccionLegal[] {
             <li>Si quieres recibir recordatorios por correo, y la fecha de cada recordatorio que te mandamos (solo la fecha y el tipo, para no repetirte el mismo día).</li>
             <li>Tu plan y, si algún día contratas uno de pago, el estado de tu suscripción.</li>
             <li>La fecha en que pediste que te avisemos cuando Korly Pro esté disponible (solo si pulsaste ese botón).</li>
+            <li>
+              Los comentarios que nos mandes con el botón &ldquo;Enviar comentarios&rdquo; (solo si lo usas): lo que escribas, si es un problema, una idea u otra cosa,
+              la pantalla de la app donde estabas (por ejemplo, el historial) y un identificador de tu cuenta. Tu correo solo va si marcas la casilla de que te
+              podamos responder. No incluyen tus montos y no se guardan en la base de datos de Korly: llegan por correo al buzón de soporte.
+            </li>
           </Lista>
 
           <Subtitulo>Datos técnicos de errores</Subtitulo>
@@ -93,6 +98,10 @@ function construirSecciones(): SeccionLegal[] {
             <li>
               Avisarte por correo cuando Korly Pro esté disponible. Solo si tú lo pides con el botón &ldquo;Avísame&rdquo;; usamos tu correo una sola vez para eso y
               puedes retirar la petición en Ajustes → Plan.
+            </li>
+            <li>
+              Recibir tus comentarios y, si marcas la casilla, responderte. Solo si tú los envías desde Ajustes → Enviar comentarios; los usamos para corregir
+              errores y decidir qué mejorar, y para escribirte a ti si lo permitiste.
             </li>
           </Lista>
 
@@ -161,7 +170,8 @@ function construirSecciones(): SeccionLegal[] {
               <strong>Vercel</strong> — entrega las pantallas de la aplicación. No guarda tus datos financieros.
             </li>
             <li>
-              <strong>Resend</strong> — envío de los recordatorios por correo. Recibe tu correo y el contenido del mensaje. Empresa de Estados Unidos.
+              <strong>Resend</strong> — envío de los recordatorios por correo y de los comentarios que mandas desde la app hacia soporte. Recibe tu correo (en los
+              recordatorios, o en los comentarios si marcas la casilla de que te respondamos) y el contenido del mensaje. Empresa de Estados Unidos.
             </li>
             <li>
               <strong>Sentry</strong> — monitoreo de errores técnicos (ver la sección 1). Estados Unidos.
@@ -176,8 +186,8 @@ function construirSecciones(): SeccionLegal[] {
               datos financieros. Estados Unidos.
             </li>
             <li>
-              <strong>Cloudflare y Google</strong> — los correos que nos escribas a {RESPONSABLE.correoArco} o a {RESPONSABLE.correoSoporte} pasan por Cloudflare
-              (que los reenvía) y llegan a una cuenta de correo de Google.
+              <strong>Cloudflare y Google</strong> — los correos que nos escribas a {RESPONSABLE.correoArco} o a {RESPONSABLE.correoSoporte}, y los comentarios que
+              envíes desde la app (que llegan a {RESPONSABLE.correoSoporte}), pasan por Cloudflare (que los reenvía) y llegan a una cuenta de correo de Google.
             </li>
           </Lista>
           <p>
@@ -246,7 +256,9 @@ function construirSecciones(): SeccionLegal[] {
             pocos meses.
           </li>
           <li>
-            <strong>Correos que nos escribas:</strong> el tiempo necesario para atender tu solicitud y lo que la ley nos exija.
+            <strong>Correos que nos escribas y comentarios enviados desde la app:</strong> el tiempo necesario para atender tu solicitud o para decidir qué mejorar, y
+            lo que la ley nos exija. Eliminar tu cuenta no los borra por sí solo, porque viven en el buzón de soporte y no en la base de datos: si quieres que
+            borremos los tuyos, pídelo a {RESPONSABLE.correoArco} y lo hacemos.
           </li>
           <li>
             <strong>Registros de pago:</strong> Stripe conserva por su cuenta los que la ley le exige guardar (hoy no hay pagos).

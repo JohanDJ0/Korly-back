@@ -19,7 +19,8 @@ export interface OpcionesWidget {
   appearance?: 'always' | 'execute' | 'interaction-only';
   callback: (token: string) => void;
   'expired-callback'?: () => void;
-  'error-callback'?: () => void;
+  /** Cloudflare manda un código de error (p. ej. `110200`: dominio no permitido en el widget). */
+  'error-callback'?: (codigo?: string) => void;
 }
 
 export interface ApiTurnstile {

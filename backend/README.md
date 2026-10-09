@@ -2437,6 +2437,17 @@ Tests: `test/unidad/metricas.test.ts` (casos exactos de embudo, ventana de 24 h,
 mediana, constancia, retención y zona horaria) y
 `test/integracion/metricas.test.ts` (consultas contra Postgres real).
 
+## Comentarios de las personas que usan Korly
+
+`POST /v1/comentarios` (`src/modulos/comentarios/`), con el botón **Enviar comentarios** de Ajustes (y del menú lateral en escritorio). Cuerpo: `{ tipo: 'problema' | 'idea' | 'otro', mensaje (1–2000 caracteres), pantalla?, responder? }`; responde `204`. Límite de 5 por hora.
+
+- **No se guarda en la base de datos** (decisión del 2026-10-08: sin tabla ni migración, un dato menos que cuidar): se manda por correo, con Resend, a `soporte@korly.com.mx` (o `COMENTARIOS_DESTINO`), que Cloudflare reenvía al Gmail del responsable.
+- **Qué lleva el correo:** el texto (como texto plano, nunca HTML), el tipo, la pantalla donde estaba la persona (solo si tiene forma de ruta de la app: `/historial`; cualquier otra cosa se descarta), el id de su cuenta y la fecha en hora de México. **El correo de la persona solo va si marca la casilla `responder`**: entonces se averigua con Supabase por su identidad (nunca viene del cuerpo) y es el "responder a" del mensaje. Nunca se manda ningún monto. El asunto no puede llevar saltos de línea.
+- **Sin `RESEND_API_KEY`** responde `503 COMENTARIOS_NO_DISPONIBLES` en vez de aparentar que envió (a diferencia de los recordatorios, que en ese caso no hacen nada).
+- Todo esto está dicho en el aviso de privacidad (versión `2026-10-09`): dato, finalidad voluntaria, proveedores y conservación (eliminar la cuenta no borra el comentario del buzón de soporte; se borra a petición).
+
+Pruebas: `test/unidad/comentarios.test.ts` (validación, armado del correo) y `test/integracion/comentarios.test.ts` (identidad real, resolución del correo, fallos del proveedor).
+
 ## Respaldos de la base de datos
 
 Supabase Free **no hace respaldos automáticos**, así que los respaldos son manuales y cifrados (decisión del 2026-10-06; el aviso de privacidad promete conservar las copias **como máximo 30 días**).

@@ -6,6 +6,11 @@ const remitente = process.env.RESEND_REMITENTE ?? 'Korly <onboarding@resend.dev>
 
 const resend = apiKey ? new Resend(apiKey) : null;
 
+/** `false` sin `RESEND_API_KEY`: ahí `enviarCorreo` no manda nada. Para quien necesita que el envío SÍ ocurra (comentarios) y debe avisar si no puede. */
+export function correoDisponible(): boolean {
+  return resend !== null;
+}
+
 export interface CorreoEntrada {
   para: string;
   asunto: string;

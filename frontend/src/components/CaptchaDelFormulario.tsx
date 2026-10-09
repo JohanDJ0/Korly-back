@@ -12,6 +12,7 @@ export function CaptchaDelFormulario({ captcha }: { captcha: CaptchaTurnstile })
       {captcha.fallo && (
         <p role="alert" className="text-destructive text-sm">
           No pudimos completar la verificación de seguridad. Revisa tu conexión, desactiva el bloqueador de anuncios para esta página y recarga.
+          {captcha.codigoDeFallo && <span className="text-muted-foreground block text-xs">Código: {captcha.codigoDeFallo}</span>}
         </p>
       )}
     </>

@@ -25,6 +25,8 @@ export default defineConfig({
       VITE_RESPONSABLE_NOMBRE: '',
       VITE_RESPONSABLE_DOMICILIO: '',
       VITE_RESPONSABLE_JURISDICCION: '',
+      // Igual: con la llave real en frontend/.env los formularios pedirían un token de Cloudflare y las pruebas no sabrían dárselo. Las pruebas del captcha la fijan ellas mismas.
+      VITE_TURNSTILE_SITE_KEY: '',
     },
     css: false,
   },

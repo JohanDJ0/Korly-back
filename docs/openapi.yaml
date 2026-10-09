@@ -39,6 +39,7 @@ tags:
   - name: Suscripción
   - name: Preferencias
   - name: Cuenta
+  - name: Comentarios
   - name: Importación y exportación
   - name: Sistema
 
@@ -1447,6 +1448,44 @@ paths:
                     description: false si no se pudo borrar el usuario en Supabase Auth (los datos de Korly sí se borraron)
         '400':
           $ref: '#/components/responses/ErrorValidacion'
+
+  # ---------- COMENTARIOS ----------
+  /comentarios:
+    post:
+      tags: [Comentarios]
+      summary: Enviar un comentario, una idea o un problema al equipo de Korly
+      description: >
+        No se guarda en la base de datos: llega por correo a soporte. Lleva el texto, el tipo, la pantalla donde estaba la
+        persona y el identificador de su cuenta; el correo de la persona solo va si `responder` es true (entonces es el
+        "responder a" del mensaje). Nunca se manda ningún monto. Límite de 5 por hora.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tipo, mensaje]
+              properties:
+                tipo:
+                  type: string
+                  enum: [problema, idea, otro]
+                mensaje:
+                  type: string
+                  minLength: 1
+                  maxLength: 2000
+                pantalla:
+                  type: string
+                  description: Ruta de la app donde estaba la persona (p. ej. /historial). Si no tiene forma de ruta se ignora.
+                responder:
+                  type: boolean
+                  description: Si la persona acepta que se le responda a su correo.
+      responses:
+        '204':
+          description: Comentario enviado
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '503':
+          description: Sin proveedor de correo configurado (`COMENTARIOS_NO_DISPONIBLES`); no se envió nada
 
   # ---------- IMPORTACIÓN Y EXPORTACIÓN ----------
   /exportar/gastos.csv:

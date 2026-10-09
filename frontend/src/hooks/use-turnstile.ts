@@ -9,6 +9,8 @@ export interface CaptchaTurnstile {
   token: string | undefined;
   /** Hubo un problema cargando o resolviendo la verificación (bloqueador de anuncios, sin conexión...). */
   fallo: boolean;
+  /** Código de error de Cloudflare, si lo dio (sirve para diagnosticar: 110200 = dominio no permitido en el widget). */
+  codigoDeFallo: string | undefined;
   /** Los tokens son de un solo uso: llamar después de CADA intento de envío, salga bien o mal. */
   reiniciar: () => void;
   contenedor: RefObject<HTMLDivElement | null>;
@@ -27,6 +29,7 @@ export function useTurnstile(habilitado = true): CaptchaTurnstile {
   const idDelWidget = useRef<string | undefined>(undefined);
   const [token, setToken] = useState<string | undefined>(undefined);
   const [fallo, setFallo] = useState(false);
+  const [codigoDeFallo, setCodigoDeFallo] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     if (!clave || !habilitado) return;
@@ -43,11 +46,13 @@ export function useTurnstile(habilitado = true): CaptchaTurnstile {
           callback: (nuevo) => {
             setToken(nuevo);
             setFallo(false);
+            setCodigoDeFallo(undefined);
           },
           'expired-callback': () => setToken(undefined),
-          'error-callback': () => {
+          'error-callback': (codigo) => {
             setToken(undefined);
             setFallo(true);
+            setCodigoDeFallo(codigo);
           },
         });
       })
@@ -68,5 +73,5 @@ export function useTurnstile(habilitado = true): CaptchaTurnstile {
     if (id) window.turnstile?.reset(id);
   }, []);
 
-  return { activo: Boolean(clave), token: habilitado ? token : undefined, fallo, reiniciar, contenedor };
+  return { activo: Boolean(clave), token: habilitado ? token : undefined, fallo, codigoDeFallo, reiniciar, contenedor };
 }

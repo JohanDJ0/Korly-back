@@ -24,6 +24,7 @@ describe('Aviso de privacidad', () => {
     expect(screen.getByText('Finalidades necesarias')).toBeInTheDocument();
     expect(screen.getByText('Finalidades voluntarias')).toBeInTheDocument();
     expect(screen.getByText(/Mandarte un recordatorio por correo/)).toBeInTheDocument();
+    expect(screen.getByText(/Recibir tus comentarios y, si marcas la casilla, responderte/)).toBeInTheDocument();
     expect(screen.getByText(/Avisarte por correo cuando Korly Pro esté disponible/)).toBeInTheDocument();
   });
 

@@ -111,9 +111,22 @@ describe('Login con captcha', () => {
     renderConProveedores(<Login />);
     await waitFor(() => expect(turnstile.dibujados).toHaveLength(1));
 
-    act(() => turnstile.dibujados[0]?.opciones['error-callback']?.());
+    act(() => turnstile.dibujados[0]?.opciones['error-callback']?.('110200'));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/No pudimos completar la verificación de seguridad/);
+    expect(screen.getByRole('alert')).toHaveTextContent('Código: 110200'); // para poder diagnosticarlo sin abrir la consola
+  });
+
+  it('si después de un error Cloudflare logra verificar, el aviso desaparece', async () => {
+    sinSesion();
+    renderConProveedores(<Login />);
+    await waitFor(() => expect(turnstile.dibujados).toHaveLength(1));
+    act(() => turnstile.dibujados[0]?.opciones['error-callback']?.('300030'));
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+
+    act(() => turnstile.resolver('token-tras-reintento'));
+
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
   });
 
   it('si el token expira antes de enviar, vuelve a exigir uno nuevo', async () => {
