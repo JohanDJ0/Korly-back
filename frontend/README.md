@@ -676,10 +676,13 @@ vuelta en pantalla de celular (Pixel 7).
 
 **Lo que NO prueban** (hay que probarlo en producción o a mano): el correo real de confirmación de Supabase, el
 captcha de Turnstile, el envío de comentarios y recordatorios por Resend, Stripe, ni el comportamiento exacto de
-los mensajes de error de Supabase más allá de los que la app muestra. No corren en el CI (decisión: solo a mano,
-antes de cambios grandes). Dos trampas al escribir pruebas: tras ir a otra pantalla usa `irA(page, 'Historial')`
+los mensajes de error de Supabase más allá de los que la app muestra. En GitHub Actions (`.github/workflows/e2e.yml`) corren **cada noche (3 am de México), a pedido** (pestaña
+Actions → «Pruebas de punta a punta» → *Run workflow*) y en pull requests, con un reintento por prueba;
+tardan ~2.5 min y, si algo falla, guardan las trazas y capturas como artefacto por 7 días. **No corren en cada push
+a propósito**: Railway espera a que terminen todos los chequeos de un commit antes de desplegar la API, y estas
+pruebas retrasarían y podrían bloquear cada despliegue. A mano, antes de cambios grandes: `npm run e2e`. Dos trampas al escribir pruebas: tras ir a otra pantalla usa `irA(page, 'Historial')`
 (espera el encabezado; si no, el siguiente `getByText` puede ver todavía la pantalla anterior), y un
 `checkbox` que se guarda en el servidor cambia al confirmar, no al instante (`click`, no `check/uncheck`).
 
 Para comprobar que una prueba no es vacía, rompe a propósito la regla que verifica y mira que
-falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: las pruebas de punta a punta en el CI (corren a mano, ver arriba).
+falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: pruebas contra servicios reales (Supabase, Resend, Stripe, Turnstile).

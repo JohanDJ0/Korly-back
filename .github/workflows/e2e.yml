@@ -1,0 +1,65 @@
+name: Pruebas de punta a punta
+
+# Un Chrome real recorre la app contra una pila local desechable (Postgres efímero + la API real + un Supabase Auth de
+# mentira; ver frontend/README.md, "Pruebas de punta a punta"). Nunca toca producción ni usa secretos.
+#
+# A propósito NO corre en cada push: Railway espera ("Wait for CI") a que terminen todos los chequeos de un commit antes
+# de desplegar la API, y estas pruebas (~5 min con la instalación) retrasarían cada despliegue y lo bloquearían ante un
+# fallo intermitente. Corren cada noche, a pedido (pestaña Actions → "Pruebas de punta a punta" → Run workflow) y en
+# pull requests.
+on:
+  schedule:
+    - cron: '0 9 * * *' # 3 am hora de México
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - 'docs/openapi.yaml'
+      - '.github/workflows/e2e.yml'
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+
+      # La pila (Postgres embebido, tsx) vive en backend/; Playwright y Vite, en frontend/.
+      - name: Instalar dependencias del backend
+        run: npm ci
+        working-directory: backend
+
+      - name: Instalar dependencias del frontend
+        run: npm ci
+        working-directory: frontend
+
+      # Las pruebas usan el Chrome instalado (channel: 'chrome'), no un Chromium descargado por Playwright. Los runners de
+      # GitHub ya lo traen; si algún día dejara de ser así, se instala aquí.
+      - name: Chrome
+        run: |
+          if ! command -v google-chrome >/dev/null; then npx playwright install --with-deps chrome; fi
+          google-chrome --version
+        working-directory: frontend
+
+      - name: Pruebas de punta a punta
+        run: npx playwright test
+        working-directory: frontend
+
+      # Trazas y capturas de lo que falló (se abren con `npx playwright show-trace`).
+      - name: Guardar resultados de lo que falló
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-e2e
+          path: frontend/e2e/resultados
+          retention-days: 7

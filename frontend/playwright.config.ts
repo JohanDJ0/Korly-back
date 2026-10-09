@@ -17,7 +17,11 @@ export default defineConfig({
   fullyParallel: false,
   timeout: 90_000,
   expect: { timeout: 10_000 },
-  reporter: [['list']],
+  // En el CI: sin `test.only` olvidado, un reintento (un recorrido de punta a punta puede tropezar una vez por el
+  // arranque en frío del runner; si falla dos veces, falla) y anotaciones en la pestaña de la corrida.
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 1 : 0,
+  reporter: process.env.CI ? [['list'], ['github']] : [['list']],
   globalSetup: './e2e/global-setup.ts',
   use: {
     baseURL: ORIGEN_WEB,
