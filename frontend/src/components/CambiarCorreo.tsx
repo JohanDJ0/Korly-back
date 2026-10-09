@@ -3,10 +3,13 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 
+import { CaptchaDelFormulario } from '@/components/CaptchaDelFormulario';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useTurnstile } from '@/hooks/use-turnstile';
 import { traducirErrorDeAuth } from '@/lib/password';
 import { supabase } from '@/lib/supabase';
+import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
 import { useAuthStore } from '@/stores/auth-store';
 
 const esquema = z.object({
@@ -29,6 +32,8 @@ export function CambiarCorreo() {
   const [abierto, setAbierto] = useState(false);
   const [enviadoA, setEnviadoA] = useState<string | null>(null);
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
+  // Comprobar la contraseña es iniciar sesión otra vez, y con el captcha encendido Supabase también lo exige ahí.
+  const captcha = useTurnstile(abierto);
 
   const {
     register,
@@ -55,7 +60,13 @@ export function CambiarCorreo() {
       return;
     }
 
-    const verificacion = await supabase.auth.signInWithPassword({ email: correoActual, password: datos.password });
+    if (captcha.activo && !captcha.token) {
+      setErrorGeneral(MENSAJE_CAPTCHA_PENDIENTE);
+      return;
+    }
+
+    const verificacion = await supabase.auth.signInWithPassword({ email: correoActual, password: datos.password, options: { captchaToken: captcha.token } });
+    captcha.reiniciar(); // el token es de un solo uso
     if (verificacion.error) {
       setErrorGeneral(traducirErrorDeAuth(verificacion.error.message));
       return;
@@ -97,6 +108,7 @@ export function CambiarCorreo() {
         <Input type="password" autoComplete="current-password" className="h-10 rounded-xl" {...register('password')} />
         {errors.password && <span className="text-destructive text-sm">{errors.password.message}</span>}
       </label>
+      <CaptchaDelFormulario captcha={captcha} />
       {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
       <div className="flex gap-2">
         <Button type="submit" className="h-10 flex-1 rounded-xl" disabled={isSubmitting}>

@@ -46,7 +46,7 @@ describe('CambiarPassword', () => {
     await abrirYLlenar('vieja-clave', 'nueva-clave-1', 'nueva-clave-1');
 
     await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ password: 'nueva-clave-1' }));
-    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'yo@correo.com', password: 'vieja-clave' });
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'yo@correo.com', password: 'vieja-clave', options: { captchaToken: undefined } });
     expect(signInWithPassword.mock.invocationCallOrder[0]).toBeLessThan(updateUser.mock.invocationCallOrder[0]!);
     expect(await screen.findByRole('status')).toHaveTextContent('Listo — tu contraseña se actualizó.');
   });

@@ -56,7 +56,7 @@ describe('Login — aviso de sesión expirada', () => {
     await usuario.type(screen.getByLabelText('Contraseña'), 'secreta');
     await usuario.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    await waitFor(() => expect(signInWithPassword).toHaveBeenCalledWith({ email: 'yo@correo.com', password: 'secreta' }));
+    await waitFor(() => expect(signInWithPassword).toHaveBeenCalledWith({ email: 'yo@correo.com', password: 'secreta', options: { captchaToken: undefined } }));
     await waitFor(() => expect(sessionStorage.getItem('korly:sesion-expirada')).toBeNull());
   });
 

@@ -5,11 +5,14 @@ import { Link } from 'react-router-dom';
 import { z } from 'zod';
 
 import { BotonAuth } from '@/components/BotonAuth';
+import { CaptchaDelFormulario } from '@/components/CaptchaDelFormulario';
 import { CargandoKorly } from '@/components/CargandoKorly';
+import { useTurnstile } from '@/hooks/use-turnstile';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
 import { supabase } from '@/lib/supabase';
+import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
 
 const esquemaOlvide = z.object({
   email: z.string().email('Correo inválido'),
@@ -31,6 +34,7 @@ type OlvideForm = z.infer<typeof esquemaOlvide>;
 export function OlvidePassword() {
   const [enviado, setEnviado] = useState(false);
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
+  const captcha = useTurnstile();
 
   const {
     register,
@@ -40,7 +44,12 @@ export function OlvidePassword() {
 
   async function onSubmit(datos: OlvideForm) {
     setErrorGeneral(null);
-    const { error } = await supabase.auth.resetPasswordForEmail(datos.email, { redirectTo: window.location.origin });
+    if (captcha.activo && !captcha.token) {
+      setErrorGeneral(MENSAJE_CAPTCHA_PENDIENTE);
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(datos.email, { redirectTo: window.location.origin, captchaToken: captcha.token });
+    captcha.reiniciar(); // el token es de un solo uso
     if (error) {
       setErrorGeneral(error.message);
       return;
@@ -66,6 +75,7 @@ export function OlvidePassword() {
           <Input id="email" type="email" autoComplete="email" autoFocus className="auth-input" {...register('email')} />
           {errors.email && <p className="text-destructive text-sm">{errors.email.message}</p>}
         </div>
+        <CaptchaDelFormulario captcha={captcha} />
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
         <BotonAuth type="submit" disabled={isSubmitting}>
           {isSubmitting && <CargandoKorly tamano={22} etiqueta="Enviando" className="text-[#3b2a00]" />}

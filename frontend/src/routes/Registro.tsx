@@ -8,10 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
 import { BotonAuth } from '@/components/BotonAuth';
+import { CaptchaDelFormulario } from '@/components/CaptchaDelFormulario';
 import { CargandoKorly } from '@/components/CargandoKorly';
+import { useTurnstile } from '@/hooks/use-turnstile';
 import { constanciaDeAviso } from '@/lib/datos-responsable';
 import { esquemaPasswordNueva } from '@/lib/password';
 import { supabase } from '@/lib/supabase';
+import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
 import { useAuthStore } from '@/stores/auth-store';
 
 const esquemaRegistro = z
@@ -40,6 +43,7 @@ export function Registro() {
   const navigate = useNavigate();
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [cuentaCreada, setCuentaCreada] = useState(false);
+  const captcha = useTurnstile();
 
   const {
     register,
@@ -51,12 +55,17 @@ export function Registro() {
 
   async function onSubmit(datos: RegistroForm) {
     setErrorGeneral(null);
+    if (captcha.activo && !captcha.token) {
+      setErrorGeneral(MENSAJE_CAPTCHA_PENDIENTE);
+      return;
+    }
     // La versión y la fecha del aviso aceptado quedan en la cuenta como constancia del consentimiento.
     const { data, error } = await supabase.auth.signUp({
       email: datos.email,
       password: datos.password,
-      options: { data: constanciaDeAviso() },
+      options: { data: constanciaDeAviso(), captchaToken: captcha.token },
     });
+    captcha.reiniciar(); // el token es de un solo uso
     if (error) {
       setErrorGeneral(error.message);
       return;
@@ -115,6 +124,7 @@ export function Registro() {
           </label>
           {errors.aceptaAviso && <p className="text-destructive text-sm">{errors.aceptaAviso.message}</p>}
         </div>
+        <CaptchaDelFormulario captcha={captcha} />
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
         <BotonAuth type="submit" disabled={isSubmitting}>
           {isSubmitting && <CargandoKorly tamano={22} etiqueta="Creando cuenta" className="text-[#3b2a00]" />}

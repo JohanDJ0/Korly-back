@@ -8,9 +8,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
 import { BotonAuth } from '@/components/BotonAuth';
+import { CaptchaDelFormulario } from '@/components/CaptchaDelFormulario';
 import { CargandoKorly } from '@/components/CargandoKorly';
+import { useTurnstile } from '@/hooks/use-turnstile';
 import { hayAvisoSesionExpirada, limpiarAvisoSesionExpirada } from '@/lib/sesion-expirada';
 import { supabase } from '@/lib/supabase';
+import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
 import { useAuthStore } from '@/stores/auth-store';
 
 const esquemaLogin = z.object({
@@ -25,6 +28,7 @@ export function Login() {
   const navigate = useNavigate();
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [sesionExpirada] = useState(hayAvisoSesionExpirada);
+  const captcha = useTurnstile();
 
   const {
     register,
@@ -36,7 +40,12 @@ export function Login() {
 
   async function onSubmit(datos: LoginForm) {
     setErrorGeneral(null);
-    const { error } = await supabase.auth.signInWithPassword(datos);
+    if (captcha.activo && !captcha.token) {
+      setErrorGeneral(MENSAJE_CAPTCHA_PENDIENTE);
+      return;
+    }
+    const { error } = await supabase.auth.signInWithPassword({ ...datos, options: { captchaToken: captcha.token } });
+    captcha.reiniciar(); // el token es de un solo uso
     if (error) {
       setErrorGeneral(error.message);
       return;
@@ -66,6 +75,7 @@ export function Login() {
             Tu sesión expiró. Inicia sesión de nuevo para continuar.
           </p>
         )}
+        <CaptchaDelFormulario captcha={captcha} />
         {errorGeneral && <p className="text-destructive text-sm">{errorGeneral}</p>}
         <BotonAuth type="submit" disabled={isSubmitting}>
           {isSubmitting && <CargandoKorly tamano={22} etiqueta="Entrando" className="text-[#3b2a00]" />}

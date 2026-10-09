@@ -38,7 +38,7 @@ describe('CambiarCorreo', () => {
     await abrirYLlenar('nuevo@correo.com', 'mi-clave');
 
     await waitFor(() => expect(updateUser).toHaveBeenCalledWith({ email: 'nuevo@correo.com' }, { emailRedirectTo: window.location.origin }));
-    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'yo@correo.com', password: 'mi-clave' });
+    expect(signInWithPassword).toHaveBeenCalledWith({ email: 'yo@correo.com', password: 'mi-clave', options: { captchaToken: undefined } });
     expect(await screen.findByRole('status')).toHaveTextContent('Te enviamos un enlace de confirmación a tu correo actual y a nuevo@correo.com');
   });
 

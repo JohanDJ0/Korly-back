@@ -528,6 +528,22 @@ mostró `RestablecerPassword` → contraseña nueva guardada
 (`updateUser`) → login exitoso con la contraseña nueva. El flujo
 completo, no solo cada paso por separado.
 
+## Captcha (Cloudflare Turnstile)
+
+Registro, inicio de sesión, "olvidé mi contraseña" y las comprobaciones de contraseña de Ajustes (cambiar contraseña y correo, que son un inicio de sesión) llevan un captcha sin acertijos. El navegador carga el widget con la llave **pública** del sitio (`VITE_TURNSTILE_SITE_KEY`), recibe un token de un solo uso y lo manda a Supabase Auth (`options.captchaToken`); **Supabase lo valida con la llave secreta, que vive solo en su panel**. El backend propio no interviene. Sin la variable, el captcha queda apagado y nada cambia (código en `src/lib/turnstile.ts`, `src/hooks/use-turnstile.ts` y `src/components/CaptchaDelFormulario.tsx`).
+
+**Orden para activarlo en producción** (al revés, Supabase exigiría un token que la app todavía no manda y nadie podría entrar):
+
+1. Cloudflare → Turnstile → *Add widget*: nombre Korly, dominios `app.korly.com.mx` y `localhost`, modo *Managed*. Da una *Site key* (pública) y una *Secret key*.
+2. Vercel → proyecto `korly-app` → variable `VITE_TURNSTILE_SITE_KEY` (tipo Config, Production) con la Site key, y volver a desplegar.
+3. Comprobar que la app desplegada ya dibuja el widget (token en el login).
+4. **Publicar el aviso de privacidad actualizado**: nombrar a Cloudflare Turnstile como proveedor en la sección 5 de `Privacidad.tsx` (qué recibe: IP y rasgos del navegador; no lo que se escribe en el formulario; Estados Unidos), una frase en la sección 9 sobre lo que la verificación puede guardar en el navegador, y subir `VERSION_AVISO_PRIVACIDAD` en `datos-responsable.ts` (obliga a todas las cuentas a aceptar de nuevo). Actualizar también `Privacidad.test.tsx`.
+5. Supabase → Authentication → Attack Protection → *Enable CAPTCHA protection* → Turnstile → pegar la Secret key.
+
+Para apagarlo en una emergencia: desactivar la protección en Supabase (paso 5) basta; la app sigue funcionando porque mandar un token de más no estorba. En desarrollo local contra el Supabase de producción, con el captcha encendido hace falta la misma `VITE_TURNSTILE_SITE_KEY` en `frontend/.env` (por eso `localhost` va en los dominios del widget). Cloudflare publica llaves de prueba (`1x00000000000000000000AA` siempre pasa) que sirven para ver el widget, pero Supabase las rechazaría con la llave secreta real.
+
+Las pruebas no hablan con Cloudflare: instalan un `window.turnstile` falso (`src/test/turnstile-falso.ts`).
+
 ## Ajustes
 
 `routes/Ajustes.tsx` — la primera pantalla de preferencias de cuenta,
