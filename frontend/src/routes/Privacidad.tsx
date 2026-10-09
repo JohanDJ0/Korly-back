@@ -53,8 +53,8 @@ function construirSecciones(): SeccionLegal[] {
 
           <Subtitulo>Datos técnicos de errores</Subtitulo>
           <p>
-            Si algo falla en la app, nuestro monitoreo recibe el detalle técnico del error: tipo de navegador y de sistema, la página donde ocurrió y tu
-            dirección IP. No incluye lo que capturaste en tus gastos ni tus montos.
+            Si algo falla en la app, nuestro monitoreo recibe el detalle técnico del error: tipo de navegador y de sistema y la página donde ocurrió. Lo
+            tenemos configurado para no guardar tu dirección IP. No incluye lo que capturaste en tus gastos ni tus montos.
           </p>
         </>
       ),
