@@ -625,10 +625,21 @@ Qué cubren hoy, y por qué esas:
   deje la petición pendiente, que un 503 de autenticación **no** la cierre, y que se cierre una
   sola vez aunque fallen varias peticiones a la vez.
 - **`Login`** — el aviso "Tu sesión expiró" y que sobreviva al redireccionamiento.
+- **Las pantallas `Home`, `Historial`, `Tarjetas`, `Ajustes` y `Resumen`** — con un servidor de
+  mentira (`src/test/servidor-falso.ts`: una tabla de rutas que reemplaza a `apiFetch` y **falla
+  fuerte ante una petición que nadie esperaba**) y `renderEnRuta` para las que leen `:periodoId` o
+  `?desglose=1`. Home: los tres estados de la primera cifra, el exceso del día, el recordatorio que
+  se silencia, los avisos de sobrante y de pagos de tarjeta, la actividad reciente y el ojito.
+  Historial: filtros, corregidos fuera, paginación, exportar a CSV (solo Pro), periodos
+  anteriores y no importar en un periodo cerrado. Tarjetas: alta con validación, compras y MSI,
+  corregir un cargo y eliminar con confirmación. Resumen: sobrante o déficit, decidir (arrastrar o
+  ahorrar en una meta), reabrir solo cuando procede y crear el periodo siguiente solo sin periodo
+  activo. Ajustes: cuenta, recordatorios, cerrar periodo con palabra de confirmación (separado de
+  cerrar sesión), descargar datos y eliminar la cuenta. Comprobadas con mutaciones (rompiendo a
+  propósito una regla de cada pantalla y viendo que alguna prueba falle).
 - **`lib/fechas`** y **`lib/dinero`** — la quincena de hoy (misma regla que el backend, con la
   fecha local), el formato de pesos y el de rangos de fechas.
 
 Para comprobar que una prueba no es vacía, rompe a propósito la regla que verifica y mira que
-falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: pruebas de las demás
-pantallas (Home, Historial, Tarjetas, Ajustes, Resumen) ni del flujo de punta a punta en un
-navegador real.
+falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: pruebas de Metas, Categorías y Recurrentes (las hojas de formularios
+de cada una) ni del flujo de punta a punta en un navegador real.

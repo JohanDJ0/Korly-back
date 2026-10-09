@@ -119,7 +119,7 @@ export function Home() {
               <div className="flex items-center gap-2">
                 <CreditCard size={15} className="text-primary shrink-0" />
                 <p className="text-[13px] font-medium">
-                  {pagosTarjeta.length} pago{pagosTarjeta.length === 1 ? '' : 's'} de tarjeta aplicados esta quincena
+                  {pagosTarjeta.length} pago{pagosTarjeta.length === 1 ? '' : 's'} de tarjeta aplicado{pagosTarjeta.length === 1 ? '' : 's'} esta quincena
                 </p>
               </div>
               <ul className="text-muted-foreground flex flex-col gap-1 pl-[23px] text-[12.5px]">
