@@ -42,7 +42,7 @@ export const RESPONSABLE = {
  * que cambie algo que afecte qué datos se tratan, para qué o con quién (la ley nueva exige consentimiento cuando
  * cambian las finalidades), o las condiciones de uso.
  */
-export const VERSION_AVISO_PRIVACIDAD = '2026-10-06';
+export const VERSION_AVISO_PRIVACIDAD = '2026-10-08';
 export const VERSION_TERMINOS = '2026-10-06';
 
 /** Metadatos del usuario de Supabase donde queda la constancia (los escribe Registro y ReaceptarAviso). */

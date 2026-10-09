@@ -31,7 +31,7 @@ describe('Aviso de privacidad', () => {
     renderConProveedores(<Privacidad />);
 
     expect(screen.getByText(/guardan o procesan tus datos fuera de México, principalmente en Estados Unidos/)).toBeInTheDocument();
-    for (const proveedor of ['Supabase', 'Railway', 'Vercel', 'Resend', 'Sentry', 'Stripe', 'Cloudflare y Google']) {
+    for (const proveedor of ['Supabase', 'Railway', 'Vercel', 'Resend', 'Sentry', 'Stripe', 'Cloudflare Turnstile', 'Cloudflare y Google']) {
       expect(screen.getByText(proveedor, { selector: 'strong' })).toBeInTheDocument();
     }
   });

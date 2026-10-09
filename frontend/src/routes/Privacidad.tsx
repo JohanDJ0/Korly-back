@@ -170,6 +170,12 @@ function construirSecciones(): SeccionLegal[] {
               <strong>Stripe</strong> — cobro de suscripciones. Solo interviene si contratas un plan de pago, que todavía no existe.
             </li>
             <li>
+              <strong>Cloudflare Turnstile</strong> — verificación de seguridad al crear tu cuenta, iniciar sesión o recuperar tu contraseña, para comprobar que
+              quien lo hace es una persona y no un programa automático. Cloudflare recibe, desde tu navegador, datos técnicos de esa verificación (como tu
+              dirección IP y características de tu navegador y dispositivo) para decidir si eres una persona; no recibe lo que escribes en el formulario ni tus
+              datos financieros. Estados Unidos.
+            </li>
+            <li>
               <strong>Cloudflare y Google</strong> — los correos que nos escribas a {RESPONSABLE.correoArco} o a {RESPONSABLE.correoSoporte} pasan por Cloudflare
               (que los reenvía) y llegan a una cuenta de correo de Google.
             </li>
@@ -275,7 +281,8 @@ function construirSecciones(): SeccionLegal[] {
           <p>Korly es para personas mayores de 18 años; no recabamos datos de menores a sabiendas. Si descubrimos que una cuenta es de un menor, la eliminaremos.</p>
           <p>
             Guardamos tu sesión en el almacenamiento de tu navegador para mantenerte dentro de la app; al cerrar sesión se borra. No usamos cookies de publicidad ni
-            de analítica.
+            de analítica. La verificación de seguridad de Cloudflare (sección 5) puede guardar en tu navegador lo necesario para funcionar; no la usamos para
+            seguirte.
           </p>
         </>
       ),
