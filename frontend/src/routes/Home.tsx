@@ -38,6 +38,10 @@ import { formatearRangoFechas, quincenaDeHoy } from '@/lib/fechas';
  * cabría sin apretar la cifra) — hallazgo real, se veía roto en modo
  * tablet. Hasta `lg`, una sola columna ancha; el orden en móvil queda
  * idéntico al de antes.
+ *
+ * En pantallas muy anchas (`xl`, 1280px+) el contenido crece hasta `max-w-6xl` (1152px) en vez de quedarse en 896px con
+ * medio monitor vacío a cada lado; la columna lateral pasa a 420px. No se agrega información: solo se reparte el espacio
+ * (la cifra única sigue siendo el producto, no un dashboard).
  */
 export function Home() {
   const formatearMonto = useFormatearMonto();
@@ -59,7 +63,7 @@ export function Home() {
   const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl xl:max-w-6xl">
       <div className="flex items-center justify-between px-5 pt-5 pb-1 sm:hidden">
         <div className="flex items-center gap-2">
           <img src="/logo/icon.svg" alt="" className="h-[30px] w-[30px] rounded-[9px]" />
@@ -83,7 +87,7 @@ export function Home() {
         </p>
       )}
 
-      <div className="flex flex-col gap-3.5 px-5 pt-2 pb-4 sm:px-0 sm:pt-0 lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-8">
+      <div className="flex flex-col gap-3.5 px-5 pt-2 pb-4 sm:px-0 sm:pt-0 lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-8 xl:grid-cols-[1fr_420px] xl:gap-10">
         <div className="flex flex-col gap-3.5">
           {
             // Hallazgo real de un usuario: cerrar un periodo y crear el

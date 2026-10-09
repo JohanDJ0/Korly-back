@@ -45,7 +45,7 @@ export function RecordatorioContextual({ disponible }: RecordatorioContextualPro
   if (disponible.huboActividadHoy || yaSeExcedioHoy) return null;
 
   return (
-    <Card className="w-full max-w-sm border-primary/40 bg-primary/5 dark:bg-primary/10">
+    <Card className="w-full border-primary/40 bg-primary/5 dark:bg-primary/10">
       <CardContent className="pt-6">
         <p className="text-sm">
           Te quedan {disponible.diasRestantes} día{disponible.diasRestantes === 1 ? '' : 's'} con{' '}

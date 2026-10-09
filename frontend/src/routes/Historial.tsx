@@ -102,7 +102,7 @@ export function Historial() {
   const viendoElPeriodoActivo = periodoViendose?.estado === 'activo';
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl xl:max-w-6xl">
       <PageHeader titulo="Historial" />
 
       <div className="flex flex-col gap-4 px-5 sm:px-0">

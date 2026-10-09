@@ -15,7 +15,7 @@ export function Tarjetas() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl">
+    <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl xl:max-w-6xl">
       <PageHeader
         titulo="Tarjetas de crédito"
         accion={
@@ -31,7 +31,7 @@ export function Tarjetas() {
         {error && <p className="text-destructive">{error.message}</p>}
         {tarjetas?.length === 0 && <p className="text-muted-foreground">Todavía no tienes ninguna tarjeta registrada.</p>}
         {tarjetas && tarjetas.length > 0 && (
-          <ul className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5">
+          <ul className="flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:items-start lg:gap-5 xl:grid-cols-3">
             {tarjetas.map((tarjeta) => (
               <FilaTarjeta key={tarjeta.id} tarjeta={tarjeta} />
             ))}
