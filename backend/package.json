@@ -15,6 +15,7 @@
     "test:local": "tsx scripts/test-local.ts",
     "recordatorios": "tsx scripts/enviar-recordatorios.ts",
     "metricas": "tsx scripts/metricas.ts",
+    "pila-e2e": "tsx scripts/pila-e2e.ts",
     "respaldo": "tsx scripts/respaldo.ts",
     "respaldo:probar": "tsx scripts/probar-respaldo.ts",
     "respaldo:restaurar": "tsx scripts/restaurar-respaldo.ts"

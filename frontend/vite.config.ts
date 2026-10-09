@@ -28,6 +28,8 @@ export default defineConfig({
       // Igual: con la llave real en frontend/.env los formularios pedirían un token de Cloudflare y las pruebas no sabrían dárselo. Las pruebas del captcha la fijan ellas mismas.
       VITE_TURNSTILE_SITE_KEY: '',
     },
+    // Los recorridos de punta a punta (e2e/*.e2e.ts) los corre Playwright, no Vitest.
+    exclude: ['**/node_modules/**', 'e2e/**'],
     css: false,
   },
 });

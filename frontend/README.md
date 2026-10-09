@@ -646,5 +646,40 @@ Qué cubren hoy, y por qué esas:
 - **`lib/fechas`** y **`lib/dinero`** — la quincena de hoy (misma regla que el backend, con la
   fecha local), el formato de pesos y el de rangos de fechas.
 
+### Pruebas de punta a punta (Playwright, en un Chrome real)
+
+`npm run e2e` desde `frontend/` (y `npm run e2e:tipos` para revisar los tipos). Un Chrome real (el que ya
+está instalado: `channel: 'chrome'`, no se descarga ningún navegador) recorre la app contra una **pila local y
+desechable** que arma sola `playwright.config.ts` + `e2e/global-setup.ts`:
+
+- **Postgres** efímero con todas las migraciones (UTF-8, como Supabase) y el rol `app_backend`.
+- La **API real** de Korly (el mismo `crearApp()`), con límites de peticiones altos.
+- Un **Supabase Auth de mentira** (`backend/scripts/lib/auth-falso.ts`): habla el pedazo de GoTrue que usan
+  el navegador y el servidor (iniciar sesión, registrarse, leer/actualizar usuario, recuperar, renovar token y
+  `admin` para consultar/borrar). Un correo con `+confirmar` se registra **sin sesión** (como cuando Supabase pide
+  confirmar el correo). Expone `/__e2e/usuarios` para preparar cuentas (p. ej. con un aviso de privacidad viejo).
+- El **frontend** real en Vite (puerto 5199; API en 3199 y auth en 54399).
+
+La pila (`backend/scripts/pila-e2e.ts`, también a mano con `npm run pila-e2e` en `backend/`) **nunca toca
+producción**: fija a valores locales todas las variables que importan (el `.env` real no entra: dotenv no pisa lo
+ya definido), se niega a arrancar si algo no apunta a localhost, y deja vacíos Resend, Stripe, Sentry y Turnstile.
+Se apaga limpia (API, auth y Postgres con su carpeta temporal) con `SALIR` por la entrada estándar o cuando
+Playwright termina o muere, para no dejar Postgres huérfanos.
+
+Qué recorren (28 pruebas, ~2 min, cada una con su cuenta nueva): acceso y sesión (protegidas sin sesión,
+registro, confirmación de correo, login con error, cerrar sesión, recarga, la puerta de re-aceptar el aviso),
+**la quincena completa** (empezar, ingreso, gastos, historial, corregir y eliminar, cerrar con la palabra de
+confirmación, reabrir, decidir el sobrante, periodo siguiente), gasto mayor al disponible, el ojito entre
+recargas, metas (aportar baja el disponible), tarjetas con MSI, recurrentes, categorías (en uso no se borran),
+Ajustes (recordatorios, "Avísame", cambiar contraseña, descargar datos, comentarios, eliminar la cuenta) y una
+vuelta en pantalla de celular (Pixel 7).
+
+**Lo que NO prueban** (hay que probarlo en producción o a mano): el correo real de confirmación de Supabase, el
+captcha de Turnstile, el envío de comentarios y recordatorios por Resend, Stripe, ni el comportamiento exacto de
+los mensajes de error de Supabase más allá de los que la app muestra. No corren en el CI (decisión: solo a mano,
+antes de cambios grandes). Dos trampas al escribir pruebas: tras ir a otra pantalla usa `irA(page, 'Historial')`
+(espera el encabezado; si no, el siguiente `getByText` puede ver todavía la pantalla anterior), y un
+`checkbox` que se guarda en el servidor cambia al confirmar, no al instante (`click`, no `check/uncheck`).
+
 Para comprobar que una prueba no es vacía, rompe a propósito la regla que verifica y mira que
-falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: el flujo de punta a punta en un navegador real.
+falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: las pruebas de punta a punta en el CI (corren a mano, ver arriba).
