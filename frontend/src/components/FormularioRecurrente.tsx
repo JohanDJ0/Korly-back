@@ -14,7 +14,8 @@ const esquemaRecurrente = z
     descripcion: z.string().trim().min(1, "Ponle un nombre (p. ej. 'Netflix')"),
     monto: z.coerce.number().positive('El monto debe ser mayor a cero'),
     frecuencia: z.enum(['quincenal', 'mensual']),
-    diaMes: z.coerce.number().int().min(1).max(31).optional(),
+    // Un campo vacío llega como 0 (z.coerce), no como undefined: sin mensaje propio salía el de zod en inglés ("Too small").
+    diaMes: z.coerce.number().int('Indica el día del mes en que se cobra (de 1 a 31)').min(1, 'Indica el día del mes en que se cobra (de 1 a 31)').max(31, 'Indica el día del mes en que se cobra (de 1 a 31)').optional(),
   })
   .refine((datos) => datos.frecuencia !== 'mensual' || datos.diaMes !== undefined, {
     message: 'Indica el día del mes en que se cobra',

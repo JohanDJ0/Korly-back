@@ -125,6 +125,8 @@ export function FilaCategoria({ categoria }: FilaCategoriaProps) {
         )}
       </div>
       {eliminarCategoria.isError && <p className="text-destructive text-sm">{eliminarCategoria.error.message}</p>}
+      {/* "Listo" cierra la edición al mandar el cambio: si el servidor lo rechaza (nombre repetido), el motivo se ve aquí y no se pierde en silencio. */}
+      {actualizarCategoria.isError && <p className="text-destructive text-sm">{actualizarCategoria.error.message}</p>}
     </li>
   );
 }

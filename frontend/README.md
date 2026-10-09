@@ -637,9 +637,14 @@ Qué cubren hoy, y por qué esas:
   activo. Ajustes: cuenta, recordatorios, cerrar periodo con palabra de confirmación (separado de
   cerrar sesión), descargar datos y eliminar la cuenta. Comprobadas con mutaciones (rompiendo a
   propósito una regla de cada pantalla y viendo que alguna prueba falle).
+- **Metas, Categorías y Recurrentes** — misma técnica. Metas: la lista con lo acumulado y el
+  porcentaje (la barra se topa en 100 % aunque el número diga 120 %) y crear una con el objetivo
+  en centavos y su validación. Categorías: predeterminadas sin eliminar, editar nombre e ícono
+  (con Enter, sin molestar al servidor si no cambió, y mostrando el motivo si lo rechaza), eliminar
+  con confirmación y crear con o sin ícono. Recurrentes: monto y frecuencia, pausar y reanudar, y
+  el alta (el día del mes solo para los mensuales, con su validación en español).
 - **`lib/fechas`** y **`lib/dinero`** — la quincena de hoy (misma regla que el backend, con la
   fecha local), el formato de pesos y el de rangos de fechas.
 
 Para comprobar que una prueba no es vacía, rompe a propósito la regla que verifica y mira que
-falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: pruebas de Metas, Categorías y Recurrentes (las hojas de formularios
-de cada una) ni del flujo de punta a punta en un navegador real.
+falle (así se revisó la del tope de disponible). Lo que **no** hay todavía: el flujo de punta a punta en un navegador real.
