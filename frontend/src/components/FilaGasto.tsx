@@ -107,11 +107,12 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
   }
 
   return (
-    <li className="flex items-center gap-3 border-b py-3 last:border-b-0">
+    // flex-wrap: al pedir confirmación, los botones pasan a su propio renglón en vez de salirse de la pantalla en el celular.
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3 last:border-b-0">
       <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
         <Icono size={16} className="text-secondary-foreground" />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-36">
         <p className="font-medium">{formatearMonto(gasto.monto)}</p>
         <p className="text-muted-foreground text-sm">
           {gasto.fechaEfectiva}
@@ -121,7 +122,7 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
         </p>
         {eliminarGasto.isError && <p className="text-destructive text-sm">{eliminarGasto.error.message}</p>}
       </div>
-      <div className="flex shrink-0 gap-2">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="outline"
@@ -139,7 +140,7 @@ export function FilaGasto({ gasto }: FilaGastoProps) {
         <BotonConfirmar
           variant="outline"
           size="sm"
-          pregunta="¿Eliminar este gasto?"
+          pregunta={`¿Eliminar este gasto de ${formatearMonto(gasto.monto)}?`}
           onConfirmar={() => {
             editarGasto.reset();
             eliminarGasto.mutate(gasto.id);

@@ -180,7 +180,7 @@ export function Historial() {
             {cargandoIngresos && <p className="text-muted-foreground text-sm">Cargando…</p>}
             {errorIngresos && <p className="text-destructive text-sm">{errorIngresos.message}</p>}
             {ingresosVigentes.length === 0 && <p className="text-muted-foreground text-sm">Sin ingresos todavía.</p>}
-            <ul>{ingresosVigentes.map((ingreso) => <FilaIngreso key={ingreso.id} ingreso={ingreso} />)}</ul>
+            <ul>{ingresosVigentes.map((ingreso) => <FilaIngreso key={ingreso.id} ingreso={ingreso} esElUnico={ingresosVigentes.length === 1} />)}</ul>
           </section>
         )}
 

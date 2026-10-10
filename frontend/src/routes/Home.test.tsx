@@ -386,6 +386,46 @@ describe('Home — atajos de gasto', () => {
     await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
   });
 
+  it('tocarlo varias veces registra varios gastos y el aviso lo dice: cada "Deshacer el último" quita uno', async () => {
+    let numero = 0;
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({
+        '/atajos-gasto': { atajos: [cafe], limite: 3 },
+        'POST /periodos/p1/gastos': () => ({ id: `g${++numero}`, movimientoId: `m${numero}`, periodoId: 'p1' }),
+        'DELETE /gastos/g3': undefined,
+        'DELETE /gastos/g2': undefined,
+      })
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<Home />);
+
+    const boton = await screen.findByRole('button', { name: `Café ${m(5500)}` });
+    await usuario.click(boton);
+    await screen.findByText(`Registrado: Café ${m(5500)}`);
+    await usuario.click(boton);
+    await usuario.click(boton);
+
+    expect(await screen.findByText(`Registraste 3 gastos. El último: Café ${m(5500)}`)).toBeInTheDocument();
+    expect(servidor.llamadasA('POST', '/periodos/p1/gastos')).toHaveLength(3);
+
+    await usuario.click(screen.getByRole('button', { name: 'Deshacer el último' }));
+    expect(await screen.findByText(`Registraste 2 gastos. El último: Café ${m(5500)}`)).toBeInTheDocument();
+    expect(servidor.llamadasA('DELETE', '/gastos/g3')).toHaveLength(1); // el más reciente primero
+
+    await usuario.click(screen.getByRole('button', { name: 'Deshacer el último' }));
+    expect(await screen.findByText(`Registrado: Café ${m(5500)}`)).toBeInTheDocument(); // queda uno: vuelve el texto simple
+    expect(servidor.llamadasA('DELETE', '/gastos/g2')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Deshacer' })).toBeInTheDocument();
+  });
+
+  it('el encabezado explica que un toque registra el gasto', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo({ '/atajos-gasto': { atajos: [cafe], limite: 3 } }));
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByText(/un toque registra el gasto/)).toBeInTheDocument();
+  });
+
   it('un atajo mayor a lo disponible NO se registra solo: abre el formulario con el monto y el nombre puestos', async () => {
     servidor = instalarServidorFalso(apiFetch, rutasConPeriodo({ '/atajos-gasto': { atajos: [caro], limite: 3 } }));
     const usuario = userEvent.setup();

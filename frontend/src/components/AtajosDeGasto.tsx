@@ -33,10 +33,18 @@ export function AtajosDeGasto({ periodoId, onAbrirFormulario }: AtajosDeGastoPro
   const { data: disponible } = useDisponible();
   const registrarGasto = useRegistrarGasto();
   const eliminarGasto = useEliminarGasto();
-  const [registrado, setRegistrado] = useState<{ gastoId: string; nombre: string; monto: Atajo['monto'] } | null>(null);
+  // Todos los gastos registrados con atajos desde que se apagó el aviso (el más reciente al final): un toque repetido
+  // registra otro gasto, y cada "Deshacer" quita uno, del último al primero.
+  const [registrados, setRegistrados] = useState<{ gastoId: string; nombre: string; monto: Atajo['monto'] }[]>([]);
   const temporizador = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => () => clearTimeout(temporizador.current), []);
+
+  /** Cada gasto nuevo da otros 7 segundos para deshacer; al vencerse, el aviso (y los "Deshacer" pendientes) se van. */
+  function reiniciarTemporizador() {
+    clearTimeout(temporizador.current);
+    temporizador.current = setTimeout(() => setRegistrados([]), MS_PARA_DESHACER);
+  }
 
   function tocar(atajo: Atajo) {
     eliminarGasto.reset();
@@ -48,26 +56,27 @@ export function AtajosDeGasto({ periodoId, onAbrirFormulario }: AtajosDeGastoPro
       { periodoId, monto: atajo.monto, fechaEfectiva: hoyISO(), categoriaId: atajo.categoriaId ?? undefined, nota: atajo.nombre },
       {
         onSuccess: (gasto) => {
-          clearTimeout(temporizador.current);
-          setRegistrado({ gastoId: gasto.id, nombre: atajo.nombre, monto: atajo.monto });
-          temporizador.current = setTimeout(() => setRegistrado(null), MS_PARA_DESHACER);
+          setRegistrados((previos) => [...previos, { gastoId: gasto.id, nombre: atajo.nombre, monto: atajo.monto }]);
+          reiniciarTemporizador();
         },
       }
     );
   }
 
+  const ultimo = registrados[registrados.length - 1];
+
   function deshacer() {
-    if (!registrado) return;
-    eliminarGasto.mutate(registrado.gastoId, {
+    if (!ultimo) return;
+    eliminarGasto.mutate(ultimo.gastoId, {
       onSuccess: () => {
-        clearTimeout(temporizador.current);
-        setRegistrado(null);
+        setRegistrados((previos) => previos.filter((r) => r.gastoId !== ultimo.gastoId));
+        reiniciarTemporizador();
       },
     });
   }
 
   const atajos = lista?.atajos ?? [];
-  if (atajos.length === 0 && !registrado) return null;
+  if (atajos.length === 0 && registrados.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-2">
@@ -75,7 +84,7 @@ export function AtajosDeGasto({ periodoId, onAbrirFormulario }: AtajosDeGastoPro
         <div className="flex flex-col gap-1.5">
           <h2 className="text-muted-foreground flex items-center gap-1 text-[11.5px] font-semibold tracking-wide">
             <Zap size={12} strokeWidth={2.5} />
-            ATAJOS
+            ATAJOS · un toque registra el gasto
           </h2>
           <div className="flex flex-wrap gap-2">
             {atajos.map((atajo) => (
@@ -94,14 +103,16 @@ export function AtajosDeGasto({ periodoId, onAbrirFormulario }: AtajosDeGastoPro
         </div>
       )}
 
-      {registrado && (
+      {ultimo && (
         <div role="status" className="bg-secondary text-secondary-foreground flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px]">
           <Check size={15} strokeWidth={2.5} className="shrink-0" />
           <span className="min-w-0 flex-1">
-            Registrado: {registrado.nombre} {formatearMonto(registrado.monto)}
+            {registrados.length === 1
+              ? `Registrado: ${ultimo.nombre} ${formatearMonto(ultimo.monto)}`
+              : `Registraste ${registrados.length} gastos. El último: ${ultimo.nombre} ${formatearMonto(ultimo.monto)}`}
           </span>
           <Button type="button" size="sm" variant="ghost" className="h-7 shrink-0 rounded-lg px-2" disabled={eliminarGasto.isPending} onClick={deshacer}>
-            {eliminarGasto.isPending ? 'Deshaciendo…' : 'Deshacer'}
+            {eliminarGasto.isPending ? 'Deshaciendo…' : registrados.length > 1 ? 'Deshacer el último' : 'Deshacer'}
           </Button>
         </div>
       )}

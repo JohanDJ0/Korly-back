@@ -11,10 +11,12 @@ import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 
 interface FilaIngresoProps {
   ingreso: Ingreso;
+  /** Es el único ingreso vigente del periodo: borrarlo deja la quincena sin cifra, y la confirmación lo dice. */
+  esElUnico?: boolean;
 }
 
 /** Espejo exacto de FilaGasto.tsx — mismo mecanismo de corrección, ver backend/README.md "Editar y eliminar un ingreso". */
-export function FilaIngreso({ ingreso }: FilaIngresoProps) {
+export function FilaIngreso({ ingreso, esElUnico = false }: FilaIngresoProps) {
   const formatearMonto = useFormatearMonto();
   const [editando, setEditando] = useState(false);
   const [monto, setMonto] = useState(() => (ingreso.monto.valorMinimo / 100).toString());
@@ -74,11 +76,12 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
   }
 
   return (
-    <li className="flex items-center gap-3 border-b py-3 last:border-b-0">
+    // flex-wrap: al pedir confirmación, los botones pasan a su propio renglón en vez de salirse de la pantalla en el celular.
+    <li className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b py-3 last:border-b-0">
       <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-xl">
         <TrendingUp size={16} className="text-secondary-foreground" />
       </div>
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0 flex-1 basis-36">
         <p className="text-primary font-medium">+{formatearMonto(ingreso.monto)}</p>
         <p className="text-muted-foreground text-sm">
           {ingreso.fechaEfectiva}
@@ -86,7 +89,7 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
         </p>
         {eliminarIngreso.isError && <p className="text-destructive text-sm">{eliminarIngreso.error.message}</p>}
       </div>
-      <div className="flex shrink-0 gap-2">
+      <div className="flex max-w-full shrink-0 flex-wrap items-center gap-2">
         <Button
           size="sm"
           variant="outline"
@@ -100,7 +103,7 @@ export function FilaIngreso({ ingreso }: FilaIngresoProps) {
         <BotonConfirmar
           variant="outline"
           size="sm"
-          pregunta="¿Eliminar este ingreso?"
+          pregunta={`¿Eliminar este ingreso de ${formatearMonto(ingreso.monto)}?${esElUnico ? " Es el único de la quincena: sin él no se puede calcular cuánto puedes gastar." : ""}`}
           onConfirmar={() => {
             editarIngreso.reset();
             eliminarIngreso.mutate(ingreso.id);
