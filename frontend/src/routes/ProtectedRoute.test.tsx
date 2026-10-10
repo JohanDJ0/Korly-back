@@ -31,7 +31,7 @@ function montar(entrada: string) {
 }
 
 beforeEach(() => {
-  useAuthStore.setState({ session: null, cargando: false, esRecuperacion: false });
+  useAuthStore.setState({ session: null, cargando: false, esRecuperacion: false, tuvoSesion: false });
 });
 
 describe('ProtectedRoute — sin sesión', () => {
@@ -39,6 +39,13 @@ describe('ProtectedRoute — sin sesión', () => {
     montar('/?gasto=1');
 
     expect(screen.getByTestId('login')).toHaveTextContent(JSON.stringify({ desde: '/?gasto=1' }));
+  });
+
+  it('si acaba de cerrar sesión en esta misma carga, no recuerda nada (no vuelve a la pantalla de quien salió)', () => {
+    useAuthStore.setState({ tuvoSesion: true });
+    montar('/historial');
+
+    expect(screen.getByTestId('login')).toHaveTextContent(/^null$/); // sin estado de navegación
   });
 
   it('también recuerda otras pantallas', () => {

@@ -65,6 +65,9 @@ const CODIGO_A_STATUS: Record<string, number> = {
   // request está bien formado, lo que falta es autorización de plan,
   // no un dato inválido.
   LIMITE_METAS_ALCANZADO: 403,
+  // modulos/atajos/: mismo criterio que el límite de metas (el request es válido, falta autorización de plan).
+  LIMITE_ATAJOS_ALCANZADO: 403,
+  ATAJO_NO_ENCONTRADO: 404,
   FUNCION_PRO: 403,
   // modulos/suscripciones/: pedir el Portal de facturación sin haber
   // empezado nunca un checkout. Mismo criterio que SIN_PERIODO_ACTIVO:

@@ -43,7 +43,7 @@ describe('TarjetaPlan — Korly Pro "próximamente" (cobros apagados)', () => {
 
     expect(screen.getByText('Plan gratuito')).toBeInTheDocument();
     expect(screen.getByText('Korly Pro llegará pronto')).toBeInTheDocument();
-    for (const ventaja of ['Presupuesto en pareja o familia', 'Metas en común', 'Alertas de ritmo', 'Metas sin límite', 'Historial completo', 'Exportar a CSV']) {
+    for (const ventaja of ['Presupuesto en pareja o familia', 'Metas en común', 'Alertas de ritmo', 'Metas sin límite', 'Más atajos de gasto', 'Historial completo', 'Exportar a CSV']) {
       expect(screen.getByText(ventaja)).toBeInTheDocument();
     }
     expect(screen.queryByRole('button', { name: /\$89/ })).not.toBeInTheDocument();

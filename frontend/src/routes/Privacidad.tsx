@@ -35,7 +35,7 @@ function construirSecciones(): SeccionLegal[] {
             <li>Tus ingresos y tus gastos, cada uno con su monto, su fecha, su categoría y la nota que quieras escribir.</li>
             <li>Tus periodos (las quincenas de calendario en las que llevas tus cuentas) y los resúmenes que se generan al cerrarlos.</li>
             <li>Tus metas de ahorro: nombre, objetivo y cada aporte, retiro o pago que hagas con ellas.</li>
-            <li>Tus gastos recurrentes y tus categorías personalizadas.</li>
+            <li>Tus gastos recurrentes, tus categorías personalizadas y tus atajos de gasto (el nombre, el monto y la categoría de los gastos que repites y registras con un toque).</li>
             <li>Tus tarjetas de crédito, con el nombre, el límite, el día de corte y el plazo de pago que tú escribes, y sus compras y mensualidades.</li>
           </Lista>
 

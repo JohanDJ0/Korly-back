@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronRight, Download, FileText, LogOut, Repeat, ShieldCheck, Tag } from 'lucide-react';
+import { Bell, ChevronRight, Download, FileText, LogOut, Repeat, ShieldCheck, Tag, Zap } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
@@ -115,6 +115,13 @@ export function Ajustes() {
                 <Repeat size={17} className="text-secondary-foreground" />
               </div>
               <span className="flex-1 text-[14px] font-medium">Gastos recurrentes</span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </Link>
+            <Link to="/atajos" className="flex items-center gap-3 p-3.5">
+              <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-[11px]">
+                <Zap size={17} className="text-secondary-foreground" />
+              </div>
+              <span className="flex-1 text-[14px] font-medium">Atajos de gasto</span>
               <ChevronRight size={16} className="text-muted-foreground" />
             </Link>
           </div>

@@ -5,6 +5,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ActividadReciente } from '@/components/ActividadReciente';
+import { AtajosDeGasto } from '@/components/AtajosDeGasto';
 import { BottomNav } from '@/components/BottomNav';
 import { CargandoKorly } from '@/components/CargandoKorly';
 import { CifraDisponible } from '@/components/CifraDisponible';
@@ -13,6 +14,7 @@ import { FormularioIngreso } from '@/components/FormularioIngreso';
 import { HojaInferior } from '@/components/HojaInferior';
 import { RecordatorioContextual } from '@/components/RecordatorioContextual';
 import { ResumenCompactoPeriodo } from '@/components/ResumenCompactoPeriodo';
+import type { Atajo } from '@/hooks/use-atajos';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
 import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
@@ -52,6 +54,8 @@ export function Home() {
   const quincena = quincenaDeHoy();
   const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
   const [mostrarFormularioIngreso, setMostrarFormularioIngreso] = useState(false);
+  // Un atajo que superó lo disponible abre el formulario con sus datos puestos (ver AtajosDeGasto.tsx).
+  const [atajoEnFormulario, setAtajoEnFormulario] = useState<Atajo | null>(null);
 
   const sinPeriodoActivo = error instanceof ApiError && error.codigo === 'PERIODO_NO_ENCONTRADO';
   const errorInesperado = error && !sinPeriodoActivo;
@@ -201,6 +205,16 @@ export function Home() {
             </button>
           )}
 
+          {periodoId && (
+            <AtajosDeGasto
+              periodoId={periodoId}
+              onAbrirFormulario={(atajo) => {
+                setAtajoEnFormulario(atajo);
+                setMostrarFormularioGasto(true);
+              }}
+            />
+          )}
+
           {periodoId && data?.estado === 'ok' && (
             <button
               onClick={() => setMostrarFormularioIngreso(true)}
@@ -231,8 +245,21 @@ export function Home() {
       )}
 
       {periodoId && mostrarFormularioGasto && (
-        <HojaInferior titulo="Nuevo gasto" onCerrar={() => setMostrarFormularioGasto(false)}>
-          <FormularioGasto periodoId={periodoId} onRegistrado={() => setMostrarFormularioGasto(false)} />
+        <HojaInferior
+          titulo="Nuevo gasto"
+          onCerrar={() => {
+            setMostrarFormularioGasto(false);
+            setAtajoEnFormulario(null);
+          }}
+        >
+          <FormularioGasto
+            periodoId={periodoId}
+            onRegistrado={() => {
+              setMostrarFormularioGasto(false);
+              setAtajoEnFormulario(null);
+            }}
+            inicial={atajoEnFormulario ? { monto: atajoEnFormulario.monto.valorMinimo / 100, categoriaId: atajoEnFormulario.categoriaId, nota: atajoEnFormulario.nombre } : undefined}
+          />
         </HojaInferior>
       )}
     </div>

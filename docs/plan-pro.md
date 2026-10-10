@@ -23,6 +23,7 @@ El límite del plan gratuito está donde **escala el compromiso del usuario**, n
 |---|---|---|
 | **Metas sin límite** | Free tiene 2 metas. | **Construido** (`LIMITE_METAS_FREE` en `modulos/metas/metas.ts`). |
 | **Historial completo** | Free ve 12 meses de quincenas. | **Construido** (`MESES_HISTORIAL_FREE` en `modulos/periodos/crear-periodo.ts`). |
+| **Más atajos de gasto** | Free tiene 3 atajos ("Café $55" a un toque); Pro hasta 12. | **Construido** (`LIMITE_ATAJOS_FREE`/`LIMITE_ATAJOS_PRO` en `modulos/atajos/atajos.ts`; pantalla en Ajustes → Atajos de gasto). |
 | **Exportar a CSV** | Gastos e ingresos para el contador o una hoja de cálculo. | **Construido** (`modulos/exportar/`, `FUNCION_PRO`). PDF: pendiente. |
 | **Alertas de ritmo** | "Vas gastando más rápido de lo que alcanza tu quincena", antes de quedarse corto. Es la alerta de mayor valor según las conversaciones de campo (documento maestro §13, punto 4). | Sin construir (F2; puntuación RICE 6.4). |
 

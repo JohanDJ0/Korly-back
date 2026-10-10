@@ -17,12 +17,19 @@ interface AuthState {
    * App.tsx y routes/RestablecerPassword.tsx.
    */
   esRecuperacion: boolean;
+  /**
+   * true en cuanto hubo una sesión en esta carga de la página. Distingue "llegué sin sesión desde un enlace" (el del
+   * recordatorio: hay que volver ahí al entrar) de "acabo de cerrar sesión" (no hay nada que recordar): ver
+   * routes/ProtectedRoute.tsx.
+   */
+  tuvoSesion: boolean;
 }
 
 export const useAuthStore = create<AuthState>(() => ({
   session: null,
   cargando: true,
   esRecuperacion: false,
+  tuvoSesion: false,
 }));
 
 /** Se llama al terminar el flujo (contraseña ya cambiada) para volver al comportamiento normal. */
@@ -48,7 +55,7 @@ function sincronizarSesion(session: Session | null) {
     queryClient.clear();
   }
   usuarioActualId = nuevoUsuarioId;
-  useAuthStore.setState({ session, cargando: false });
+  useAuthStore.setState((estado) => ({ session, cargando: false, tuvoSesion: estado.tuvoSesion || session !== null }));
 }
 
 void supabase.auth.getSession().then(({ data }) => {

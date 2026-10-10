@@ -68,6 +68,7 @@ function rutasConPeriodo(extra: Rutas = {}): Rutas {
     '/periodos/p1/gastos': { datos: [], siguienteCursor: null },
     '/periodos/p1/desglose': desgloseVacio,
     '/categorias': [],
+    '/atajos-gasto': { atajos: [], limite: 3 },
     ...extra,
   };
 }
@@ -337,6 +338,93 @@ describe('Home — enlace del recordatorio (/?gasto=1)', () => {
 
     await screen.findByText('Empecemos');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+});
+
+describe('Home — atajos de gasto', () => {
+  const cafe = { id: 'a1', nombre: 'Café', monto: pesos(5500), categoriaId: 'c-comida' };
+  const caro = { id: 'a2', nombre: 'Laptop', monto: pesos(600000), categoriaId: null }; // $6,000.00 > $4,550.05 disponibles
+
+  it('sin atajos no se pinta nada (Inicio no se llena de cosas)', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo());
+    renderConProveedores(<Home />);
+
+    await screen.findByRole('button', { name: 'Registrar gasto' });
+    expect(screen.queryByText('ATAJOS')).not.toBeInTheDocument();
+  });
+
+  it('un toque registra el gasto de hoy con el monto, la categoría y el nombre como nota, y avisa con "Deshacer"', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo({ '/atajos-gasto': { atajos: [cafe], limite: 3 }, 'POST /periodos/p1/gastos': { id: 'g9', movimientoId: 'm9', periodoId: 'p1' } }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<Home />);
+
+    await usuario.click(await screen.findByRole('button', { name: `Café ${m(5500)}` }));
+
+    await waitFor(() => expect(servidor.llamadasA('POST', '/periodos/p1/gastos')).toHaveLength(1));
+    expect(servidor.llamadasA('POST', '/periodos/p1/gastos')[0]?.cuerpo).toEqual({
+      monto: { valorMinimo: 5500, moneda: 'MXN' },
+      fechaEfectiva: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+      categoriaId: 'c-comida',
+      nota: 'Café',
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent(`Registrado: Café ${m(5500)}`);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument(); // no abre ningún formulario
+  });
+
+  it('"Deshacer" borra el gasto recién registrado', async () => {
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({ '/atajos-gasto': { atajos: [cafe], limite: 3 }, 'POST /periodos/p1/gastos': { id: 'g9', movimientoId: 'm9', periodoId: 'p1' }, 'DELETE /gastos/g9': undefined })
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<Home />);
+
+    await usuario.click(await screen.findByRole('button', { name: `Café ${m(5500)}` }));
+    await usuario.click(await screen.findByRole('button', { name: 'Deshacer' }));
+
+    await waitFor(() => expect(servidor.llamadasA('DELETE', '/gastos/g9')).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByRole('status')).not.toBeInTheDocument());
+  });
+
+  it('un atajo mayor a lo disponible NO se registra solo: abre el formulario con el monto y el nombre puestos', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo({ '/atajos-gasto': { atajos: [caro], limite: 3 } }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<Home />);
+
+    await usuario.click(await screen.findByRole('button', { name: `Laptop ${m(600000)}` }));
+
+    const hoja = await screen.findByRole('dialog', { name: 'Nuevo gasto' });
+    expect(within(hoja).getByLabelText('¿Cuánto gastaste?')).toHaveValue(6000);
+    expect(within(hoja).getByLabelText(/Nota/i)).toHaveValue('Laptop');
+    expect(servidor.llamadasA('POST', '/periodos/p1/gastos')).toHaveLength(0);
+  });
+
+  it('con el ojito activado, el monto del atajo no se ve', async () => {
+    usePrivacidadStore.setState({ oculto: true });
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo({ '/atajos-gasto': { atajos: [cafe], limite: 3 } }));
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByRole('button', { name: 'Café $ ••••' })).toBeInTheDocument();
+    expect(screen.queryByText(m(5500))).not.toBeInTheDocument();
+  });
+
+  it('si el servidor rechaza el gasto, muestra el error y no promete "Deshacer"', async () => {
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({
+        '/atajos-gasto': { atajos: [cafe], limite: 3 },
+        'POST /periodos/p1/gastos': () => {
+          throw new ApiError(409, 'PERIODO_NO_ACTIVO', 'El periodo ya no está activo');
+        },
+      })
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<Home />);
+
+    await usuario.click(await screen.findByRole('button', { name: `Café ${m(5500)}` }));
+
+    expect(await screen.findByText('El periodo ya no está activo')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Deshacer' })).not.toBeInTheDocument();
   });
 });
 

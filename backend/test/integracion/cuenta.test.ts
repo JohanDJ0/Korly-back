@@ -15,6 +15,7 @@ import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-id
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { aportarAMeta, crearMeta } from '../../src/modulos/metas/metas.js';
 import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
+import { crearAtajo } from '../../src/modulos/atajos/atajos.js';
 import { crearGastoRecurrente } from '../../src/modulos/recurrentes/recurrentes.js';
 import { registrarCargoTarjeta } from '../../src/modulos/tarjetas/registrar-cargo.js';
 import { crearTarjeta } from '../../src/modulos/tarjetas/tarjetas.js';
@@ -43,6 +44,7 @@ describe('privacidad y derechos ARCO', () => {
     const meta = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
     await aportarAMeta({ tenantId, metaId: meta.id, monto: 1000n, moneda: 'MXN', fechaReferencia: HOY });
     await crearGastoRecurrente({ tenantId, descripcion: 'Netflix', montoValorMinimo: 219n, moneda: 'MXN', frecuencia: 'mensual', diaMes: 10, fechaReferencia: HOY });
+    await crearAtajo({ tenantId, nombre: 'Cafe', montoValorMinimo: 5500n, moneda: 'MXN', categoriaId: comida?.id });
 
     await cerrarPeriodoManualmente(tenantId, periodo.id, new Date('2026-08-16T00:00:00Z'));
     await decidirSobrante(tenantId, periodo.id, 'arrastrar');

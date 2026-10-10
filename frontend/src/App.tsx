@@ -13,6 +13,7 @@ import { OlvidePassword } from '@/routes/OlvidePassword';
 import { Privacidad } from '@/routes/Privacidad';
 import { ProtectedRoute } from '@/routes/ProtectedRoute';
 import { Recurrentes } from '@/routes/Recurrentes';
+import { Atajos } from '@/routes/Atajos';
 import { Registro } from '@/routes/Registro';
 import { Resumen } from '@/routes/Resumen';
 import { Tarjetas } from '@/routes/Tarjetas';
@@ -35,6 +36,7 @@ export function App() {
             <Route path="/resumen/:periodoId" element={<Resumen />} />
             <Route path="/metas" element={<Metas />} />
             <Route path="/recurrentes" element={<Recurrentes />} />
+            <Route path="/atajos" element={<Atajos />} />
             <Route path="/tarjetas" element={<Tarjetas />} />
             <Route path="/categorias" element={<Categorias />} />
             <Route path="/ajustes" element={<Ajustes />} />

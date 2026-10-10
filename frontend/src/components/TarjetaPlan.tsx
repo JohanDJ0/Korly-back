@@ -25,6 +25,7 @@ const GRUPOS_PRO = [
     ventajas: [
       { nombre: 'Alertas de ritmo', detalle: 'te avisa a tiempo si vas gastando más rápido de lo que alcanza tu quincena.' },
       { nombre: 'Metas sin límite', detalle: 'el plan gratuito incluye 2.' },
+      { nombre: 'Más atajos de gasto', detalle: 'el plan gratuito incluye 3 para registrar con un toque; Pro, hasta 12.' },
       { nombre: 'Historial completo', detalle: 'todas tus quincenas, no solo los últimos 12 meses.' },
       { nombre: 'Exportar a CSV', detalle: 'tus gastos e ingresos para tu contador o tu hoja de cálculo.' },
     ],

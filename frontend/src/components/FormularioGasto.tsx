@@ -8,7 +8,9 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { GuardarComoAtajo } from '@/components/GuardarComoAtajo';
 import { SelectorCategoriaChips } from '@/components/SelectorCategoriaChips';
+import { useCategorias } from '@/hooks/use-categorias';
 import { useDisponible } from '@/hooks/use-disponible';
 import { useRegistrarGasto } from '@/hooks/use-registrar-gasto';
 import { useFormatearMonto } from '@/hooks/use-formatear-monto';
@@ -29,6 +31,8 @@ interface FormularioGastoProps {
   periodoId: string;
   /** Se llama tras registrar con éxito — Home.tsx lo usa para cerrar la hoja inferior. */
   onRegistrado?: () => void;
+  /** Valores con los que arranca (p. ej. un atajo que superó lo disponible): el monto en pesos, tal como se escribiría. */
+  inicial?: { monto: number; categoriaId?: string | null; nota?: string };
 }
 
 /**
@@ -45,11 +49,12 @@ interface FormularioGastoProps {
  * cifra de "te quedan $-300" por un dedazo de un cero es una mala sorpresa: en ese caso, y solo
  * en ese caso, se pide un segundo toque explícito. El flujo normal sigue siendo un solo toque.
  */
-export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProps) {
+export function FormularioGasto({ periodoId, onRegistrado, inicial }: FormularioGastoProps) {
   const formatearMonto = useFormatearMonto();
   const registrarGasto = useRegistrarGasto();
   const { data: disponible } = useDisponible();
-  const [categoriaId, setCategoriaId] = useState('');
+  const [categoriaId, setCategoriaId] = useState(inicial?.categoriaId ?? '');
+  const { data: categorias } = useCategorias();
   // El gasto que superó lo disponible y espera que el usuario lo confirme o lo corrija.
   const [aConfirmar, setAConfirmar] = useState<GastoFormSalida | null>(null);
 
@@ -61,10 +66,11 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
     formState: { errors },
   } = useForm<GastoFormEntrada, unknown, GastoFormSalida>({
     resolver: zodResolver(esquemaGasto),
-    defaultValues: { fechaEfectiva: hoyISO() },
+    defaultValues: { fechaEfectiva: hoyISO(), ...(inicial ? { monto: inicial.monto, nota: inicial.nota } : {}) },
   });
   const montoEnVivo = useWatch({ control, name: 'monto' });
   const montoValido = Number(montoEnVivo);
+  const notaEnVivo = useWatch({ control, name: 'nota' });
 
   /** Cuánto le faltaría a la quincena (en centavos, positivo) si se registra este monto; 0 si alcanza o si no se sabe el disponible. */
   function faltante(monto: number): number {
@@ -172,6 +178,10 @@ export function FormularioGasto({ periodoId, onRegistrado }: FormularioGastoProp
             ? 'Guardando…'
             : `Registrar${Number.isFinite(montoValido) && montoValido > 0 ? ` ${montoValido.toFixed(2)}` : ''}`}
         </Button>
+      )}
+
+      {Number.isFinite(montoValido) && montoValido > 0 && (
+        <GuardarComoAtajo monto={montoValido} categoriaId={categoriaId} nombreSugerido={notaEnVivo || categorias?.find((c) => c.id === categoriaId)?.nombre || ''} />
       )}
 
       {/*

@@ -12,6 +12,7 @@ import { rutasGastos } from './modulos/gastos/rutas.js';
 import { rutasDisponible } from './modulos/disponible/rutas.js';
 import { rutasCierre } from './modulos/cierre/rutas.js';
 import { rutasMetas } from './modulos/metas/rutas.js';
+import { rutasAtajos } from './modulos/atajos/rutas.js';
 import { rutasCategorias } from './modulos/categorias/rutas.js';
 import { rutasRecurrentes } from './modulos/recurrentes/rutas.js';
 import { rutasExportar } from './modulos/exportar/rutas.js';
@@ -159,6 +160,7 @@ export function crearApp(opciones: OpcionesApp = {}) {
       v1.register(rutasMetas);
       v1.register(rutasCategorias);
       v1.register(rutasRecurrentes);
+      v1.register(rutasAtajos);
       v1.register(rutasExportar);
       v1.register(rutasImportar);
       v1.register(rutasTarjetas);

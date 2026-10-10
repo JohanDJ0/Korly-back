@@ -2441,6 +2441,27 @@ Tests: `test/unidad/metricas.test.ts` (casos exactos de embudo, ventana de 24 h,
 mediana, constancia, retención y zona horaria) y
 `test/integracion/metricas.test.ts` (consultas contra Postgres real).
 
+## Atajos de gasto
+
+Plantillas que cada persona arma para registrar con un toque un gasto que repite ("Café $55"). Tabla
+`atajos_gasto` (migración `0028`, RLS por `tenant_id`, `src/db/schema/atajos-gasto.ts`), módulo
+`src/modulos/atajos/`, rutas `GET/POST /v1/atajos-gasto` y `PATCH/DELETE /v1/atajos-gasto/:atajoId`
+(documentadas en `docs/openapi.yaml`, etiqueta Atajos).
+
+- **Es configuración, no ledger.** Un atajo nunca crea un movimiento: al tocarlo, la app registra un gasto normal por
+  `POST /periodos/:id/gastos` (fecha de hoy, nombre del atajo como nota). Por eso eliminarlo es un `DELETE` de verdad.
+- **Límite por plan:** Free 3, Pro 12 (`LIMITE_ATAJOS_FREE` / `LIMITE_ATAJOS_PRO`). `GET` devuelve `{ atajos, limite }` para que la
+  pantalla muestre "2 de 3". Se cuenta lo que ya existe: quien baja de Pro a Free conserva sus atajos, puede editarlos y borrarlos,
+  pero no crear más hasta quedar debajo del tope. Error `LIMITE_ATAJOS_ALCANZADO` (403); el texto no promete contratar Pro mientras
+  `COBROS_HABILITADOS` esté apagado (mismo criterio que las metas).
+- **Nombre** de 1 a 30 caracteres, único por persona (`VALIDACION` si se repite); **monto** positivo; **categoría** opcional,
+  validada contra la persona (`CATEGORIA_NO_ENCONTRADA`). `PATCH` con `categoriaId: null` la quita.
+- **Al eliminar una categoría** los atajos que la usaban se quedan sin categoría (`eliminarCategoria`), en vez de impedir borrarla.
+- **Datos de la persona:** la tabla está en `TABLAS_DEL_TENANT_EN_ORDEN_DE_PURGA`, así que entra sola a la exportación de datos y al
+  borrado de cuenta; los respaldos descubren las tablas solos. El aviso de privacidad debe mencionarlos (versión nueva) antes de
+  desplegar la pantalla.
+- **Migración en producción:** se aplica a mano (`npm run db:migrate`) **antes** de desplegar el código que la usa.
+
 ## Comentarios de las personas que usan Korly
 
 `POST /v1/comentarios` (`src/modulos/comentarios/`), con el botón **Enviar comentarios** de Ajustes (y del menú lateral en escritorio). Cuerpo: `{ tipo: 'problema' | 'idea' | 'otro', mensaje (1–2000 caracteres), pantalla?, responder? }`; responde `204`. Límite de 5 por hora.

@@ -19,13 +19,15 @@ export function ProtectedRoute() {
   const session = useAuthStore((s) => s.session);
   const cargando = useAuthStore((s) => s.cargando);
   const esRecuperacion = useAuthStore((s) => s.esRecuperacion);
+  const tuvoSesion = useAuthStore((s) => s.tuvoSesion);
   const ubicacion = useLocation();
 
   if (cargando) return <CargandoKorly pantallaCompleta />;
   if (esRecuperacion) return <RestablecerPassword />;
-  // El lugar al que se quería entrar viaja a /login (ver lib/destino-tras-login.ts): el enlace del
-  // recordatorio por correo (`/?gasto=1`) abre muchas veces en un navegador sin sesión.
-  if (!session) return <Navigate to="/login" replace state={{ desde: `${ubicacion.pathname}${ubicacion.search}${ubicacion.hash}` }} />;
+  // El lugar al que se quería entrar viaja a /login (ver lib/destino-tras-login.ts): el enlace del recordatorio por
+  // correo (`/?gasto=1`) abre muchas veces en un navegador sin sesión. Solo si se llegó sin sesión: quien acaba de
+  // cerrarla no quiere volver a esa pantalla al entrar (y podría ser otra persona en el mismo equipo).
+  if (!session) return <Navigate to="/login" replace state={tuvoSesion ? undefined : { desde: `${ubicacion.pathname}${ubicacion.search}${ubicacion.hash}` }} />;
   if (!aceptoAvisoVigente(session.user.user_metadata)) return <ReaceptarAviso />;
 
   return (

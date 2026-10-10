@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import { atajosGasto } from '../../db/schema/atajos-gasto.js';
 import { cargosTarjeta } from '../../db/schema/cargos-tarjeta.js';
 import { categorias } from '../../db/schema/categorias.js';
 import { gastos } from '../../db/schema/gastos.js';
@@ -228,6 +229,8 @@ export async function eliminarCategoria(tenantId: string, categoriaId: string): 
       throw new ErrorDominio('CATEGORIA_EN_USO', 'No se puede eliminar una categoría que ya está en uso');
     }
 
+    // Un atajo de gasto es configuración, no historial: se queda, solo sin categoría (la FK impediría borrarla).
+    await tx.update(atajosGasto).set({ categoriaId: null }).where(and(eq(atajosGasto.tenantId, tenantId), eq(atajosGasto.categoriaId, categoriaId)));
     await tx.delete(categorias).where(and(eq(categorias.tenantId, tenantId), eq(categorias.id, categoriaId)));
   });
 }

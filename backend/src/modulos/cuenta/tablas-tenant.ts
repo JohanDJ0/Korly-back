@@ -1,5 +1,6 @@
 import { getTableName } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
+import { atajosGasto } from '../../db/schema/atajos-gasto.js';
 import { cargosTarjeta, pagosTarjeta } from '../../db/schema/cargos-tarjeta.js';
 import { categorias } from '../../db/schema/categorias.js';
 import { resumenes } from '../../db/schema/cierre.js';
@@ -47,6 +48,7 @@ export const TABLAS_DEL_TENANT_EN_ORDEN_DE_PURGA: readonly TablaDelTenant[] = [
   tabla(gastos),
   tabla(ingresos),
   tabla(gastosRecurrentes),
+  tabla(atajosGasto), // apunta a categorias: antes que ella
   tabla(recordatoriosEnviados),
   tabla(asientos),
   tabla(movimientos),

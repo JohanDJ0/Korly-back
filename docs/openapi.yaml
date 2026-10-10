@@ -35,6 +35,7 @@ tags:
   - name: Metas
   - name: Categorías
   - name: Recurrentes
+  - name: Atajos
   - name: Tarjetas
   - name: Suscripción
   - name: Preferencias
@@ -1046,6 +1047,93 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Error'
+
+  # ---------- ATAJOS DE GASTO ----------
+  /atajos-gasto:
+    get:
+      tags: [Atajos]
+      summary: Listar los atajos de gasto de la persona
+      description: >
+        Plantillas (nombre + monto + categoría opcional) para registrar con un toque un gasto
+        que se repite. En el orden en que se crearon. `limite` es cuántos puede tener según su
+        plan (Free 3, Pro 12).
+      responses:
+        '200':
+          description: Atajos y límite del plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaAtajos'
+
+    post:
+      tags: [Atajos]
+      summary: Crear un atajo de gasto
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CrearAtajoRequest'
+      responses:
+        '201':
+          description: Atajo creado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Atajo'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '403':
+          description: Límite de atajos del plan (`LIMITE_ATAJOS_ALCANZADO`)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /atajos-gasto/{atajoId}:
+    patch:
+      tags: [Atajos]
+      summary: Cambiar el nombre, el monto y/o la categoría de un atajo
+      description: >
+        PATCH real: manda solo lo que quieras cambiar. `categoriaId: null` quita la categoría.
+      parameters:
+        - name: atajoId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActualizarAtajoRequest'
+      responses:
+        '200':
+          description: Atajo actualizado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Atajo'
+        '400':
+          $ref: '#/components/responses/ErrorValidacion'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+    delete:
+      tags: [Atajos]
+      summary: Eliminar un atajo
+      parameters:
+        - name: atajoId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Atajo eliminado
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
 
   # ---------- GASTOS RECURRENTES ----------
   /gastos-recurrentes:
@@ -2215,6 +2303,57 @@ components:
         icono:
           allOf:
             - $ref: '#/components/schemas/IconoCategoria'
+          nullable: true
+
+    # ---------- Atajos de gasto ----------
+
+    Atajo:
+      type: object
+      required: [id, nombre, monto, categoriaId]
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string, maxLength: 30 }
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+
+    ListaAtajos:
+      type: object
+      required: [atajos, limite]
+      properties:
+        atajos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Atajo'
+        limite:
+          type: integer
+          description: Cuántos atajos puede tener según su plan.
+
+    CrearAtajoRequest:
+      type: object
+      required: [nombre, monto]
+      properties:
+        nombre: { type: string, maxLength: 30 }
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
+          nullable: true
+
+    ActualizarAtajoRequest:
+      type: object
+      description: PATCH real — solo se cambia lo que se manda.
+      properties:
+        nombre: { type: string, maxLength: 30 }
+        monto:
+          $ref: '#/components/schemas/Monto'
+        categoriaId:
+          type: string
+          format: uuid
           nullable: true
 
     # ---------- Gastos recurrentes ----------
