@@ -1,4 +1,6 @@
-import { screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +17,12 @@ vi.mock('@/lib/supabase', () => ({
 
 import { Login } from '@/routes/Login';
 import { renderConProveedores } from '@/test/utilidades';
+
+/** Muestra dónde aterrizó el usuario después de entrar. */
+function Aterrizaje() {
+  const { pathname, search } = useLocation();
+  return <p data-testid="aterrizaje">{`${pathname}${search}`}</p>;
+}
 
 beforeEach(() => {
   signInWithPassword.mockReset();
@@ -72,6 +80,50 @@ describe('Login — aviso de sesión expirada', () => {
 
     expect(await screen.findByText('Invalid login credentials')).toBeInTheDocument();
     expect(screen.queryByText(/Tu sesión expiró/)).not.toBeInTheDocument();
+  });
+
+  it('al entrar, vuelve a donde se quería ir (el enlace del recordatorio: /?gasto=1), no siempre a la raíz', async () => {
+    signInWithPassword.mockResolvedValue({ error: null });
+    const usuario = userEvent.setup();
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={[{ pathname: '/login', state: { desde: '/?gasto=1' } }]}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="*" element={<Aterrizaje />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    await usuario.type(screen.getByLabelText('Correo'), 'yo@correo.com');
+    await usuario.type(screen.getByLabelText('Contraseña'), 'secreta');
+    await usuario.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByTestId('aterrizaje')).toHaveTextContent('/?gasto=1');
+  });
+
+  it('sin destino recordado, entra a la raíz', async () => {
+    signInWithPassword.mockResolvedValue({ error: null });
+    const usuario = userEvent.setup();
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/login']}>
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="*" element={<Aterrizaje />} />
+          </Routes>
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    await usuario.type(screen.getByLabelText('Correo'), 'yo@correo.com');
+    await usuario.type(screen.getByLabelText('Contraseña'), 'secreta');
+    await usuario.click(screen.getByRole('button', { name: 'Entrar' }));
+
+    expect(await screen.findByTestId('aterrizaje')).toHaveTextContent(/^\/$/);
   });
 
   it('un correo inválido se rechaza antes de llamar a Supabase', async () => {

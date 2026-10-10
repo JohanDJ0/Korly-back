@@ -2021,7 +2021,11 @@ configurados.
   diario NO usa ese molde: es un mensaje casi en texto plano (ver
   `construirCorreoRecordatorio`), porque con el diseño con banda y botón Gmail lo
   mandaba a la pestaña Promociones; la versión sencilla, con la cifra en el asunto,
-  llegó a Principal (probado contra una cuenta real de Gmail).
+  llegó a Principal (probado contra una cuenta real de Gmail). La dirección del
+  correo es `<app>/?gasto=1` (`urlRegistroDeGasto`): la app abre directo la hoja de
+  "Nuevo gasto"; sin sesión, `ProtectedRoute` manda a /login recordando el destino
+  y Login vuelve ahí al entrar (`frontend/src/lib/destino-tras-login.ts`). Sigue
+  siendo una dirección en el texto, no un botón, por lo de Promociones.
 - `CORS_ORIGIN` acepta una lista separada por comas **sin espacios**. En producción
   vale solo `https://app.korly.com.mx` (se quitó `korly-app.vercel.app`; en Supabase
   las Redirect URLs son `app.korly.com.mx` y `localhost:5173`, cada una con su `/**`).

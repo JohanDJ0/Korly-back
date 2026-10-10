@@ -1,6 +1,6 @@
 import { AlertTriangle, CreditCard, Plus, Settings } from 'lucide-react';
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,6 +61,24 @@ export function Home() {
   // existe sin error.
   const periodoId = !error ? data?.periodoId : undefined;
   const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
+
+  // `/?gasto=1` es el enlace del recordatorio por correo: abre directo la hoja de "Nuevo gasto". Se espera a
+  // tener periodo (sin él no hay dónde registrar) y el parámetro se quita para que recargar o volver atrás
+  // no reabra la hoja. Sin periodo activo, se queda en la pantalla de siempre.
+  const [parametros, setParametros] = useSearchParams();
+  const pidenGasto = parametros.get('gasto') === '1';
+  useEffect(() => {
+    if (!pidenGasto || !periodoId) return;
+    setMostrarFormularioGasto(true);
+    setParametros(
+      (previos) => {
+        const siguientes = new URLSearchParams(previos);
+        siguientes.delete('gasto');
+        return siguientes;
+      },
+      { replace: true }
+    );
+  }, [pidenGasto, periodoId, setParametros]);
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-sm flex-col sm:max-w-2xl sm:px-8 sm:pt-8 lg:max-w-4xl xl:max-w-6xl">

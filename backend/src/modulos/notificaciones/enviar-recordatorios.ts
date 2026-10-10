@@ -166,6 +166,12 @@ export async function procesarRecordatorioDiarioDeTenant(
   });
 }
 
+/** Dirección de la app que abre la hoja de "Nuevo gasto": `https://app…/?gasto=1`. */
+export function urlRegistroDeGasto(urlApp: string): string {
+  const base = urlApp.replace(/\/+$/, '');
+  return base.includes('?') ? `${base}&gasto=1` : `${base}/?gasto=1`;
+}
+
 /**
  * Asunto, HTML y texto plano del recordatorio diario. La cifra accionable va
  * en el asunto (regla 1, documento-maestro-v2.md §13.4): lo que se lee en la
@@ -187,7 +193,9 @@ export function construirCorreoRecordatorio(disponible: DisponibleOk, urlApp: st
 
   const quedan = `Te quedan ${dias} de tu quincena con ${formatearMontoMXN(disponible.disponibleValorMinimo)} disponible.`;
   const hoy = `Hoy puedes gastar hasta ${cifraDiaria}.`;
-  const registra = `Cuando gastes algo, regístralo en ${urlApp}`;
+  // `?gasto=1` abre la app directo en "Nuevo gasto" (o, sin sesión, tras iniciarla). Sigue siendo una dirección
+  // escrita en el texto, no un botón: ver el comentario de arriba. Si urlApp ya trae parámetros, se respeta.
+  const registra = `Cuando gastes algo, regístralo aquí: ${urlRegistroDeGasto(urlApp)}`;
   const pie = 'Recibes este recordatorio porque lo activaste en Korly. Puedes desactivarlo en Ajustes.';
 
   const textoPlano = ['Hola,', '', quedan, '', hoy, '', registra, '', '—', pie, `¿Dudas? Responde a este correo o escribe a ${CORREO_SOPORTE}.`].join('\n');

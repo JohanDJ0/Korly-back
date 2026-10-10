@@ -1,4 +1,4 @@
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 
 import { CargandoKorly } from '@/components/CargandoKorly';
 import { ReaceptarAviso } from '@/components/ReaceptarAviso';
@@ -19,10 +19,13 @@ export function ProtectedRoute() {
   const session = useAuthStore((s) => s.session);
   const cargando = useAuthStore((s) => s.cargando);
   const esRecuperacion = useAuthStore((s) => s.esRecuperacion);
+  const ubicacion = useLocation();
 
   if (cargando) return <CargandoKorly pantallaCompleta />;
   if (esRecuperacion) return <RestablecerPassword />;
-  if (!session) return <Navigate to="/login" replace />;
+  // El lugar al que se quería entrar viaja a /login (ver lib/destino-tras-login.ts): el enlace del
+  // recordatorio por correo (`/?gasto=1`) abre muchas veces en un navegador sin sesión.
+  if (!session) return <Navigate to="/login" replace state={{ desde: `${ubicacion.pathname}${ubicacion.search}${ubicacion.hash}` }} />;
   if (!aceptoAvisoVigente(session.user.user_metadata)) return <ReaceptarAviso />;
 
   return (

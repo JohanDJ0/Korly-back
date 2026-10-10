@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
 
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { BotonAuth } from '@/components/BotonAuth';
 import { CaptchaDelFormulario } from '@/components/CaptchaDelFormulario';
 import { CargandoKorly } from '@/components/CargandoKorly';
 import { useTurnstile } from '@/hooks/use-turnstile';
+import { destinoTrasLogin } from '@/lib/destino-tras-login';
 import { hayAvisoSesionExpirada, limpiarAvisoSesionExpirada } from '@/lib/sesion-expirada';
 import { supabase } from '@/lib/supabase';
 import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
@@ -26,6 +27,7 @@ type LoginForm = z.infer<typeof esquemaLogin>;
 export function Login() {
   const session = useAuthStore((s) => s.session);
   const navigate = useNavigate();
+  const destino = destinoTrasLogin(useLocation().state);
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
   const [sesionExpirada] = useState(hayAvisoSesionExpirada);
   const captcha = useTurnstile();
@@ -36,7 +38,7 @@ export function Login() {
     formState: { errors, isSubmitting },
   } = useForm<LoginForm>({ resolver: zodResolver(esquemaLogin) });
 
-  if (session) return <Navigate to="/" replace />;
+  if (session) return <Navigate to={destino} replace />;
 
   async function onSubmit(datos: LoginForm) {
     setErrorGeneral(null);
@@ -51,7 +53,7 @@ export function Login() {
       return;
     }
     limpiarAvisoSesionExpirada();
-    navigate('/', { replace: true });
+    navigate(destino, { replace: true });
   }
 
   return (

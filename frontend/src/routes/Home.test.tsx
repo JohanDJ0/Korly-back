@@ -13,7 +13,7 @@ import { formatearMonto } from '@/lib/dinero';
 import { Home } from '@/routes/Home';
 import { usePrivacidadStore } from '@/stores/privacidad-store';
 import { instalarServidorFalso, type Rutas, type ServidorFalso } from '@/test/servidor-falso';
-import { pesos, renderConProveedores } from '@/test/utilidades';
+import { pesos, renderConProveedores, renderEnRuta } from '@/test/utilidades';
 
 const m = (valorMinimo: number) => formatearMonto(pesos(valorMinimo));
 
@@ -306,6 +306,37 @@ describe('Home — registrar gastos e ingresos', () => {
     await usuario.click(await screen.findByRole('button', { name: 'Registrar ingreso' }));
 
     expect(await screen.findByRole('dialog', { name: 'Nuevo ingreso' })).toBeInTheDocument();
+  });
+});
+
+describe('Home — enlace del recordatorio (/?gasto=1)', () => {
+  it('abre directo la hoja de "Nuevo gasto" y quita el parámetro: cerrarla no la reabre', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo());
+    const usuario = userEvent.setup();
+    renderEnRuta(<Home />, { path: '/', entrada: '/?gasto=1' });
+
+    expect(await screen.findByRole('dialog', { name: 'Nuevo gasto' })).toBeInTheDocument();
+
+    await usuario.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    await new Promise((resolver) => setTimeout(resolver, 50));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('sin el parámetro, la hoja no se abre sola', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo());
+    renderEnRuta(<Home />, { path: '/', entrada: '/' });
+
+    await screen.findByRole('button', { name: 'Registrar gasto' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('sin periodo activo no hay dónde registrar: no abre nada', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo({ '/periodos/activo/disponible': sinPeriodo, '/periodos/activo': sinPeriodo }));
+    renderEnRuta(<Home />, { path: '/', entrada: '/?gasto=1' });
+
+    await screen.findByText('Empecemos');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
 

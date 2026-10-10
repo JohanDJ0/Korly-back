@@ -71,6 +71,36 @@ test.describe('acceso y sesión', () => {
     await expect(page).not.toHaveURL(/\/login/);
   });
 
+  test('el enlace del recordatorio (/?gasto=1) sin sesión pasa por el login y termina en la hoja de "Nuevo gasto"', async ({ page, persona }) => {
+    await page.getByRole('button', { name: 'Empezar esta quincena' }).click();
+    await expect(page.getByText('Registra tu ingreso')).toBeVisible(); // ya hay periodo: ya hay dónde registrar
+    await page.getByRole('button', { name: 'Cerrar sesión' }).click();
+    await expect(page).toHaveURL(/\/login$/);
+
+    await page.goto('/?gasto=1'); // lo que abre el botón del correo
+    await expect(page).toHaveURL(/\/login$/);
+    await page.getByLabel('Correo').fill(persona.correo);
+    await page.getByLabel('Contraseña').fill(persona.contrasena);
+    await page.getByRole('button', { name: 'Entrar' }).click();
+
+    await expect(page.getByRole('dialog', { name: 'Nuevo gasto' })).toBeVisible();
+    await expect(page).toHaveURL(/localhost:5199\/$/); // el parámetro ya se quitó
+  });
+
+  test('con sesión abierta, el enlace del recordatorio abre la hoja de gasto al instante', async ({ page, persona }) => {
+    void persona;
+    await page.getByRole('button', { name: 'Empezar esta quincena' }).click();
+    await expect(page.getByText('Registra tu ingreso')).toBeVisible();
+
+    await page.goto('/?gasto=1');
+
+    await expect(page.getByRole('dialog', { name: 'Nuevo gasto' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await page.reload();
+    await expect(page.getByText('Registra tu ingreso')).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeHidden(); // recargar no la reabre
+  });
+
   test('quien ya tiene sesión no ve el inicio de sesión: lo mandan a Inicio', async ({ page, persona }) => {
     void persona;
     await page.goto('/login');

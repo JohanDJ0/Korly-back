@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { construirCorreoRecordatorio } from '../../src/modulos/notificaciones/enviar-recordatorios.js';
+import { construirCorreoRecordatorio, urlRegistroDeGasto } from '../../src/modulos/notificaciones/enviar-recordatorios.js';
 import { PLANTILLAS } from '../../src/shared/plantillas-supabase.js';
 import { CORREO_SOPORTE, renderizarCorreo } from '../../src/shared/plantilla-correo.js';
 
@@ -78,8 +78,8 @@ describe('construirCorreoRecordatorio', () => {
   it('es un mensaje sencillo: la dirección de la app va escrita en el texto, sin botón ni banda con diseño (Gmail lo mandaba a Promociones)', () => {
     const { html, textoPlano } = construirCorreoRecordatorio(disponible, 'https://app.korly.com.mx');
 
-    expect(html).toContain('regístralo en https://app.korly.com.mx');
-    expect(textoPlano).toContain('regístralo en https://app.korly.com.mx');
+    expect(html).toContain('regístralo aquí: https://app.korly.com.mx/?gasto=1');
+    expect(textoPlano).toContain('regístralo aquí: https://app.korly.com.mx/?gasto=1');
     expect(html).not.toMatch(/<a |<table|border-radius|background:/);
   });
 
@@ -95,6 +95,17 @@ describe('construirCorreoRecordatorio', () => {
 
     expect(html).toContain('a=1&amp;b=&lt;x&gt;');
     expect(html).not.toContain('<x>');
+  });
+});
+
+describe('urlRegistroDeGasto', () => {
+  it('agrega ?gasto=1 a la raíz, con o sin diagonal final', () => {
+    expect(urlRegistroDeGasto('https://app.korly.com.mx')).toBe('https://app.korly.com.mx/?gasto=1');
+    expect(urlRegistroDeGasto('https://app.korly.com.mx/')).toBe('https://app.korly.com.mx/?gasto=1');
+  });
+
+  it('si la dirección ya trae parámetros, agrega el suyo con &', () => {
+    expect(urlRegistroDeGasto('http://localhost:5173/?a=1')).toBe('http://localhost:5173/?a=1&gasto=1');
   });
 });
 
