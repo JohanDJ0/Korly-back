@@ -5,6 +5,7 @@ import { AuthCard } from '@/components/AuthCard';
 import { BotonAuth } from '@/components/BotonAuth';
 import { CargandoKorly } from '@/components/CargandoKorly';
 import { constanciaDeAviso } from '@/lib/datos-responsable';
+import { mensajeDeErrorAuth } from '@/lib/errores-auth';
 import { supabase } from '@/lib/supabase';
 
 /**
@@ -28,7 +29,7 @@ export function ReaceptarAviso() {
     setError(null);
     const { error: errorDeAuth } = await supabase.auth.updateUser({ data: constanciaDeAviso() });
     setGuardando(false);
-    if (errorDeAuth) setError(errorDeAuth.message);
+    if (errorDeAuth) setError(mensajeDeErrorAuth(errorDeAuth));
   }
 
   return (

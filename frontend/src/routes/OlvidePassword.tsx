@@ -11,6 +11,7 @@ import { useTurnstile } from '@/hooks/use-turnstile';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
+import { mensajeDeErrorAuth } from '@/lib/errores-auth';
 import { supabase } from '@/lib/supabase';
 import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
 
@@ -51,7 +52,7 @@ export function OlvidePassword() {
     const { error } = await supabase.auth.resetPasswordForEmail(datos.email, { redirectTo: window.location.origin, captchaToken: captcha.token });
     captcha.reiniciar(); // el token es de un solo uso
     if (error) {
-      setErrorGeneral(error.message);
+      setErrorGeneral(mensajeDeErrorAuth(error));
       return;
     }
     setEnviado(true);

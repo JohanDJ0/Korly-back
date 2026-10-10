@@ -729,3 +729,58 @@
     transition: none;
   }
 }
+
+/*
+ * Resaltado de la guía de primeros pasos (components/PasoDeGuia.tsx): un aro dorado grueso con dos ondas que se abren una
+ * tras otra y se desvanecen, más un brillo que respira, para que el elemento explicado salte a la vista sin tapar nada.
+ * El elemento aporta su propio redondeo. Con "reducir movimiento" quedan solo el aro y el brillo, fijos.
+ * Todas las llaves de la animación llevan las mismas 5 sombras (separación, aro, onda 1, onda 2 y brillo): así se interpolan.
+ */
+.resaltado-guia {
+  box-shadow:
+    0 0 0 3px var(--background),
+    0 0 0 6px var(--brand-gold),
+    0 0 0 6px rgb(254 184 22 / 0),
+    0 0 0 6px rgb(254 184 22 / 0),
+    0 0 18px 3px rgb(254 184 22 / 0.4);
+  animation: resaltado-guia-latido 1.7s ease-out infinite;
+}
+@keyframes resaltado-guia-latido {
+  0% {
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 0 6px var(--brand-gold),
+      0 0 0 6px rgb(254 184 22 / 0.85),
+      0 0 0 6px rgb(254 184 22 / 0),
+      0 0 22px 5px rgb(254 184 22 / 0.6);
+  }
+  30% {
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 0 6px var(--brand-gold),
+      0 0 0 14px rgb(254 184 22 / 0.4),
+      0 0 0 6px rgb(254 184 22 / 0.7),
+      0 0 12px 2px rgb(254 184 22 / 0.3);
+  }
+  65% {
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 0 6px var(--brand-gold),
+      0 0 0 24px rgb(254 184 22 / 0),
+      0 0 0 16px rgb(254 184 22 / 0.3),
+      0 0 14px 3px rgb(254 184 22 / 0.4);
+  }
+  100% {
+    box-shadow:
+      0 0 0 3px var(--background),
+      0 0 0 6px var(--brand-gold),
+      0 0 0 24px rgb(254 184 22 / 0),
+      0 0 0 26px rgb(254 184 22 / 0),
+      0 0 22px 5px rgb(254 184 22 / 0.6);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .resaltado-guia {
+    animation: none;
+  }
+}

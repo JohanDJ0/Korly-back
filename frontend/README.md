@@ -553,6 +553,34 @@ backend/README.md, "Recordatorios por correo"). `GET`/`PATCH
 volver a prender persiste contra la base real, no solo en el estado
 local del checkbox.
 
+## Guía de primeros pasos
+
+Avisos en línea dentro de las pantallas reales (no un tour con globos flotantes, que en el celular se descolocan). Cada
+paso aparece cuando la persona llega a ese punto: bienvenida y quincena (sin quincena), ingreso (sin ingreso), cifra y
+"Registrar gasto" (con la cifra), atajos (hay atajos), gastos recurrentes (tras el primer gasto propio) y cierre. Siempre se
+puede "Saltar guía". Los textos y la lógica de qué paso toca viven en `src/lib/guia.ts` (`TEXTOS_GUIA`, `pasoDeInicio`);
+`PasoDeGuia.tsx` los pinta y `RESALTADO_GUIA` marca el elemento explicado.
+
+- **Quién la ve:** cuentas creadas desde `GUIA_DESDE` (las anteriores ya saben usar la app) o quien pulse "Ver la guía otra
+  vez" en Ajustes. `guia_terminada` en `user_metadata` de Supabase manda sobre la fecha (`true` la apaga en todos los
+  dispositivos, `false` la enciende). No hay tabla ni columna nueva.
+- **Qué pasos ya se vieron** se recuerda en el navegador (`stores/guia-store.ts`, `korly:guia:<id>`); terminar o saltarla
+  también se anota ahí (`korly:guia-terminada:<id>`) para que no reaparezca si la página se recarga antes de que la cuenta
+  confirme el cambio. En otro dispositivo, una guía a medias repite los pasos que dependen de lo que hay en pantalla.
+- **Pruebas:** `lib/guia.test.ts`, `routes/Home.guia.test.tsx`, `components/FormularioGasto.guia.test.tsx`,
+  `routes/Ajustes.guia.test.tsx` y `e2e/guia.e2e.ts`. **Toda cuenta nueva ve la guía**, así que en las pruebas de punta a
+  punta el helper `registrar()` la salta por omisión (`{ saltarGuia: false }` para probarla).
+- **Si cambias un texto o agregas un paso:** actualiza `TEXTOS_GUIA`, `PASOS_GUIA` y `pasoDeInicio` (hay una prueba por
+  paso) y revisa que el paso nuevo no se dispare antes que los anteriores.
+
+## Errores de acceso en español (`lib/errores-auth.ts`)
+
+Supabase Auth manda sus errores en inglés ("Invalid login credentials"). `mensajeDeErrorAuth(error, contexto)` los traduce por su
+`code` (y, si no lo trae, por el texto) y es el único camino para mostrar un error de Supabase en pantalla (login, registro,
+olvidé mi contraseña, restablecer, cambiar contraseña/correo, reaceptar el aviso). `contexto` distingue "correo o contraseña
+incorrectos" (`login`) de "la contraseña actual no es correcta" (`reautenticar`). Un error que no se reconoce sale como un
+mensaje genérico en español, nunca en inglés. Al mostrar un error nuevo de Supabase, pásalo por esta función.
+
 ## Confirmaciones (`BotonConfirmar.tsx`)
 
 **Hallazgo real del usuario:** el botón "Eliminar" de una meta "no

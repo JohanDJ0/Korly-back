@@ -13,6 +13,7 @@ import { CargandoKorly } from '@/components/CargandoKorly';
 import { useTurnstile } from '@/hooks/use-turnstile';
 import { constanciaDeAviso } from '@/lib/datos-responsable';
 import { esquemaPasswordNueva } from '@/lib/password';
+import { mensajeDeErrorAuth } from '@/lib/errores-auth';
 import { supabase } from '@/lib/supabase';
 import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
 import { useAuthStore } from '@/stores/auth-store';
@@ -67,7 +68,7 @@ export function Registro() {
     });
     captcha.reiniciar(); // el token es de un solo uso
     if (error) {
-      setErrorGeneral(error.message);
+      setErrorGeneral(mensajeDeErrorAuth(error));
       return;
     }
     // Si el proyecto exige confirmar el correo, signUp() no da sesión

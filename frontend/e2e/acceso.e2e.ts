@@ -46,7 +46,7 @@ test.describe('acceso y sesión', () => {
     await expect(page).toHaveURL(/\/login$/);
 
     await iniciarSesion(page, correo, 'contrasena-equivocada');
-    await expect(page.getByText('Invalid login credentials')).toBeVisible();
+    await expect(page.getByText('El correo o la contraseña no son correctos')).toBeVisible();
     await expect(page).toHaveURL(/\/login$/);
 
     await iniciarSesion(page, correo);

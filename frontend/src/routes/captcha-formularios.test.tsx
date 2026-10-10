@@ -102,7 +102,7 @@ describe('Login con captcha', () => {
 
     await usuario.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(await screen.findByText('Invalid login credentials')).toBeInTheDocument();
+    expect(await screen.findByText('El correo o la contraseña no son correctos')).toBeInTheDocument();
     expect(turnstile.api.reset).toHaveBeenCalled();
   });
 

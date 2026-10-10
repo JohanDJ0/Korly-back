@@ -78,7 +78,7 @@ describe('Login — aviso de sesión expirada', () => {
     await usuario.type(screen.getByLabelText('Contraseña'), 'mala');
     await usuario.click(screen.getByRole('button', { name: 'Entrar' }));
 
-    expect(await screen.findByText('Invalid login credentials')).toBeInTheDocument();
+    expect(await screen.findByText('El correo o la contraseña no son correctos')).toBeInTheDocument();
     expect(screen.queryByText(/Tu sesión expiró/)).not.toBeInTheDocument();
   });
 

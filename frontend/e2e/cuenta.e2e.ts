@@ -49,7 +49,7 @@ test.describe('la cuenta y Ajustes', () => {
 
     await page.getByRole('complementary').getByRole('button', { name: 'Cerrar sesión' }).click(); // el del menú lateral (Ajustes tiene otro en la tarjeta de cuenta)
     await iniciarSesion(page, persona.correo, persona.contrasena);
-    await expect(page.getByText('Invalid login credentials')).toBeVisible(); // la vieja ya no sirve
+    await expect(page.getByText('El correo o la contraseña no son correctos')).toBeVisible(); // la vieja ya no sirve
     await iniciarSesion(page, persona.correo, 'la-nueva-contrasena-1');
     await expect(page.getByText('Empecemos')).toBeVisible();
   });
@@ -111,7 +111,7 @@ test.describe('la cuenta y Ajustes', () => {
 
     await expect(page).toHaveURL(/\/login$/);
     await iniciarSesion(page, correo);
-    await expect(page.getByText('Invalid login credentials')).toBeVisible(); // la cuenta ya no existe
+    await expect(page.getByText('El correo o la contraseña no son correctos')).toBeVisible(); // la cuenta ya no existe
 
     await registrar(page, correo, CONTRASENA); // mismo correo: cuenta nueva, sin rastro de lo anterior
     await expect(page.getByText('Empecemos')).toBeVisible();

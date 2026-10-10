@@ -12,6 +12,7 @@ import { CaptchaDelFormulario } from '@/components/CaptchaDelFormulario';
 import { CargandoKorly } from '@/components/CargandoKorly';
 import { useTurnstile } from '@/hooks/use-turnstile';
 import { destinoTrasLogin } from '@/lib/destino-tras-login';
+import { mensajeDeErrorAuth } from '@/lib/errores-auth';
 import { hayAvisoSesionExpirada, limpiarAvisoSesionExpirada } from '@/lib/sesion-expirada';
 import { supabase } from '@/lib/supabase';
 import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
@@ -49,7 +50,7 @@ export function Login() {
     const { error } = await supabase.auth.signInWithPassword({ ...datos, options: { captchaToken: captcha.token } });
     captcha.reiniciar(); // el token es de un solo uso
     if (error) {
-      setErrorGeneral(error.message);
+      setErrorGeneral(mensajeDeErrorAuth(error, 'login'));
       return;
     }
     limpiarAvisoSesionExpirada();

@@ -68,7 +68,7 @@ describe('ReaceptarAviso', () => {
     await usuario.click(screen.getByRole('checkbox'));
     await usuario.click(screen.getByRole('button', { name: 'Aceptar y continuar' }));
 
-    expect(await screen.findByText('Network error')).toBeInTheDocument();
+    expect(await screen.findByText('No pudimos conectarnos. Revisa tu internet e inténtalo de nuevo.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Aceptar y continuar' })).toBeEnabled();
   });
 

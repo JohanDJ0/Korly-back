@@ -16,7 +16,7 @@ export function correoUnico(prefijo = 'persona'): string {
 export const pesos = (monto: number): string => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(monto);
 
 /** Crea una cuenta por la pantalla de registro (la de verdad) y deja a la persona dentro, en Inicio. */
-export async function registrar(page: Page, correo = correoUnico(), contrasena = CONTRASENA): Promise<{ correo: string; contrasena: string }> {
+export async function registrar(page: Page, correo = correoUnico(), contrasena = CONTRASENA, { saltarGuia = true }: { saltarGuia?: boolean } = {}): Promise<{ correo: string; contrasena: string }> {
   await page.goto('/registro');
   await page.getByLabel('Correo').fill(correo);
   await page.locator('#password').fill(contrasena);
@@ -24,6 +24,11 @@ export async function registrar(page: Page, correo = correoUnico(), contrasena =
   await page.getByRole('checkbox').check();
   await page.getByRole('button', { name: 'Crear cuenta' }).click();
   await expect(page.getByText('Empecemos')).toBeVisible();
+  // Toda cuenta nueva ve la guía de primeros pasos (su bienvenida tapa la pantalla): las pruebas que no son de la guía la saltan.
+  if (saltarGuia) {
+    await page.getByRole('button', { name: 'Saltar guía' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+  }
   return { correo, contrasena };
 }
 

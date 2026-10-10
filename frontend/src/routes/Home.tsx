@@ -1,6 +1,6 @@
 import { AlertTriangle, CreditCard, Plus, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,17 +12,22 @@ import { CifraDisponible } from '@/components/CifraDisponible';
 import { FormularioGasto } from '@/components/FormularioGasto';
 import { FormularioIngreso } from '@/components/FormularioIngreso';
 import { HojaInferior } from '@/components/HojaInferior';
+import { PasoDeGuia, RESALTADO_GUIA } from '@/components/PasoDeGuia';
 import { RecordatorioContextual } from '@/components/RecordatorioContextual';
 import { ResumenCompactoPeriodo } from '@/components/ResumenCompactoPeriodo';
-import type { Atajo } from '@/hooks/use-atajos';
+import { useAtajos, type Atajo } from '@/hooks/use-atajos';
 import { useCrearPeriodo } from '@/hooks/use-crear-periodo';
 import { useDisponible } from '@/hooks/use-disponible';
+import { useGastos } from '@/hooks/use-gastos';
+import { useGuia } from '@/hooks/use-guia';
 import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
 import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { formatearRangoFechas, quincenaDeHoy } from '@/lib/fechas';
+import { pasoDeInicio, TEXTOS_GUIA } from '@/lib/guia';
+import { cn } from '@/lib/utils';
 
 /**
  * El aha moment del producto (documento-maestro-v2.md §13.3): ver la
@@ -65,6 +70,24 @@ export function Home() {
   // existe sin error.
   const periodoId = !error ? data?.periodoId : undefined;
   const { data: pagosTarjeta } = usePagosTarjetaPeriodo(periodoId);
+
+  // Guía de primeros pasos (lib/guia.ts): solo para cuentas nuevas o quien la pidió en Ajustes. Cada paso aparece
+  // cuando la persona llega a ese punto, pegado al elemento que explica.
+  const guia = useGuia();
+  const navigate = useNavigate();
+  const { data: listaAtajos } = useAtajos();
+  const { data: paginasGastos } = useGastos(periodoId);
+  const hayGastos = paginasGastos?.pages.some((pagina) => pagina.datos.some((g) => !g.revertido && !g.esRecurrente)) ?? false;
+  const pasoGuia = guia.activa
+    ? pasoDeInicio(guia.vistos, {
+        sinPeriodo: sinPeriodoActivo,
+        sinIngreso: !error && data?.estado === 'sin_ingreso',
+        conCifra: !error && data?.estado === 'ok',
+        hayAtajos: (listaAtajos?.atajos.length ?? 0) > 0,
+        hayGastos,
+      })
+    : null;
+  const saltarGuia = () => void guia.terminar();
 
   // `/?gasto=1` es el enlace del recordatorio por correo: abre directo la hoja de "Nuevo gasto". Se espera a
   // tener periodo (sin él no hay dónde registrar) y el parámetro se quita para que recargar o volver atrás
@@ -172,16 +195,19 @@ export function Home() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <Button onClick={() => crearPeriodo.mutate()} disabled={crearPeriodo.isPending} className="w-full">
+                <Button onClick={() => crearPeriodo.mutate()} disabled={crearPeriodo.isPending} className={cn('w-full', pasoGuia === 'quincena' && RESALTADO_GUIA)}>
                   {crearPeriodo.isPending ? 'Creando…' : 'Empezar esta quincena'}
                 </Button>
                 {crearPeriodo.isError && <p className="text-destructive mt-2 text-sm">{crearPeriodo.error.message}</p>}
               </CardContent>
             </Card>
           )}
+          {pasoGuia === 'quincena' && (
+            <PasoDeGuia texto={TEXTOS_GUIA.quincena.texto} etiquetaPrincipal="Siguiente" onPrincipal={() => guia.marcarVisto('quincena')} onSaltar={saltarGuia} />
+          )}
 
           {!error && data?.estado === 'sin_ingreso' && (
-            <Card className="rounded-2xl">
+            <Card className={cn('rounded-2xl', pasoGuia === 'ingreso' && RESALTADO_GUIA)}>
               <CardHeader>
                 <CardTitle>Registra tu ingreso</CardTitle>
                 <CardDescription>Para ver cuánto puedes gastar hoy, necesitamos saber cuánto recibiste.</CardDescription>
@@ -191,28 +217,70 @@ export function Home() {
               </CardContent>
             </Card>
           )}
+          {pasoGuia === 'ingreso' && (
+            <PasoDeGuia texto={TEXTOS_GUIA.ingreso.texto} etiquetaPrincipal="Siguiente" onPrincipal={() => guia.marcarVisto('ingreso')} onSaltar={saltarGuia} />
+          )}
 
-          {!error && data?.estado === 'ok' && <CifraDisponible disponible={data} />}
+          {!error && data?.estado === 'ok' && (
+            <div className={cn('rounded-3xl', pasoGuia === 'cifra' && RESALTADO_GUIA)}>
+              <CifraDisponible disponible={data} />
+            </div>
+          )}
+          {pasoGuia === 'cifra' && (
+            <PasoDeGuia texto={TEXTOS_GUIA.cifra.texto} etiquetaPrincipal="Siguiente" onPrincipal={() => guia.marcarVisto('cifra')} onSaltar={saltarGuia} />
+          )}
           {!error && data?.estado === 'ok' && <RecordatorioContextual disponible={data} />}
 
           {periodoId && (
             <button
-              onClick={() => setMostrarFormularioGasto(true)}
-              className="bg-primary text-primary-foreground shadow-primary/30 flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15.5px] font-semibold shadow-lg"
+              onClick={() => {
+                // Abrir el formulario por su cuenta equivale a haber leído este paso.
+                if (pasoGuia === 'registrar-gasto') guia.marcarVisto('registrar-gasto');
+                setMostrarFormularioGasto(true);
+              }}
+              className={cn(
+                'bg-primary text-primary-foreground shadow-primary/30 flex items-center justify-center gap-2 rounded-2xl py-3.5 text-[15.5px] font-semibold shadow-lg',
+                pasoGuia === 'registrar-gasto' && RESALTADO_GUIA
+              )}
             >
               <Plus size={18} strokeWidth={2.5} />
               Registrar gasto
             </button>
           )}
+          {pasoGuia === 'registrar-gasto' && (
+            <PasoDeGuia texto={TEXTOS_GUIA['registrar-gasto'].texto} etiquetaPrincipal="Entendido" onPrincipal={() => guia.marcarVisto('registrar-gasto')} onSaltar={saltarGuia} />
+          )}
 
           {periodoId && (
-            <AtajosDeGasto
-              periodoId={periodoId}
-              onAbrirFormulario={(atajo) => {
-                setAtajoEnFormulario(atajo);
-                setMostrarFormularioGasto(true);
+            <div className={cn('rounded-2xl', pasoGuia === 'atajo-inicio' && RESALTADO_GUIA)}>
+              <AtajosDeGasto
+                periodoId={periodoId}
+                onAbrirFormulario={(atajo) => {
+                  setAtajoEnFormulario(atajo);
+                  setMostrarFormularioGasto(true);
+                }}
+              />
+            </div>
+          )}
+          {pasoGuia === 'atajo-inicio' && (
+            <PasoDeGuia texto={TEXTOS_GUIA['atajo-inicio'].texto} etiquetaPrincipal="Entendido" onPrincipal={() => guia.marcarVisto('atajo-inicio')} onSaltar={saltarGuia} />
+          )}
+          {pasoGuia === 'recurrentes' && (
+            <PasoDeGuia
+              titulo={TEXTOS_GUIA.recurrentes.titulo}
+              texto={TEXTOS_GUIA.recurrentes.texto}
+              etiquetaPrincipal="Ver gastos recurrentes"
+              onPrincipal={() => {
+                guia.marcarVisto('recurrentes');
+                navigate('/recurrentes');
               }}
+              etiquetaSecundaria="Ahora no"
+              onSecundaria={() => guia.marcarVisto('recurrentes')}
+              onSaltar={saltarGuia}
             />
+          )}
+          {pasoGuia === 'cierre' && (
+            <PasoDeGuia titulo={TEXTOS_GUIA.cierre.titulo} texto={TEXTOS_GUIA.cierre.texto} etiquetaPrincipal="Terminar" onPrincipal={saltarGuia} />
           )}
 
           {periodoId && data?.estado === 'ok' && (
@@ -237,6 +305,21 @@ export function Home() {
       </div>
 
       <BottomNav />
+
+      {pasoGuia === 'bienvenida' && (
+        // Cerrarla por cualquier lado (X, fuera, Escape) cuenta como "Empezar": saltar toda la guía es una decisión explícita.
+        <HojaInferior titulo={TEXTOS_GUIA.bienvenida.titulo} onCerrar={() => guia.marcarVisto('bienvenida')}>
+          <p className="text-[14px] leading-snug">{TEXTOS_GUIA.bienvenida.texto}</p>
+          <div className="flex flex-col gap-2">
+            <Button type="button" className="h-auto rounded-2xl py-3 text-[15px] font-semibold" onClick={() => guia.marcarVisto('bienvenida')}>
+              Empezar
+            </Button>
+            <Button type="button" variant="ghost" className="text-muted-foreground rounded-2xl" onClick={saltarGuia}>
+              Saltar guía
+            </Button>
+          </div>
+        </HojaInferior>
+      )}
 
       {periodoId && mostrarFormularioIngreso && (
         <HojaInferior titulo="Nuevo ingreso" onCerrar={() => setMostrarFormularioIngreso(false)}>

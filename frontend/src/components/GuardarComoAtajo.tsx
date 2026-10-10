@@ -11,6 +11,8 @@ interface GuardarComoAtajoProps {
   categoriaId: string;
   /** Lo que se propone como nombre: la nota que se escribió, o el nombre de la categoría. */
   nombreSugerido: string;
+  /** Se llama al guardarse el atajo (la guía lo usa para dar su pista por leída). */
+  onGuardado?: () => void;
 }
 
 /**
@@ -18,7 +20,7 @@ interface GuardarComoAtajoProps {
  * pide el nombre. No registra el gasto ni cierra nada — es un paso aparte, opcional, que no agrega toques al flujo
  * normal. Los errores del servidor (límite del plan, nombre repetido) se muestran tal cual: ya vienen redactados.
  */
-export function GuardarComoAtajo({ monto, categoriaId, nombreSugerido }: GuardarComoAtajoProps) {
+export function GuardarComoAtajo({ monto, categoriaId, nombreSugerido, onGuardado }: GuardarComoAtajoProps) {
   const crearAtajo = useCrearAtajo();
   const [abierto, setAbierto] = useState(false);
   const [nombre, setNombre] = useState('');
@@ -40,6 +42,7 @@ export function GuardarComoAtajo({ monto, categoriaId, nombreSugerido }: Guardar
         onSuccess: (atajo) => {
           setGuardado(atajo.nombre);
           setAbierto(false);
+          onGuardado?.();
         },
       }
     );

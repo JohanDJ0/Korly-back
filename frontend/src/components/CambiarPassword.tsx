@@ -7,7 +7,8 @@ import { CaptchaDelFormulario } from '@/components/CaptchaDelFormulario';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useTurnstile } from '@/hooks/use-turnstile';
-import { esquemaPasswordNueva, traducirErrorDeAuth } from '@/lib/password';
+import { mensajeDeErrorAuth } from '@/lib/errores-auth';
+import { esquemaPasswordNueva } from '@/lib/password';
 import { supabase } from '@/lib/supabase';
 import { MENSAJE_CAPTCHA_PENDIENTE } from '@/lib/turnstile';
 import { useAuthStore } from '@/stores/auth-store';
@@ -66,12 +67,12 @@ export function CambiarPassword() {
     const verificacion = await supabase.auth.signInWithPassword({ email: correo, password: datos.actual, options: { captchaToken: captcha.token } });
     captcha.reiniciar(); // el token es de un solo uso
     if (verificacion.error) {
-      setErrorGeneral(traducirErrorDeAuth(verificacion.error.message));
+      setErrorGeneral(mensajeDeErrorAuth(verificacion.error, 'reautenticar'));
       return;
     }
     const { error } = await supabase.auth.updateUser({ password: datos.nueva });
     if (error) {
-      setErrorGeneral(traducirErrorDeAuth(error.message));
+      setErrorGeneral(mensajeDeErrorAuth(error));
       return;
     }
     cerrar();

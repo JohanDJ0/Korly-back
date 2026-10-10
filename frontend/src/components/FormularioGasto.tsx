@@ -9,12 +9,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { GuardarComoAtajo } from '@/components/GuardarComoAtajo';
+import { PasoDeGuia, RESALTADO_GUIA } from '@/components/PasoDeGuia';
 import { SelectorCategoriaChips } from '@/components/SelectorCategoriaChips';
 import { useCategorias } from '@/hooks/use-categorias';
 import { useDisponible } from '@/hooks/use-disponible';
+import { useGuia } from '@/hooks/use-guia';
 import { useRegistrarGasto } from '@/hooks/use-registrar-gasto';
 import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { hoyISO } from '@/lib/fechas';
+import { TEXTOS_GUIA } from '@/lib/guia';
+import { cn } from '@/lib/utils';
 
 const esquemaGasto = z.object({
   monto: z.coerce.number().positive('El monto debe ser mayor a cero'),
@@ -55,6 +59,9 @@ export function FormularioGasto({ periodoId, onRegistrado, inicial }: Formulario
   const { data: disponible } = useDisponible();
   const [categoriaId, setCategoriaId] = useState(inicial?.categoriaId ?? '');
   const { data: categorias } = useCategorias();
+  const guia = useGuia();
+  // Paso de la guía (lib/guia.ts): una pista sobre "Guardar como atajo", solo si ya leyó cómo registrar un gasto.
+  const pistaDeAtajo = guia.activa && guia.vistos.has('registrar-gasto') && !guia.vistos.has('atajo-formulario');
   // El gasto que superó lo disponible y espera que el usuario lo confirme o lo corrija.
   const [aConfirmar, setAConfirmar] = useState<GastoFormSalida | null>(null);
 
@@ -101,6 +108,8 @@ export function FormularioGasto({ periodoId, onRegistrado, inicial }: Formulario
       },
       {
         onSuccess: () => {
+          // La pista de la guía se da por leída cuando el formulario cumple su función (registrar), no antes: mostrarla no pide otro toque.
+          if (pistaDeAtajo) guia.marcarVisto('atajo-formulario');
           reset({ fechaEfectiva: hoyISO() });
           setCategoriaId('');
           onRegistrado?.();
@@ -181,7 +190,19 @@ export function FormularioGasto({ periodoId, onRegistrado, inicial }: Formulario
       )}
 
       {Number.isFinite(montoValido) && montoValido > 0 && (
-        <GuardarComoAtajo monto={montoValido} categoriaId={categoriaId} nombreSugerido={notaEnVivo || categorias?.find((c) => c.id === categoriaId)?.nombre || ''} />
+        <>
+          {pistaDeAtajo && (
+            <PasoDeGuia
+              texto={TEXTOS_GUIA['atajo-formulario'].texto}
+              etiquetaPrincipal="Entendido"
+              onPrincipal={() => guia.marcarVisto('atajo-formulario')}
+              onSaltar={() => void guia.terminar()}
+            />
+          )}
+          <div className={cn('self-center rounded-xl px-2 py-1', pistaDeAtajo && RESALTADO_GUIA)}>
+            <GuardarComoAtajo onGuardado={() => guia.marcarVisto('atajo-formulario')} monto={montoValido} categoriaId={categoriaId} nombreSugerido={notaEnVivo || categorias?.find((c) => c.id === categoriaId)?.nombre || ''} />
+          </div>
+        </>
       )}
 
       {/*

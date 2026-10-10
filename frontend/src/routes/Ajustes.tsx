@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
-import { Bell, ChevronRight, Download, FileText, LogOut, Repeat, ShieldCheck, Tag, Zap } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Bell, ChevronRight, Download, FileText, Lightbulb, LogOut, Repeat, ShieldCheck, Tag, Zap } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import { Button } from '@/components/ui/button';
 import { BottomNav } from '@/components/BottomNav';
@@ -13,6 +14,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { TarjetaPlan } from '@/components/TarjetaPlan';
 import { useActualizarPreferencias } from '@/hooks/use-actualizar-preferencias';
 import { useDescargarDatos } from '@/hooks/use-descargar-datos';
+import { useGuia } from '@/hooks/use-guia';
 import { usePreferencias } from '@/hooks/use-preferencias';
 import { useSuscripcion } from '@/hooks/use-suscripcion';
 import { supabase } from '@/lib/supabase';
@@ -36,6 +38,9 @@ export function Ajustes() {
   });
   const { data: suscripcion } = useSuscripcion();
   const descargarDatos = useDescargarDatos();
+  const guia = useGuia();
+  const navigate = useNavigate();
+  const [errorGuia, setErrorGuia] = useState<string | null>(null);
   const [parametros] = useSearchParams();
   const resultadoCheckout = parametros.get('suscripcion');
 
@@ -134,7 +139,25 @@ export function Ajustes() {
         </section>
         <section className="flex flex-col gap-2.5">
           <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">AYUDA</h2>
-          <div className="border-border bg-card rounded-2xl border p-3.5">
+          <div className="border-border bg-card flex flex-col gap-3 rounded-2xl border p-3.5">
+            <button
+              type="button"
+              className="flex items-center gap-3 text-left"
+              onClick={() => {
+                setErrorGuia(null);
+                guia
+                  .reiniciar()
+                  .then(() => navigate('/'))
+                  .catch(() => setErrorGuia('No pudimos reiniciar la guía. Inténtalo de nuevo.'));
+              }}
+            >
+              <div className="bg-secondary flex h-9.5 w-9.5 shrink-0 items-center justify-center rounded-[11px]">
+                <Lightbulb size={17} className="text-secondary-foreground" />
+              </div>
+              <span className="flex-1 text-[14px] font-medium">Ver la guía otra vez</span>
+              <ChevronRight size={16} className="text-muted-foreground" />
+            </button>
+            {errorGuia && <p className="text-destructive text-sm">{errorGuia}</p>}
             <BotonComentarios />
           </div>
         </section>

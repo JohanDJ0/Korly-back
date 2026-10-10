@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AuthCard } from '@/components/AuthCard';
 import { esquemaPasswordNueva } from '@/lib/password';
+import { mensajeDeErrorAuth } from '@/lib/errores-auth';
 import { supabase } from '@/lib/supabase';
 import { limpiarRecuperacion } from '@/stores/auth-store';
 
@@ -44,7 +45,7 @@ export function RestablecerPassword() {
     setErrorGeneral(null);
     const { error } = await supabase.auth.updateUser({ password: datos.password });
     if (error) {
-      setErrorGeneral(error.message);
+      setErrorGeneral(mensajeDeErrorAuth(error));
       return;
     }
     limpiarRecuperacion();
