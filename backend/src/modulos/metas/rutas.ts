@@ -7,6 +7,7 @@ import {
   depositarEnMeta,
   editarMeta,
   eliminarMeta,
+  listarAportesDelPeriodo,
   listarMetas,
   listarMovimientosDeMeta,
   pagarConMeta,
@@ -210,6 +211,21 @@ export async function rutasMetas(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: { metaId: string; movimientoId: string } }>('/metas/:metaId/depositos/:movimientoId', async (request, reply) => {
     await deshacerDepositoMeta(request.identidad.tenantId, request.params.metaId, request.params.movimientoId);
     reply.code(204).send();
+  });
+
+  // Extensión sobre openapi.yaml: lo aportado a metas en un periodo, para "Actividad reciente" (ver backend/README.md).
+  app.get<{ Params: { periodoId: string } }>('/periodos/:periodoId/aportes-meta', async (request, reply) => {
+    const aportes = await listarAportesDelPeriodo(request.identidad.tenantId, request.params.periodoId);
+    reply.send(
+      aportes.map((a) => ({
+        id: a.id,
+        metaId: a.metaId,
+        metaNombre: a.metaNombre,
+        monto: montoADto(a.montoValorMinimo, a.moneda),
+        fechaEfectiva: a.fechaEfectiva,
+        fechaRegistro: a.fechaRegistro.toISOString(),
+      }))
+    );
   });
 
   app.get<{ Params: { metaId: string } }>('/metas/:metaId/movimientos', async (request, reply) => {

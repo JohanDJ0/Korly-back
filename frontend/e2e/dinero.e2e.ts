@@ -54,6 +54,34 @@ test.describe('metas, tarjetas, recurrentes y categorías', () => {
     });
   });
 
+  test('ahorrar en una meta baja el disponible pero no es un gasto de hoy: no hay "te excediste", se reparte lo que queda y sale como ahorro', async ({ page, persona }) => {
+    void persona;
+    await conIngreso(page, 10000);
+    await irA(page, 'Metas');
+    await page.getByRole('button', { name: /Nueva meta/ }).first().click();
+    const hoja = page.getByRole('dialog', { name: 'Nueva meta' });
+    await hoja.getByLabel('¿Para qué estás ahorrando?').fill('Vacaciones');
+    await hoja.getByLabel('Objetivo').fill('20000');
+    await hoja.getByRole('button', { name: 'Crear meta' }).click();
+    await expect(hoja).toBeHidden();
+
+    // Casi todo el ingreso: con el cálculo anterior (el aporte como "gastado hoy") esto dejaba la cifra del día en negativo.
+    await page.getByRole('button', { name: /Agregar dinero/ }).click();
+    await page.getByPlaceholder('Monto').fill('9000');
+    await page.getByRole('button', { name: 'Aportar' }).click();
+    await expect(page.getByText(`${pesos(9000)} de ${pesos(20000)}`)).toBeVisible();
+
+    await page.getByRole('link', { name: 'Inicio' }).first().click();
+    await expect(page.getByText('Puedes gastar hoy', { exact: true })).toBeVisible(); // y no "Te excediste hoy por…"
+    await expect(page.getByText('Te excediste hoy por')).toBeHidden();
+    await expect(page.getByText(pesos(1000)).first()).toBeVisible(); // lo que queda de la quincena
+    await expect(page.getByText('Ya gastaste')).toBeHidden(); // el ahorro no cuenta como gastado hoy
+
+    // En la actividad sale como ahorro a su meta, no como un gasto.
+    await expect(page.getByText('Ahorro a Vacaciones')).toBeVisible();
+    await expect(page.getByText(`-${pesos(9000)}`).first()).toBeVisible();
+  });
+
   test('una tarjeta: darla de alta, registrar una compra a meses sin intereses, ver sus mensualidades y corregirla', async ({ page, persona }) => {
     void persona;
     await irA(page, 'Tarjetas');

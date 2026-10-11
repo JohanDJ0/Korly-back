@@ -27,6 +27,7 @@ export function useAportarMeta() {
       void queryClient.invalidateQueries({ queryKey: ['movimientos-meta'] });
       void queryClient.invalidateQueries({ queryKey: ['disponible'] });
       void queryClient.invalidateQueries({ queryKey: ['desglose'] });
+      void queryClient.invalidateQueries({ queryKey: ['aportes-meta'] }); // "Actividad reciente" de Inicio
     },
   });
 }

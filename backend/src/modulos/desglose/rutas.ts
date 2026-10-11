@@ -27,6 +27,7 @@ export async function rutasDesglose(app: FastifyInstance): Promise<void> {
           monto: montoADto(item.montoValorMinimo, moneda),
         })),
       },
+      aportesAMetas: { total: montoADto(desglose.aportesAMetas.totalValorMinimo, moneda) },
       rubros: desglose.rubros.map((rubro) => ({
         clave: rubro.clave,
         etiqueta: rubro.etiqueta,

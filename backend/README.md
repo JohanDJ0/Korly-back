@@ -1177,7 +1177,8 @@ periodo activo — `409 SIN_PERIODO_ACTIVO`, documentado en
 `gastadoHoy` de `consultarDisponible` (`['gasto', 'aporte_meta']`):
 sin esto, aportar el mismo día no bajaría "puedes gastar hoy" aunque sí
 bajara `disponible`, la misma inconsistencia que ya se corrigió para
-`gastadoHoy` con la reversión de un ingreso.
+`gastadoHoy` con la reversión de un ingreso. **(Superado el 2026-10-11:
+el aporte ya no entra a `gastadoHoy`, ver "Aportes a metas y la cifra del día".)**
 
 **Retirar es simétrico de aportar — decisión propia, no documentada en
 ningún lado.** `modelo-dominio.md` solo confirma el caso de aportar; el
@@ -1257,7 +1258,7 @@ Hay ahora tres movimientos distintos, y cada uno cuenta distinto:
 
 | Acción en la meta | Movimiento | Qué hace |
 | --- | --- | --- |
-| Aportar | `aporte_meta` | Quincena → meta. Cuenta como gasto del periodo. |
+| Aportar | `aporte_meta` | Quincena → meta. Baja el disponible y cuenta como gasto en el resumen de cierre, **pero no como "gastado hoy"** ni en las semanas del desglose (ver "Aportes a metas y la cifra del día"). |
 | Pasar a mi quincena (retirar) | `retiro_meta` | Meta → quincena. Cuenta como ingreso del periodo. |
 | **Pagar con la meta** | `pago_meta` | Meta → externo. **No toca la quincena.** |
 
@@ -2220,8 +2221,10 @@ periodos cerrados (retroactivo a todos) que para el activo. Frontend:
 **Cuadra con el resumen por construcción.** Recorre los mismos asientos de
 la cuenta del periodo que `calcularTotalesTx` (mismo tipo efectivo, mismo
 `TIPOS_GASTO`, ahora exportado de `generar-resumen.ts`), así que la suma
-de rubros + recurrentes es exactamente `totalGastado`. Los aportes a
-metas y los pagos de tarjeta, que no tienen categoría, son rubros propios.
+de rubros + recurrentes es exactamente `totalGastado`. Los pagos de
+tarjeta, que no tienen categoría, son un rubro propio. Los aportes a metas
+(desde 2026-10-11) van aparte en `aportesAMetas`, como los recurrentes: rubros
++ recurrentes + aportes es exactamente `totalGastado`.
 
 **Semanas: una quincena son dos semanas más 1-2 días sueltos.** Bloques
 de 7 días desde el inicio, y el remanente se suma al último bloque en vez
@@ -2461,6 +2464,22 @@ Plantillas que cada persona arma para registrar con un toque un gasto que repite
   borrado de cuenta; los respaldos descubren las tablas solos. El aviso de privacidad debe mencionarlos (versión nueva) antes de
   desplegar la pantalla.
 - **Migración en producción:** se aplica a mano (`npm run db:migrate`) **antes** de desplegar el código que la usa.
+
+## Aportes a metas y la cifra del día
+
+Hallazgo del usuario con su cuenta real (2026-10-11): aportar $500 a una meta con 7 días por delante mostraba "te excediste hoy
+por $286", y el aporte salía como "gasto de la semana". Un aporte es una decisión de ahorro, no un gasto del día.
+
+- **`consultarDisponible`:** el corte de `gastadoHoy` pasó de `['gasto', 'aporte_meta', 'retiro_meta']` a `['gasto', 'retiro_meta']`.
+  El aporte baja `disponible` de inmediato (sin cambios) y la cifra de hoy es `disponible / díasRestantes`: lo que queda se
+  reparte entre los días que faltan. `huboActividadHoy` sigue contando el aporte (es algo que el usuario hizo hoy, silencia el
+  recordatorio). Un retiro de meta sigue en el corte para cancelarse con el gasto que cubre.
+- **Desglose del periodo:** `aportesAMetas.total` (neto de lo que volvió como retiro) va aparte; ya no es un rubro ni cuenta en
+  las semanas, el promedio por día ni la "semana más cara". `totalVariable = totalGastado − recurrentes − aportesAMetas`.
+- **No cambia:** el resumen de cierre cuenta el aporte como gasto (con su compensación al retirar) para que `ingresos − gastado`
+  siga siendo el saldo de la cuenta.
+- **`GET /v1/periodos/:periodoId/aportes-meta`** (extensión, documentada en openapi): los aportes de la quincena para "Actividad
+  reciente" de Inicio, que no los muestra como gasto sino como "Ahorro a <meta>".
 
 ## Comentarios de las personas que usan Korly
 

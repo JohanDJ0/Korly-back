@@ -67,7 +67,7 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * menos) y `díasRestantes` bajó uno - ahí es donde ocurre la
  * redistribución, nunca a mitad del mismo día.
  *
- * **Por qué el corte se restringe a `['gasto', 'aporte_meta', 'retiro_meta']`
+ * **Por qué el corte se restringe a `['gasto', 'retiro_meta']`
  * y no al neto de "todo lo de hoy":** se probó primero con el neto de
  * TODOS los asientos de hoy, y falla justo en el caso más común - el día
  * 1, con el ingreso y el primer gasto fechados el mismo día. Un ingreso
@@ -75,10 +75,18 @@ export type Disponible = DisponibleOk | DisponibleSinIngreso;
  * así que "gastado hoy" habría salido en 0 - el gasto real quedó
  * escondido detrás del ingreso, más grande. Restringir a tipos
  * específicos evita que un ingreso del mismo día tape un gasto real.
- * `'aporte_meta'` se cuenta junto con `'gasto'` porque modelo-dominio.md
- * §6 confirma que un aporte "se trata como un gasto más" — sin esto,
- * aportar a una meta el mismo día no bajaría "puedes gastar hoy" aunque
- * sí baje `disponible`.
+ * **`'aporte_meta'` NO entra a este corte (cambio pedido por el usuario,
+ * 2026-10-11; antes contaba como un gasto más, modelo-dominio.md §6).**
+ * Aportar a una meta baja `disponible` de inmediato —eso no cambia— pero
+ * no es lo que el usuario decidió gastar HOY: es ahorro, igual que un
+ * recurrente es un compromiso. Contarlo como gastado hoy repartía el
+ * ingreso completo entre los días restantes y le restaba el aporte entero
+ * solo a hoy, así que ahorrar $500 con 7 días por delante mostraba "te
+ * excediste hoy por $286" aunque a la quincena le quedaran $1,000. Fuera
+ * del corte, la cifra de hoy es `disponible / díasRestantes`: el aporte
+ * se descuenta del presupuesto y lo que queda se reparte entre los días
+ * que faltan — ahorrar se siente cada día (A/n menos), no de golpe hoy.
+ * `huboActividadHoy` SÍ lo sigue contando: es algo que el usuario hizo hoy.
  *
  * **`'retiro_meta'` entra a este mismo corte (hallazgo real, reportado
  * por el usuario contra su cuenta real)** — a diferencia de un
@@ -152,8 +160,11 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
   const disponibleValorMinimo = await obtenerSaldoCuenta(tenantId, periodo.cuentaId);
   const diasRestantes = calcularDiasRestantes(periodo.fechaFin, fechaReferencia);
 
+  // Qué consume el objetivo de hoy (gastos y retiros que los cubren) y qué cuenta como "hizo algo hoy" (además, los
+  // aportes a metas): no son lo mismo, ver el comentario grande de arriba.
+  const tiposQueConsumenHoy = ['gasto', 'retiro_meta'] as const;
   const tiposActividadHoy = ['gasto', 'aporte_meta', 'retiro_meta'] as const;
-  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), [...tiposActividadHoy], {
+  const netoGastosHoy = await obtenerNetoCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), [...tiposQueConsumenHoy], {
     excluirGastosRecurrentes: true,
   });
   const gastadoHoyValorMinimo = netoGastosHoy < 0n ? -netoGastosHoy : 0n;
@@ -161,10 +172,10 @@ export async function consultarDisponible(tenantId: string, fechaReferencia: Dat
   const objetivoHoy = pisoDivisionBigInt(disponibleBaseHoy, BigInt(diasRestantes));
   const cifraDiariaValorMinimo = objetivoHoy - gastadoHoyValorMinimo;
 
-  // Mismos tipos y misma exclusión de recurrentes que el corte de
-  // arriba — "hubo actividad" significa lo mismo que "el usuario decidió
-  // algo hoy", no "algo automático coincidió con hoy" (ver el comentario
-  // grande de esta función sobre pago_tarjeta/recurrentes).
+  // Misma exclusión de recurrentes que el corte de arriba — "hubo
+  // actividad" significa "el usuario decidió algo hoy" (un gasto, un
+  // aporte a una meta, un retiro), no "algo automático coincidió con hoy"
+  // (ver el comentario grande de esta función sobre pago_tarjeta/recurrentes).
   const huboActividadHoy = await existeActividadCuentaEnFecha(tenantId, periodo.cuentaId, fechaISO(fechaReferencia), [...tiposActividadHoy], {
     excluirGastosRecurrentes: true,
   });

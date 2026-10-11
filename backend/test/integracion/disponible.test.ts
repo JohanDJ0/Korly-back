@@ -425,7 +425,7 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     expect(resultado.gastadoHoyValorMinimo).toBe(555n); // solo el gasto real, no la reversión del ingreso
   });
 
-  it('un aporte a una meta el mismo día cuenta como gastado hoy (modelo-dominio.md §6: "se trata como un gasto más")', async () => {
+  it('un aporte a una meta baja el disponible pero NO cuenta como gastado hoy: la cifra de hoy se recalcula sobre lo que queda (modelo-dominio.md §6, matiz del 2026-10-11)', async () => {
     const tenantId = await tenantNuevo();
     const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
     const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
@@ -437,9 +437,45 @@ describe('consultarDisponible (motor de flujo de caja)', () => {
     const resultado = await consultarDisponible(tenantId, hoy);
     if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
 
-    expect(resultado.disponibleValorMinimo).toBe(4700n); // 5000 - 300
-    expect(resultado.gastadoHoyValorMinimo).toBe(300n);
-    expect(resultado.cifraDiariaValorMinimo).toBe(33n); // objetivoHoy = piso(5000/15) = 333; 333 - 300 = 33
+    expect(resultado.disponibleValorMinimo).toBe(4700n); // 5000 - 300: el aporte sí baja el disponible
+    expect(resultado.gastadoHoyValorMinimo).toBe(0n); // ...pero no es lo que se decidió gastar hoy
+    expect(resultado.cifraDiariaValorMinimo).toBe(313n); // piso(4700/15): lo que queda, repartido entre los 15 días
+    expect(resultado.huboActividadHoy).toBe(true); // sí es algo que la persona hizo hoy: silencia el recordatorio
+  });
+
+  it('el caso real del usuario: ahorrar bastante con pocos días restantes no dice "te excediste hoy", reparte lo que queda', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-09T00:00:00Z'); // 7 días restantes (9 al 15)
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 150000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+    const meta = await crearMeta(tenantId, 'Vacaciones', 1000000n, 'MXN');
+
+    await aportarAMeta({ tenantId, metaId: meta.id, monto: 50000n, moneda: 'MXN', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.diasRestantes).toBe(7);
+    expect(resultado.disponibleValorMinimo).toBe(100000n); // 1,500 - 500 = 1,000 pesos
+    expect(resultado.cifraDiariaValorMinimo).toBe(14285n); // piso(100000/7); antes salía negativa: (150000/7 = 21428) - 50000
+    expect(resultado.cifraDiariaValorMinimo).toBeGreaterThan(0n);
+  });
+
+  it('un aporte y un gasto el mismo día: solo el gasto consume el objetivo de hoy', async () => {
+    const tenantId = await tenantNuevo();
+    const periodo = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    const hoy = new Date('2026-08-01T00:00:00Z'); // 15 días restantes
+    await registrarIngreso({ tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+    const meta = await crearMeta(tenantId, 'Vacaciones', 1000n, 'MXN');
+    await aportarAMeta({ tenantId, metaId: meta.id, monto: 500n, moneda: 'MXN', fechaReferencia: hoy });
+    await registrarGasto({ tenantId, periodoId: periodo.id, monto: 100n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: hoy });
+
+    const resultado = await consultarDisponible(tenantId, hoy);
+    if (resultado?.estado !== 'ok') throw new Error('esperaba estado ok');
+
+    expect(resultado.disponibleValorMinimo).toBe(4400n); // 5000 - 500 - 100
+    expect(resultado.gastadoHoyValorMinimo).toBe(100n); // solo el gasto
+    expect(resultado.cifraDiariaValorMinimo).toBe(200n); // objetivoHoy = piso((4400 + 100)/15) = 300; 300 - 100 de gasto = 200 (el aporte ya está en el disponible)
   });
 
   it('hallazgo real (cuenta de producción): un retiro de meta que cubre un gasto el mismo día no cuenta como excedido — se cancelan entre sí', async () => {

@@ -34,6 +34,7 @@ export function ResumenCompactoPeriodo({ periodoId }: ResumenCompactoPeriodoProp
   const moneda = desglose.totalGastado.moneda;
   const totalVariable = desglose.totalVariable.valorMinimo;
   const hayRecurrentes = desglose.recurrentes.items.length > 0;
+  const hayAportes = desglose.aportesAMetas.total.valorMinimo > 0;
   const principales = desglose.rubros.slice(0, MAX_CATEGORIAS);
   const restantes = desglose.rubros.length - principales.length;
 
@@ -63,7 +64,7 @@ export function ResumenCompactoPeriodo({ periodoId }: ResumenCompactoPeriodoProp
                 </div>
                 <div className="bg-secondary h-1.5 overflow-hidden rounded-full">
                   <div
-                    className={cn('h-full rounded-full', rubro.tipo === 'aportes_meta' || rubro.tipo === 'pagos_tarjeta' ? 'bg-brand-gold' : 'bg-primary')}
+                    className={cn('h-full rounded-full', rubro.tipo === 'pagos_tarjeta' ? 'bg-brand-gold' : 'bg-primary')}
                     style={{ width: `${porcentaje}%` }}
                   />
                 </div>
@@ -74,10 +75,20 @@ export function ResumenCompactoPeriodo({ periodoId }: ResumenCompactoPeriodoProp
         </div>
       )}
 
-      {hayRecurrentes && (
-        <div className="border-border flex items-baseline justify-between gap-2 border-t pt-3 text-[13px]">
-          <span className="text-muted-foreground">Recurrentes (aparte)</span>
-          <span className="font-display font-semibold tabular-nums">{formatearMonto(desglose.recurrentes.total)}</span>
+      {(hayRecurrentes || hayAportes) && (
+        <div className="border-border flex flex-col gap-1.5 border-t pt-3 text-[13px]">
+          {hayRecurrentes && (
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-muted-foreground">Recurrentes (aparte)</span>
+              <span className="font-display font-semibold tabular-nums">{formatearMonto(desglose.recurrentes.total)}</span>
+            </div>
+          )}
+          {hayAportes && (
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-muted-foreground">Ahorro en metas (aparte)</span>
+              <span className="font-display font-semibold tabular-nums">{formatearMonto(desglose.aportesAMetas.total)}</span>
+            </div>
+          )}
         </div>
       )}
 

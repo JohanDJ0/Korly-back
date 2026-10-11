@@ -8,7 +8,7 @@ interface DesglosePeriodoProps {
 }
 
 function colorDeBarra(tipo: RubroDesglose['tipo']) {
-  return tipo === 'aportes_meta' || tipo === 'pagos_tarjeta' ? 'bg-brand-gold' : 'bg-primary';
+  return tipo === 'pagos_tarjeta' ? 'bg-brand-gold' : 'bg-primary';
 }
 
 function cuandoSeCobra(recurrente: RecurrenteDesglose) {
@@ -22,9 +22,10 @@ function cuandoSeCobra(recurrente: RecurrenteDesglose) {
  * - **Gastos recurrentes**, aparte: son compromisos fijos, no algo que se
  *   decidió gastar esa semana — metidos en las semanas inflaban siempre
  *   la primera.
+ * - **Aportes a metas**, aparte también: es ahorro, no lo que se decidió
+ *   gastar esa semana.
  * - **Por categoría** y **por semana**, solo sobre el gasto variable
- *   (incluye "Aportes a metas" y "Pagos de tarjeta" como líneas propias,
- *   que no tienen categoría).
+ *   (incluye "Pagos de tarjeta" como línea propia, que no tiene categoría).
  *
  * "Semana más cara" compara el promedio por día, no el total: una
  * quincena son dos semanas y la segunda absorbe los 1-2 días sueltos del
@@ -46,6 +47,8 @@ export function DesglosePeriodo({ periodoId }: DesglosePeriodoProps) {
   const moneda = desglose.totalGastado.moneda;
   const totalVariable = desglose.totalVariable.valorMinimo;
   const hayRecurrentes = desglose.recurrentes.items.length > 0;
+  const aportes = desglose.aportesAMetas.total.valorMinimo;
+  const hayAportes = aportes > 0;
 
   const etiquetaDe = new Map(desglose.rubros.map((r) => [r.clave, r.etiqueta]));
   const mayorPromedio = Math.max(...desglose.semanas.map((s) => s.promedioDiario.valorMinimo), 1);
@@ -73,15 +76,29 @@ export function DesglosePeriodo({ periodoId }: DesglosePeriodoProps) {
               <span className="font-display font-bold tabular-nums">{formatearMonto(desglose.recurrentes.total)}</span>
             </div>
           </div>
-          <p className="text-muted-foreground text-xs">
-            Gastado {formatearMonto(desglose.totalGastado)} = {formatearMonto(desglose.recurrentes.total)} recurrentes + {formatearMonto({ valorMinimo: totalVariable, moneda })} variable.
-            Abajo solo se analiza el gasto variable.
-          </p>
         </section>
       )}
 
+      {hayAportes && (
+        <section className="flex flex-col gap-2.5">
+          <h2 className="text-muted-foreground text-[12.5px] font-semibold tracking-wide">APORTES A METAS</h2>
+          <div className="border-border bg-card flex items-baseline justify-between gap-2 rounded-2xl border px-4 py-3 text-[13.5px]">
+            <span className="text-muted-foreground">Ahorrado esta quincena</span>
+            <span className="font-display font-bold tabular-nums">{formatearMonto(desglose.aportesAMetas.total)}</span>
+          </div>
+        </section>
+      )}
+
+      {(hayRecurrentes || hayAportes) && (
+        <p className="text-muted-foreground text-xs">
+          Gastado {formatearMonto(desglose.totalGastado)} ={hayRecurrentes ? ` ${formatearMonto(desglose.recurrentes.total)} recurrentes +` : ''}
+          {hayAportes ? ` ${formatearMonto(desglose.aportesAMetas.total)} aportes a metas +` : ''} {formatearMonto({ valorMinimo: totalVariable, moneda })} variable.
+          Abajo solo se analiza el gasto variable.
+        </p>
+      )}
+
       {totalVariable <= 0 ? (
-        <p className="text-muted-foreground text-sm">No hay gasto variable en este periodo — todo lo gastado fue recurrente.</p>
+        <p className="text-muted-foreground text-sm">No hay gasto variable en este periodo — todo lo gastado fue recurrente o ahorro a metas.</p>
       ) : (
         <>
           <section className="flex flex-col gap-2.5">

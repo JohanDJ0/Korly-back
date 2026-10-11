@@ -171,6 +171,8 @@ Decisión confirmada: un aporte a meta se trata como un gasto más para efectos 
 
 **Razón:** si el aporte no redujera el disponible, el usuario podría "ahorrar" sin sentir ningún costo en su día a día, y eso rompería la conexión entre la decisión de ahorrar y la cifra que ve todos los días — justo el mecanismo que hace funcionar el producto. Consistente con la fórmula del §5 tal como está escrita, sin necesidad de un caso especial.
 
+**Matiz (2026-10-11, detectado por el usuario con su cuenta real): reduce el disponible, pero NO cuenta como "gastado hoy".** Tratarlo como un gasto más en `gastado_hoy` repartía el ingreso completo entre los días restantes y le restaba el aporte entero solo a hoy: ahorrar $500 con 7 días por delante mostraba "te excediste hoy por $286" aunque a la quincena le quedaran $1,000. El aporte es una decisión de ahorro, no de gasto del día — igual que un recurrente es un compromiso. Queda fuera de `gastado_hoy` (como los recurrentes): el aporte baja el `disponible` de inmediato y la cifra de hoy pasa a ser `disponible / díasRestantes`, así que ahorrar se siente en la cifra de cada día restante (A/n menos) y no de golpe hoy. Sigue contando como actividad del día (silencia el recordatorio). En el desglose del periodo va aparte (`aportesAMetas`), fuera de las semanas, igual que los recurrentes; el resumen de cierre lo sigue contando como gasto (con su compensación al retirar) para cuadrar con el saldo.
+
 ---
 
 ## 7. Qué queda fuera de este documento (y por qué)

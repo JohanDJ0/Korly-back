@@ -53,6 +53,7 @@ const desgloseVacio: Desglose = {
   totalGastado: pesos(0),
   totalVariable: pesos(0),
   recurrentes: { total: pesos(0), items: [] },
+  aportesAMetas: { total: pesos(0) },
   rubros: [],
   semanas: [],
   semanaMasCara: null,
@@ -65,6 +66,7 @@ function rutasConPeriodo(extra: Rutas = {}): Rutas {
     '/periodos/activo': periodo,
     '/resumenes/pendiente': null,
     '/periodos/p1/pagos-tarjeta': [],
+    '/periodos/p1/aportes-meta': [],
     '/periodos/p1/gastos': { datos: [], siguienteCursor: null },
     '/periodos/p1/desglose': desgloseVacio,
     '/categorias': [],
@@ -247,6 +249,61 @@ describe('Home — actividad reciente y resumen compacto', () => {
     expect(await screen.findByText('Comida')).toBeInTheDocument();
     expect(screen.getByText(/automático/)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver todo' })).toHaveAttribute('href', '/historial');
+  });
+
+  it('un aporte a una meta aparece en la actividad como "Ahorro a <meta>", mezclado con los gastos por fecha de registro', async () => {
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({
+        '/periodos/p1/gastos': {
+          datos: [gasto('g1', 11100, { fechaRegistro: '2026-10-04T10:00:00Z' }), gasto('g2', 22200, { fechaRegistro: '2026-10-04T08:00:00Z' })],
+          siguienteCursor: null,
+        },
+        '/periodos/p1/aportes-meta': [{ id: 'a1', metaId: 'm1', metaNombre: 'Vacaciones', monto: pesos(50000), fechaEfectiva: '2026-10-04', fechaRegistro: '2026-10-04T09:00:00Z' }],
+      })
+    );
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByText('Ahorro a Vacaciones')).toBeInTheDocument();
+    expect(screen.getByText(`-${m(50000)}`)).toBeInTheDocument();
+    const filas = screen.getAllByText(/^-\$[\d,.]+$/).map((nodo) => nodo.textContent);
+    expect(filas).toEqual([`-${m(11100)}`, `-${m(50000)}`, `-${m(22200)}`]); // 10:00, 09:00 y 08:00: el más reciente primero
+  });
+
+  it('con solo un aporte (sin gastos) también hay bloque de actividad', async () => {
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({ '/periodos/p1/aportes-meta': [{ id: 'a1', metaId: 'm1', metaNombre: 'Laptop', monto: pesos(30000), fechaEfectiva: '2026-10-04', fechaRegistro: '2026-10-04T09:00:00Z' }] })
+    );
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByText('Ahorro a Laptop')).toBeInTheDocument();
+    expect(screen.getByText('Actividad reciente')).toBeInTheDocument();
+  });
+
+  it('con el ojito activado, el monto del ahorro tampoco se ve', async () => {
+    usePrivacidadStore.setState({ oculto: true });
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({ '/periodos/p1/aportes-meta': [{ id: 'a1', metaId: 'm1', metaNombre: 'Laptop', monto: pesos(30000), fechaEfectiva: '2026-10-04', fechaRegistro: '2026-10-04T09:00:00Z' }] })
+    );
+    renderConProveedores(<Home />);
+
+    await screen.findByText('Ahorro a Laptop');
+    expect(screen.queryByText(`-${m(30000)}`)).not.toBeInTheDocument();
+  });
+
+  it('el resumen compacto muestra el ahorro en metas como una línea aparte, fuera de las semanas', async () => {
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({
+        '/periodos/p1/desglose': { ...desgloseVacio, totalGastado: pesos(50000), totalVariable: pesos(0), aportesAMetas: { total: pesos(50000) } } satisfies Desglose,
+      })
+    );
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByText('Ahorro en metas (aparte)')).toBeInTheDocument();
+    expect(screen.getAllByText(m(50000)).length).toBeGreaterThan(0);
   });
 
   it('sin gastos no hay bloque de actividad', async () => {

@@ -6,7 +6,7 @@ import type { MontoDto } from '@/lib/dinero';
 export interface RubroDesglose {
   clave: string;
   etiqueta: string;
-  tipo: 'categoria' | 'sin_categoria' | 'aportes_meta' | 'pagos_tarjeta';
+  tipo: 'categoria' | 'sin_categoria' | 'pagos_tarjeta';
   monto: MontoDto;
 }
 
@@ -35,9 +35,11 @@ export interface Desglose {
   fechaInicio: string;
   fechaFin: string;
   totalGastado: MontoDto;
-  /** `totalGastado` menos los recurrentes — lo que cubren `rubros` y `semanas`. */
+  /** `totalGastado` menos los recurrentes y los aportes a metas — lo que cubren `rubros` y `semanas`. */
   totalVariable: MontoDto;
   recurrentes: { total: MontoDto; items: RecurrenteDesglose[] };
+  /** Lo aportado a metas (neto de lo que volvió como retiro): ahorro, aparte del análisis por rubro y semana. */
+  aportesAMetas: { total: MontoDto };
   rubros: RubroDesglose[];
   semanas: SemanaDesglose[];
   semanaMasCara: number | null;

@@ -236,9 +236,10 @@ paths:
       description: >
         Se calcula al consultar (no se guarda), así que funciona igual para
         un periodo cerrado que para el activo. Cuadra con `totalGastado`
-        del resumen. Los gastos recurrentes van aparte (`recurrentes`) y no
-        entran a `rubros` ni a `semanas`. Lo aportado a metas y retirado
-        de vuelta a la quincena en el mismo periodo se compensa.
+        del resumen. Los gastos recurrentes (`recurrentes`) y lo aportado a
+        metas (`aportesAMetas`) van aparte y no entran a `rubros` ni a
+        `semanas`. Lo aportado a metas y retirado de vuelta a la quincena
+        en el mismo periodo se compensa.
       parameters:
         - $ref: '#/components/parameters/PeriodoId'
       responses:
@@ -248,6 +249,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Desglose'
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
+
+  /periodos/{periodoId}/aportes-meta:
+    get:
+      tags: [Metas]
+      summary: Lo aportado a metas desde la quincena de un periodo
+      description: >
+        Para "Actividad reciente" de Inicio: un aporte no es un gasto, así que
+        no sale en el listado de gastos. Solo aportes desde la quincena (no
+        aportes externos ni retiros) y sin los que se deshicieron; los 20 más
+        recientes, el más nuevo primero.
+      parameters:
+        - $ref: '#/components/parameters/PeriodoId'
+      responses:
+        '200':
+          description: Aportes del periodo
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AporteDelPeriodo'
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
 
@@ -1885,9 +1909,21 @@ components:
         montoAplicado:
           $ref: '#/components/schemas/Monto'
 
+    AporteDelPeriodo:
+      type: object
+      required: [id, metaId, metaNombre, monto, fechaEfectiva, fechaRegistro]
+      properties:
+        id: { type: string, format: uuid, description: Id del movimiento del aporte. }
+        metaId: { type: string, format: uuid }
+        metaNombre: { type: string }
+        monto:
+          $ref: '#/components/schemas/Monto'
+        fechaEfectiva: { type: string, format: date }
+        fechaRegistro: { type: string, format: date-time }
+
     Desglose:
       type: object
-      required: [periodoId, fechaInicio, fechaFin, totalGastado, totalVariable, recurrentes, rubros, semanas, semanaMasCara]
+      required: [periodoId, fechaInicio, fechaFin, totalGastado, totalVariable, recurrentes, aportesAMetas, rubros, semanas, semanaMasCara]
       properties:
         periodoId: { type: string, format: uuid }
         fechaInicio: { type: string, format: date }
@@ -1897,7 +1933,7 @@ components:
         totalVariable:
           allOf:
             - $ref: '#/components/schemas/Monto'
-          description: '`totalGastado` menos los recurrentes: es lo que cubren `rubros` y `semanas`.'
+          description: '`totalGastado` menos los recurrentes y los aportes a metas: es lo que cubren `rubros` y `semanas`.'
         recurrentes:
           type: object
           required: [total, items]
@@ -1916,6 +1952,13 @@ components:
                   diaMes: { type: integer, nullable: true }
                   monto:
                     $ref: '#/components/schemas/Monto'
+        aportesAMetas:
+          type: object
+          required: [total]
+          description: Lo aportado a metas en el periodo, neto de lo que volvió como retiro. Es ahorro, no gasto de la semana.
+          properties:
+            total:
+              $ref: '#/components/schemas/Monto'
         rubros:
           type: array
           description: De mayor a menor monto.
@@ -1927,7 +1970,7 @@ components:
               etiqueta: { type: string }
               tipo:
                 type: string
-                enum: [categoria, sin_categoria, aportes_meta, pagos_tarjeta]
+                enum: [categoria, sin_categoria, pagos_tarjeta]
               monto:
                 $ref: '#/components/schemas/Monto'
         semanas:

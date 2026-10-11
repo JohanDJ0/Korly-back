@@ -108,7 +108,27 @@ describe('desglose del periodo', () => {
     expect(resumen?.totalGastadoValorMinimo).toBe(5500n);
     expect(desgloseAntes.totalGastadoValorMinimo).toBe(5500n);
     expect(desgloseDespues.totalGastadoValorMinimo).toBe(resumen?.totalGastadoValorMinimo);
-    expect(desgloseDespues.rubros.find((r) => r.tipo === 'aportes_meta')?.montoValorMinimo).toBe(1500n);
+    // El aporte va aparte (como los recurrentes): no es un rubro ni cuenta en las semanas, pero sí en el total.
+    expect(desgloseDespues.aportesAMetas.totalValorMinimo).toBe(1500n);
+    expect(desgloseDespues.rubros.map((r) => r.montoValorMinimo)).toEqual([4000n]);
+    expect(desgloseDespues.totalVariableValorMinimo).toBe(4000n);
+  });
+
+  it('un aporte a una meta no es gasto de la semana: no suma a las semanas ni a la "semana más cara"', async () => {
+    const { tenantId, periodo } = await tenantConPeriodo();
+    const comida = await categoriaId(tenantId, 'Comida');
+    await gastar(tenantId, periodo.id, 7000n, '2026-10-02', comida); // semana 1: 1000 al día
+    await gastar(tenantId, periodo.id, 8000n, '2026-10-10', comida); // semana 2 (8 días): 1000 al día
+    const meta = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
+    await aportarAMeta({ tenantId, metaId: meta.id, monto: 9000n, moneda: 'MXN', fechaReferencia: new Date('2026-10-10T00:00:00Z') });
+
+    const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
+
+    expect(desglose.semanas.map((s) => s.totalValorMinimo)).toEqual([7000n, 8000n]); // sin los 9000 del aporte
+    expect(desglose.semanas.flatMap((s) => s.rubros.map((r) => r.clave))).not.toContain('aportes_meta');
+    expect(desglose.totalGastadoValorMinimo).toBe(24000n); // 7000 + 8000 + 9000: el total sí lo incluye
+    expect(desglose.aportesAMetas.totalValorMinimo).toBe(9000n);
+    expect(desglose.totalVariableValorMinimo).toBe(15000n);
   });
 
   it('un gasto editado cuenta una sola vez, con el monto corregido y en la semana del original', async () => {
@@ -218,6 +238,7 @@ describe('desglose del periodo', () => {
 
       const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
       expect(desglose.totalGastadoValorMinimo).toBe(0n);
+      expect(desglose.aportesAMetas.totalValorMinimo).toBe(0n);
       expect(desglose.rubros).toEqual([]);
       expect(desglose.semanas.every((semana) => semana.totalValorMinimo === 0n && semana.rubros.length === 0)).toBe(true);
 
@@ -232,7 +253,9 @@ describe('desglose del periodo', () => {
 
       const desglose = await obtenerDesglose(tenantId, periodo.id, FIN_PERIODO);
       expect(desglose.totalGastadoValorMinimo).toBe(30000n);
-      expect(desglose.rubros.map((r) => [r.tipo, r.montoValorMinimo])).toEqual([['aportes_meta', 30000n]]);
+      expect(desglose.aportesAMetas.totalValorMinimo).toBe(30000n); // aportado 50000 − retirado 20000
+      expect(desglose.rubros).toEqual([]); // el aporte no es un rubro
+      expect(desglose.totalVariableValorMinimo).toBe(0n);
 
       const resumen = await cerrarPeriodoManualmente(tenantId, periodo.id, FIN_PERIODO);
       expect(resumen.totalGastadoValorMinimo).toBe(desglose.totalGastadoValorMinimo);

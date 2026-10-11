@@ -1,9 +1,10 @@
 import { and, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import { asientos, cuentas, movimientos } from '../../db/schema/ledger.js';
 import { metas } from '../../db/schema/metas.js';
 import { periodos } from '../../db/schema/periodos.js';
 import { crearCuentaTx, registrarMovimientoTx, revertirMovimientoEnSusCuentasTx } from '../ledger/registrar-movimiento.js';
-import { obtenerPeriodoActivoTx } from '../periodos/crear-periodo.js';
+import { obtenerPeriodoActivoTx, obtenerPeriodoPorIdTx } from '../periodos/crear-periodo.js';
 import { cobrosHabilitados, obtenerPlanTenantTx } from '../planes/planes.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
@@ -556,6 +557,61 @@ export async function deshacerDepositoMeta(tenantId: string, metaId: string, mov
     }
 
     await revertirMovimientoEnSusCuentasTx(tx, tenantId, deposito.id, fechaISO(fechaReferencia), 'Reversión de aporte externo a meta');
+  });
+}
+
+export interface AporteDelPeriodo {
+  /** Id del movimiento del aporte. */
+  id: string;
+  metaId: string;
+  metaNombre: string;
+  montoValorMinimo: bigint;
+  moneda: string;
+  fechaEfectiva: string;
+  fechaRegistro: Date;
+}
+
+const LIMITE_APORTES_DEL_PERIODO = 20;
+
+/**
+ * Lo que se aportó a metas desde la cuenta de un periodo, el más reciente primero: para que "Actividad reciente" de
+ * Inicio muestre a dónde se fue ese dinero (un aporte no es un gasto, así que no sale en la lista de gastos). Solo
+ * aportes de la quincena —no depósitos externos ni retiros— y sin los que ya se deshicieron.
+ */
+export async function listarAportesDelPeriodo(tenantId: string, periodoId: string): Promise<AporteDelPeriodo[]> {
+  return conTenant(tenantId, async (tx) => {
+    const periodo = await obtenerPeriodoPorIdTx(tx, tenantId, periodoId);
+    if (!periodo) throw new ErrorDominio('PERIODO_NO_ENCONTRADO', 'El periodo especificado no existe');
+
+    const asientoDeLaMeta = alias(asientos, 'asiento_de_la_meta');
+    const filas = await tx
+      .select({
+        id: movimientos.id,
+        metaId: metas.id,
+        metaNombre: metas.nombre,
+        monto: asientoDeLaMeta.montoValorMinimo,
+        moneda: movimientos.moneda,
+        fechaEfectiva: movimientos.fechaEfectiva,
+        fechaRegistro: movimientos.fechaRegistro,
+      })
+      .from(asientos)
+      .innerJoin(movimientos, eq(movimientos.id, asientos.movimientoId))
+      .innerJoin(asientoDeLaMeta, and(eq(asientoDeLaMeta.movimientoId, movimientos.id), ne(asientoDeLaMeta.cuentaId, periodo.cuentaId)))
+      .innerJoin(metas, eq(metas.cuentaId, asientoDeLaMeta.cuentaId))
+      .where(and(eq(asientos.tenantId, tenantId), eq(asientos.cuentaId, periodo.cuentaId), eq(movimientos.tipo, 'aporte_meta')))
+      .orderBy(desc(movimientos.fechaRegistro))
+      .limit(LIMITE_APORTES_DEL_PERIODO);
+    if (filas.length === 0) return [];
+
+    const revertidos = await tx
+      .select({ movimientoRevertidoId: movimientos.movimientoRevertidoId })
+      .from(movimientos)
+      .where(and(eq(movimientos.tenantId, tenantId), inArray(movimientos.movimientoRevertidoId, filas.map((f) => f.id))));
+    const idsRevertidos = new Set(revertidos.map((fila) => fila.movimientoRevertidoId));
+
+    return filas
+      .filter((fila) => !idsRevertidos.has(fila.id) && fila.monto > 0n)
+      .map((fila) => ({ id: fila.id, metaId: fila.metaId, metaNombre: fila.metaNombre, montoValorMinimo: fila.monto, moneda: fila.moneda, fechaEfectiva: fila.fechaEfectiva, fechaRegistro: fila.fechaRegistro }));
   });
 }
 

@@ -10,7 +10,7 @@ import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
 import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { consultarDisponible } from '../../src/modulos/disponible/consultar-disponible.js';
-import { aportarAMeta, crearMeta, deshacerDepositoMeta, deshacerPagoMeta, depositarEnMeta, editarMeta, eliminarMeta, listarMetas, listarMovimientosDeMeta, pagarConMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
+import { aportarAMeta, crearMeta, deshacerDepositoMeta, deshacerPagoMeta, depositarEnMeta, editarMeta, eliminarMeta, listarAportesDelPeriodo, listarMetas, listarMovimientosDeMeta, pagarConMeta, retirarDeMeta } from '../../src/modulos/metas/metas.js';
 import { conTenant } from '../../src/shared/db.js';
 
 describe('metas de ahorro', () => {
@@ -570,6 +570,51 @@ describe('metas de ahorro', () => {
       const metaAjena = await crearMeta(otroTenant, 'Ajena', 1000n, 'MXN');
 
       await expect(listarMovimientosDeMeta(tenantId, metaAjena.id)).rejects.toMatchObject({ codigo: 'META_NO_ENCONTRADA' });
+    });
+  });
+
+  describe('listarAportesDelPeriodo (lo que sale en "Actividad reciente")', () => {
+    it('lista los aportes de la quincena con el nombre de su meta, el más reciente primero', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId: tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const vacaciones = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
+      const laptop = await crearMeta(tenantId, 'Laptop', 100000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: vacaciones.id, monto: 300n, moneda: 'MXN', fechaReferencia: HOY });
+      await aportarAMeta({ tenantId, metaId: laptop.id, monto: 200n, moneda: 'MXN', fechaReferencia: HOY });
+
+      const aportes = await listarAportesDelPeriodo(tenantId, periodo.id);
+
+      expect(aportes.map((a) => [a.metaNombre, a.montoValorMinimo])).toEqual([
+        ['Laptop', 200n],
+        ['Vacaciones', 300n],
+      ]);
+      expect(aportes[0]?.fechaEfectiva).toBe('2026-08-01');
+    });
+
+    it('no lista retiros, depósitos externos ni aportes de otra persona', async () => {
+      const { tenantId, periodo } = await tenantConPeriodoActivo();
+      const otra = await tenantConPeriodoActivo();
+      await registrarIngreso({ tenantId: tenantId, periodoId: periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      await registrarIngreso({ tenantId: otra.tenantId, periodoId: otra.periodo.id, monto: 5000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: HOY });
+      const meta = await crearMeta(tenantId, 'Vacaciones', 100000n, 'MXN');
+      await aportarAMeta({ tenantId, metaId: meta.id, monto: 300n, moneda: 'MXN', fechaReferencia: HOY });
+      await retirarDeMeta({ tenantId, metaId: meta.id, monto: 100n, moneda: 'MXN', motivo: 'Imprevisto', fechaReferencia: HOY });
+      await depositarEnMeta({ tenantId, metaId: meta.id, monto: 50n, moneda: 'MXN' });
+      const ajena = await crearMeta(otra.tenantId, 'Ajena', 100000n, 'MXN');
+      await aportarAMeta({ tenantId: otra.tenantId, metaId: ajena.id, monto: 70n, moneda: 'MXN', fechaReferencia: HOY });
+
+      const aportes = await listarAportesDelPeriodo(tenantId, periodo.id);
+
+      expect(aportes.map((a) => a.montoValorMinimo)).toEqual([300n]);
+      expect((await listarAportesDelPeriodo(otra.tenantId, otra.periodo.id)).map((a) => a.metaNombre)).toEqual(['Ajena']);
+    });
+
+    it('un periodo que no es de esta persona (o no existe) da PERIODO_NO_ENCONTRADO', async () => {
+      const { tenantId } = await tenantConPeriodoActivo();
+      const otra = await tenantConPeriodoActivo();
+
+      await expect(listarAportesDelPeriodo(tenantId, otra.periodo.id)).rejects.toMatchObject({ codigo: 'PERIODO_NO_ENCONTRADO' });
+      await expect(listarAportesDelPeriodo(tenantId, randomUUID())).rejects.toMatchObject({ codigo: 'PERIODO_NO_ENCONTRADO' });
     });
   });
 

@@ -14,7 +14,7 @@ import { acotarFecha, calcularBloquesSemana, diasTranscurridosDelBloque, indiceB
 
 const movimientoRevertido = alias(movimientos, 'movimiento_revertido');
 
-export type TipoRubro = 'categoria' | 'sin_categoria' | 'aportes_meta' | 'pagos_tarjeta';
+export type TipoRubro = 'categoria' | 'sin_categoria' | 'pagos_tarjeta';
 
 export interface RubroDesglose {
   clave: string;
@@ -51,10 +51,15 @@ export interface Desglose {
   moneda: string;
   /** Igual a `totalGastado` del resumen de cierre, por construcción — ver `obtenerDesglose`. */
   totalGastadoValorMinimo: bigint;
-  /** `totalGastado` menos los recurrentes: es lo que cubren `rubros` y `semanas`. */
+  /** `totalGastado` menos los recurrentes y los aportes a metas: es lo que cubren `rubros` y `semanas`. */
   totalVariableValorMinimo: bigint;
   /** Compromisos fijos del periodo, aparte del análisis por rubro/semana — ver `obtenerDesglose`. */
   recurrentes: { totalValorMinimo: bigint; items: RecurrenteDesglose[] };
+  /**
+   * Lo aportado a metas en el periodo, neto de lo que ya volvió como retiro: ahorro, aparte del análisis por
+   * rubro/semana igual que los recurrentes (no es lo que se decidió gastar esa semana) — ver `obtenerDesglose`.
+   */
+  aportesAMetas: { totalValorMinimo: bigint };
   rubros: RubroDesglose[];
   semanas: SemanaDesglose[];
   /**
@@ -68,7 +73,6 @@ export interface Desglose {
 
 const MIN_DIAS_PARA_COMPARAR = 3;
 const ETIQUETA_SIN_CATEGORIA = 'Sin categoría';
-const ETIQUETA_APORTES = 'Aportes a metas';
 const ETIQUETA_PAGOS_TARJETA = 'Pagos de tarjeta';
 
 /**
@@ -88,6 +92,10 @@ const ETIQUETA_PAGOS_TARJETA = 'Pagos de tarjeta';
  * corregido es lo único que cuenta); si el original es de un periodo ya
  * cerrado, la reversión entra aquí como crédito en su propia fecha — el
  * periodo cerrado conserva el original, tal como lo congeló su resumen.
+ *
+ * **Los aportes a metas también van aparte (2026-10-11, pedido del usuario):** es ahorro, no lo que decidió gastar esa
+ * semana, así que no entran a `rubros` ni a `semanas` (ni a la "semana más cara") y se listan en `aportesAMetas`,
+ * neto de lo que volvió como retiro. Siguen sumando a `totalGastado` para que cuadre con el resumen de cierre.
  *
  * **Los recurrentes van aparte** (pedido del usuario: fechados al inicio
  * del periodo inflaban siempre la semana 1, y de todos modos no son algo
@@ -172,7 +180,7 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
     let totalGastadoValorMinimo = 0n;
     let totalRecurrentesValorMinimo = 0n;
     const monedas = new Set<string>();
-    const aportesPorSemana = bloques.map(() => 0n);
+    let totalAportadoValorMinimo = 0n;
 
     for (const fila of filasDeGasto) {
       const tipoEfectivo = tipoEfectivoDe(fila);
@@ -188,15 +196,17 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
         continue;
       }
 
+      // Ahorro, no gasto de la semana: va a su propio total (más abajo se le resta lo que volvió como retiro).
+      if (tipoEfectivo === 'aporte_meta') {
+        totalAportadoValorMinimo += importe;
+        continue;
+      }
+
       let clave: string;
       let etiqueta: string;
       let tipoRubro: TipoRubro;
       let categoriaId: string | null = null;
-      if (tipoEfectivo === 'aporte_meta') {
-        clave = 'aportes_meta';
-        etiqueta = ETIQUETA_APORTES;
-        tipoRubro = 'aportes_meta';
-      } else if (tipoEfectivo === 'pago_tarjeta') {
+      if (tipoEfectivo === 'pago_tarjeta') {
         clave = 'pagos_tarjeta';
         etiqueta = ETIQUETA_PAGOS_TARJETA;
         tipoRubro = 'pagos_tarjeta';
@@ -218,7 +228,6 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
       const indiceSemana = indiceBloque(periodo.fechaInicio, fecha, bloques.length);
       const semana = totalesPorSemana[indiceSemana];
       if (!semana) throw new Error('Fecha fuera de los bloques del periodo');
-      if (tipoEfectivo === 'aporte_meta') aportesPorSemana[indiceSemana] = (aportesPorSemana[indiceSemana] ?? 0n) + importe;
       semana.total += importe;
       semana.porRubro.set(clave, (semana.porRubro.get(clave) ?? 0n) + importe);
 
@@ -231,29 +240,13 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
       throw new Error(`La cuenta ${periodo.cuentaId} mezcla más de una moneda entre sus movimientos (fuera de alcance del MVP)`);
     }
 
-    // Lo aportado a metas que ya volvió a la quincena como retiro no es gasto
-    // (ver `compensacionAportesYRetiros`, misma regla que el resumen de cierre).
-    // Se descuenta de las semanas donde se aportó, de la más reciente hacia atrás.
-    const totalAportado = aportesPorSemana.reduce((suma, monto) => suma + monto, 0n);
+    // Lo aportado a metas que ya volvió a la quincena como retiro no es gasto ni ahorro
+    // (ver `compensacionAportesYRetiros`, misma regla que el resumen de cierre): se
+    // descuenta del total aportado y del gastado, así lo aportado neto sigue cuadrando.
     const totalRetirado = filas.filter((fila) => tipoEfectivoDe(fila) === 'retiro_meta').reduce((suma, fila) => suma + fila.monto, 0n);
-    let porCompensar = compensacionAportesYRetiros(totalAportado, totalRetirado);
-    if (porCompensar > 0n) {
-      totalGastadoValorMinimo -= porCompensar;
-      for (let indice = totalesPorSemana.length - 1; indice >= 0 && porCompensar > 0n; indice--) {
-        const aportadoEnSemana = aportesPorSemana[indice] ?? 0n;
-        const descuento = aportadoEnSemana < porCompensar ? aportadoEnSemana : porCompensar;
-        if (descuento <= 0n) continue;
-        const semana = totalesPorSemana[indice]!;
-        semana.total -= descuento;
-        const restante = (semana.porRubro.get('aportes_meta') ?? 0n) - descuento;
-        if (restante === 0n) semana.porRubro.delete('aportes_meta');
-        else semana.porRubro.set('aportes_meta', restante);
-        const rubro = rubros.get('aportes_meta');
-        if (rubro) rubro.monto -= descuento;
-        porCompensar -= descuento;
-      }
-      if (rubros.get('aportes_meta')?.monto === 0n) rubros.delete('aportes_meta');
-    }
+    const porCompensar = compensacionAportesYRetiros(totalAportadoValorMinimo, totalRetirado);
+    totalGastadoValorMinimo -= porCompensar;
+    const aportesNetosValorMinimo = totalAportadoValorMinimo - porCompensar;
 
     const idsDeCategoria = [...rubros.values()].map((r) => r.categoriaId).filter((id): id is string => id !== null);
     if (idsDeCategoria.length > 0) {
@@ -309,8 +302,9 @@ export async function obtenerDesglose(tenantId: string, periodoId: string, fecha
       fechaFin: periodo.fechaFin,
       moneda: monedas.values().next().value ?? 'MXN',
       totalGastadoValorMinimo,
-      totalVariableValorMinimo: totalGastadoValorMinimo - totalRecurrentesValorMinimo,
+      totalVariableValorMinimo: totalGastadoValorMinimo - totalRecurrentesValorMinimo - aportesNetosValorMinimo,
       recurrentes: { totalValorMinimo: totalRecurrentesValorMinimo, items: itemsRecurrentes },
+      aportesAMetas: { totalValorMinimo: aportesNetosValorMinimo },
       rubros: [...rubros.entries()]
         .map(([clave, rubro]) => ({ clave, etiqueta: rubro.etiqueta, tipo: rubro.tipo, montoValorMinimo: rubro.monto }))
         .sort((a, b) => (a.montoValorMinimo < b.montoValorMinimo ? 1 : a.montoValorMinimo > b.montoValorMinimo ? -1 : 0)),
