@@ -24,6 +24,12 @@ interface FormularioIngresoProps {
   periodoId: string;
   /** Para cerrar la hoja inferior cuando el ingreso es uno adicional (bono, dinero extra) y no el primero. */
   onRegistrado?: () => void;
+  /**
+   * Es el primer ingreso de la quincena (la tarjeta "Registra tu ingreso"): se pregunta por el dinero que se tiene, no por el
+   * pago — quien empieza a mitad de quincena anota lo que le queda hoy, y "¿Cuánto recibiste?" le hacía pensar que tenía que
+   * esperar al siguiente pago. Los ingresos adicionales siguen preguntando por lo que se recibió.
+   */
+  primerIngreso?: boolean;
 }
 
 /**
@@ -33,7 +39,7 @@ interface FormularioIngresoProps {
  * lugar del frontend donde el usuario escribe dinero en formato humano
  * antes de que se convierta a la unidad mínima que espera el backend.
  */
-export function FormularioIngreso({ periodoId, onRegistrado }: FormularioIngresoProps) {
+export function FormularioIngreso({ periodoId, onRegistrado, primerIngreso = false }: FormularioIngresoProps) {
   const registrarIngreso = useRegistrarIngreso();
   const { data: periodo } = usePeriodoActivo();
 
@@ -60,7 +66,7 @@ export function FormularioIngreso({ periodoId, onRegistrado }: FormularioIngreso
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
       <div className="flex flex-col gap-2">
-        <Label htmlFor="monto">¿Cuánto recibiste?</Label>
+        <Label htmlFor="monto">{primerIngreso ? '¿Cuánto dinero tienes para esta quincena?' : '¿Cuánto recibiste?'}</Label>
         <Input id="monto" type="number" step="0.01" min="0" inputMode="decimal" autoFocus {...register('monto')} />
         {errors.monto && <p className="text-sm text-destructive">{errors.monto.message}</p>}
       </div>

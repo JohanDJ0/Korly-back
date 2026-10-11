@@ -191,7 +191,7 @@ export function Home() {
                 <CardTitle>Empecemos</CardTitle>
                 <CardDescription>
                   Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Hoy estás en la quincena del{' '}
-                  {formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}.
+                  {formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}. No importa si la quincena ya va a la mitad: puedes empezar hoy con lo que tengas.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -210,10 +210,12 @@ export function Home() {
             <Card className={cn('rounded-2xl', pasoGuia === 'ingreso' && RESALTADO_GUIA)}>
               <CardHeader>
                 <CardTitle>Registra tu ingreso</CardTitle>
-                <CardDescription>Para ver cuánto puedes gastar hoy, necesitamos saber cuánto recibiste.</CardDescription>
+                <CardDescription>
+                  Escribe cuánto dinero tienes para esta quincena. Si ya va a la mitad, pon solo lo que te queda hoy: lo repartimos entre los días que faltan.
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                <FormularioIngreso periodoId={data.periodoId} />
+                <FormularioIngreso periodoId={data.periodoId} primerIngreso />
               </CardContent>
             </Card>
           )}

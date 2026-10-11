@@ -42,7 +42,7 @@ export async function iniciarSesion(page: Page, correo: string, contrasena = CON
 /** Empieza la quincena y registra el ingreso: lo mínimo para ver la cifra del día. */
 export async function conIngreso(page: Page, monto: number): Promise<void> {
   await page.getByRole('button', { name: 'Empezar esta quincena' }).click();
-  await page.getByLabel('¿Cuánto recibiste?').fill(String(monto));
+  await page.getByLabel('¿Cuánto dinero tienes para esta quincena?').fill(String(monto));
   await page.getByRole('button', { name: 'Registrar ingreso' }).click();
   await expect(page.getByText('Puedes gastar hoy')).toBeVisible();
 }

@@ -9,6 +9,7 @@ test.describe('guía de primeros pasos', () => {
     await test.step('bienvenida', async () => {
       const bienvenida = page.getByRole('dialog', { name: 'Bienvenido a Korly' });
       await expect(bienvenida).toContainText('Te decimos cuánto puedes gastar hoy');
+      await expect(bienvenida).toContainText('aunque la quincena ya vaya a la mitad');
       await bienvenida.getByRole('button', { name: 'Empezar' }).click();
       await expect(bienvenida).toBeHidden();
     });
@@ -21,8 +22,8 @@ test.describe('guía de primeros pasos', () => {
     });
 
     await test.step('el ingreso', async () => {
-      await expect(guia(page)).toContainText('Escribe lo que recibiste esta quincena');
-      await page.getByLabel('¿Cuánto recibiste?').fill('8000');
+      await expect(guia(page)).toContainText('Escribe cuánto dinero tienes para esta quincena');
+      await page.getByLabel('¿Cuánto dinero tienes para esta quincena?').fill('8000');
       await page.getByRole('button', { name: 'Registrar ingreso' }).click();
     });
 

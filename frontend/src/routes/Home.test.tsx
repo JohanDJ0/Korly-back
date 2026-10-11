@@ -88,6 +88,7 @@ describe('Home — los tres estados de la primera cifra', () => {
     renderConProveedores(<Home />);
 
     expect(await screen.findByText('Empecemos')).toBeInTheDocument();
+    expect(screen.getByText(/No importa si la quincena ya va a la mitad: puedes empezar hoy con lo que tengas/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Empezar esta quincena' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Registrar gasto' })).not.toBeInTheDocument();
     expect(screen.queryByText('Puedes gastar hoy')).not.toBeInTheDocument();
@@ -109,7 +110,8 @@ describe('Home — los tres estados de la primera cifra', () => {
     renderConProveedores(<Home />);
 
     expect(await screen.findByText('Registra tu ingreso')).toBeInTheDocument();
-    expect(screen.getByLabelText('¿Cuánto recibiste?')).toBeInTheDocument();
+    expect(screen.getByText(/Si ya va a la mitad, pon solo lo que te queda hoy: lo repartimos entre los días que faltan/)).toBeInTheDocument();
+    expect(screen.getByLabelText('¿Cuánto dinero tienes para esta quincena?')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Registrar gasto' })).toBeInTheDocument(); // la captura de gastos no se bloquea
     // El único "Registrar ingreso" que existe es el botón de enviar del formulario de arriba, no el atajo de abajo.
     const botonesIngreso = screen.getAllByRole('button', { name: 'Registrar ingreso' });

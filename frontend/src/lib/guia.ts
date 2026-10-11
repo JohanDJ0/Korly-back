@@ -82,13 +82,15 @@ export function pasoDeInicio(vistos: ReadonlySet<PasoGuia>, contexto: ContextoGu
 export const TEXTOS_GUIA = {
   bienvenida: {
     titulo: 'Bienvenido a Korly',
-    texto: 'Te decimos cuánto puedes gastar hoy. Solo necesitas dos datos: cuánto recibes y en qué gastas. Te acompañamos en el primer paso.',
+    texto:
+      'Te decimos cuánto puedes gastar hoy. Solo necesitas dos datos: cuánto recibes y en qué gastas. Puedes empezar cuando quieras, aunque la quincena ya vaya a la mitad. Te acompañamos en el primer paso.',
   },
   quincena: {
     texto: 'Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Cada quincena tiene sus propios ingresos y gastos.',
   },
   ingreso: {
-    texto: 'Escribe lo que recibiste esta quincena, por ejemplo tu sueldo. Con eso calculamos tu cifra del día. Si te pagan en otro momento, después puedes sumar otro ingreso.',
+    texto:
+      'Escribe cuánto dinero tienes para esta quincena. Si te pagaron hace unos días y ya gastaste algo, anota solo lo que te queda hoy. Con eso calculamos tu cifra del día.',
   },
   cifra: {
     texto: 'Esta es tu cifra del día: lo que puedes gastar hoy sin pasarte de tu quincena. Se calcula con lo que te queda entre los días que faltan.',
