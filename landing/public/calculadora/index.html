@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="es-MX">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Calculadora de gasto diario: ¿cuánto puedo gastar al día?</title>
+    <meta
+      name="description"
+      content="Calcula gratis cuánto puedes gastar al día hasta tu siguiente quincena. Pon tu dinero y los días que faltan; sin registro y sin guardar tus datos."
+    />
+    <link rel="canonical" href="https://korly.com.mx/calculadora/" />
+    <meta name="theme-color" content="#122420" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_MX" />
+    <meta property="og:site_name" content="Korly" />
+    <meta property="og:title" content="Calculadora de gasto diario: ¿cuánto puedo gastar al día?" />
+    <meta property="og:description" content="Pon tu dinero y los días que faltan para tu siguiente quincena y sabe cuánto puedes gastar cada día. Gratis y sin registro." />
+    <meta property="og:url" content="https://korly.com.mx/calculadora/" />
+    <meta property="og:image" content="https://korly.com.mx/assets/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Korly: la cifra de cuánto puedes gastar hoy" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Calculadora de gasto diario: ¿cuánto puedo gastar al día?" />
+    <meta name="twitter:description" content="Pon tu dinero y los días que faltan para tu siguiente quincena. Gratis y sin registro." />
+    <meta name="twitter:image" content="https://korly.com.mx/assets/og-image.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css?v=20261016a" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "name": "Calculadora de gasto diario de Korly",
+            "url": "https://korly.com.mx/calculadora/",
+            "applicationCategory": "FinanceApplication",
+            "operatingSystem": "Web",
+            "inLanguage": "es-MX",
+            "isAccessibleForFree": true,
+            "description": "Calcula cuánto puedes gastar al día hasta tu siguiente quincena a partir del dinero que tienes y los días que faltan.",
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "MXN" },
+            "publisher": { "@type": "Organization", "name": "Korly", "url": "https://korly.com.mx/" }
+          },
+          {
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://korly.com.mx/" },
+              { "@type": "ListItem", "position": 2, "name": "Calculadora de gasto diario", "item": "https://korly.com.mx/calculadora/" }
+            ]
+          },
+          {
+            "@type": "FAQPage",
+            "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "¿Cómo se calcula cuánto puedo gastar al día?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Se resta lo que ya tienes comprometido (renta, servicios, pagos de tarjeta) al dinero que tienes y el resultado se divide entre los días que faltan para tu siguiente pago, contando hoy. Korly redondea hacia abajo para que el error siempre te favorezca." }
+              },
+              {
+                "@type": "Question",
+                "name": "¿Cuántos días tiene una quincena?",
+                "acceptedAnswer": { "@type": "Answer", "text": "La primera quincena del mes va del 1 al 15 (15 días). La segunda va del 16 al último día del mes, así que tiene entre 13 y 16 días según el mes." }
+              },
+              {
+                "@type": "Question",
+                "name": "¿La calculadora guarda mis datos?",
+                "acceptedAnswer": { "@type": "Answer", "text": "No. El cálculo se hace en tu navegador: lo que escribes no se envía ni se guarda en ningún lado." }
+              }
+            ]
+          }
+        ]
+      }
+    </script>
+  </head>
+
+  <body>
+    <header class="site-header">
+      <div class="wrap header-row">
+        <a href="/" class="brand" aria-label="Korly, inicio">
+          <img src="/assets/icon.svg" alt="" width="40" height="40" /><span class="brand-name">Korly</span>
+        </a>
+        <nav class="main-nav" aria-label="Principal">
+          <a href="/#como-funciona">Cómo funciona</a>
+          <a href="/calculadora/" aria-current="page">Calculadora</a>
+          <a href="/guias/">Guías</a>
+          <a href="/#preguntas">Preguntas</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-ghost" href="https://app.korly.com.mx/login">Iniciar sesión</a>
+          <a class="btn btn-gold" href="https://app.korly.com.mx/registro">Crear cuenta</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-hero">
+        <div class="wrap">
+          <ol class="crumbs" aria-label="Ruta de navegación">
+            <li><a href="/">Inicio</a></li>
+            <li>Calculadora de gasto diario</li>
+          </ol>
+          <h1>Calculadora de gasto diario: ¿cuánto puedo gastar al día?</h1>
+          <p class="lead">Pon el dinero que tienes y los días que faltan para tu siguiente quincena. Te decimos cuánto puedes gastar cada día. Gratis y sin registro.</p>
+        </div>
+      </section>
+
+      <div class="wrap narrow">
+        <form class="calc" id="calc" novalidate>
+          <div class="calc-campos">
+            <div>
+              <label for="dinero">Dinero que tienes para esta quincena (hoy)</label>
+              <input id="dinero" name="dinero" type="text" inputmode="decimal" autocomplete="off" placeholder="Por ejemplo, 3600" />
+              <span class="ayuda">Lo que tienes ahora, no tu sueldo completo. Si ya gastaste algo, anota solo lo que te queda.</span>
+            </div>
+            <div>
+              <label for="fijos">Pagos fijos que aún debes hacer (opcional)</label>
+              <input id="fijos" name="fijos" type="text" inputmode="decimal" autocomplete="off" placeholder="Renta, servicios, tarjeta… por ejemplo, 1200" />
+              <span class="ayuda">Súmalos y escríbelos aquí: se restan antes de repartir lo que queda.</span>
+            </div>
+            <div>
+              <label for="dias">Días que faltan para tu siguiente pago (contando hoy)</label>
+              <input id="dias" name="dias" type="text" inputmode="numeric" autocomplete="off" placeholder="Por ejemplo, 15" />
+              <span class="ayuda" id="quincena-texto"></span>
+              <button type="button" class="calc-boton" id="usar-dias" hidden>Usar los días de mi quincena de hoy</button>
+            </div>
+          </div>
+
+          <div class="calc-resultado" id="resultado" aria-live="polite">
+            <p class="etiqueta">Puedes gastar al día</p>
+            <p class="cifra" id="cifra">—</p>
+            <p class="detalle" id="detalle">Escribe cuánto dinero tienes y los días que faltan.</p>
+          </div>
+          <noscript><p class="note">Esta calculadora necesita JavaScript. La fórmula es: (dinero − pagos fijos) ÷ días que faltan.</p></noscript>
+        </form>
+      </div>
+
+      <article class="article">
+        <div class="prose">
+          <h2>Cómo se calcula</h2>
+          <p>La cuenta es sencilla:</p>
+          <div class="callout">
+            <p><strong>Gasto diario = (dinero que tienes − pagos fijos pendientes) ÷ días que faltan</strong></p>
+          </div>
+          <p>
+            Los días se cuentan <strong>incluyendo hoy</strong>: si hoy es el último día antes de tu siguiente pago, te queda 1 día, no 0. Y el resultado se redondea
+            <strong>hacia abajo</strong> al centavo: así, si te equivocas por un poco, el error siempre juega a tu favor.
+          </p>
+
+          <h2>Un ejemplo</h2>
+          <p>Tienes $3,600 después de apartar lo fijo y faltan 15 días para tu siguiente pago:</p>
+          <table class="ejemplo">
+            <tbody>
+              <tr><td>Dinero que tienes</td><td>$3,600.00</td></tr>
+              <tr><td>Días que faltan (contando hoy)</td><td>15</td></tr>
+              <tr><td>Puedes gastar al día</td><td>$240.00</td></tr>
+            </tbody>
+          </table>
+          <p>
+            Si a la mitad de la quincena te quedan $1,500 y faltan 7 días, la cifra pasa a ser $214.28 al día. Por eso conviene volver a calcular: lo que gastas hoy
+            cambia lo que puedes gastar mañana.
+          </p>
+
+          <h2>¿Qué días cuento?</h2>
+          <p>
+            Depende de cuándo te paguen. Si tu pago es quincenal de calendario (el 15 y el último día del mes), la primera quincena va del <strong>1 al 15</strong> y la
+            segunda del <strong>16 al último día</strong> del mes, que puede tener entre 13 y 16 días. La calculadora te propone los días de la quincena en la que estás hoy;
+            si te pagan en otras fechas, escribe tú los días que faltan.
+          </p>
+
+          <h2>Preguntas frecuentes</h2>
+          <div class="faq">
+            <details>
+              <summary>¿Cómo se calcula cuánto puedo gastar al día?</summary>
+              <p>
+                Se resta lo que ya tienes comprometido (renta, servicios, pagos de tarjeta) al dinero que tienes y el resultado se divide entre los días que faltan para tu
+                siguiente pago, contando hoy. Se redondea hacia abajo.
+              </p>
+            </details>
+            <details>
+              <summary>¿Cuántos días tiene una quincena?</summary>
+              <p>La primera quincena del mes va del 1 al 15 (15 días). La segunda va del 16 al último día del mes, así que tiene entre 13 y 16 días según el mes.</p>
+            </details>
+            <details>
+              <summary>¿La calculadora guarda mis datos?</summary>
+              <p>No. El cálculo se hace en tu navegador: lo que escribes no se envía ni se guarda en ningún lado.</p>
+            </details>
+          </div>
+
+          <div class="cta-box">
+            <h2>¿Y si el cálculo se hiciera solo cada día?</h2>
+            <p>Korly es un gestor de gastos gratis hecho para México: anotas con cuánto cuentas y tus gastos, y cada día te muestra cuánto puedes gastar. Sin conectar tu banco.</p>
+            <a class="btn btn-gold btn-lg" href="https://app.korly.com.mx/registro">Crear cuenta gratis</a>
+          </div>
+
+          <h2>Sigue leyendo</h2>
+          <div class="leer-tambien">
+            <a href="/guias/cuanto-puedo-gastar-al-dia-con-mi-sueldo-quincenal/">¿Cuánto puedo gastar al día con mi sueldo quincenal?<small>La fórmula explicada, con ejemplos y qué hacer con rentas y tarjetas.</small></a>
+            <a href="/guias/como-controlar-tus-gastos-por-quincena/">Cómo controlar tus gastos por quincena, paso a paso<small>Un método sencillo que cabe en una libreta, en Excel o en una app.</small></a>
+          </div>
+        </div>
+      </article>
+    </main>
+
+    <footer class="site-footer">
+      <div class="wrap footer-row">
+        <span class="brand brand-small"><img src="/assets/icon.svg" alt="" width="32" height="32" /><span class="brand-name">Korly</span></span>
+        <nav aria-label="Recursos, legal y contacto">
+          <a href="/calculadora/">Calculadora</a>
+          <a href="/guias/">Guías</a>
+          <a href="https://app.korly.com.mx/privacidad">Aviso de privacidad</a>
+          <a href="https://app.korly.com.mx/terminos">Términos y condiciones</a>
+          <a href="mailto:soporte@korly.com.mx">soporte@korly.com.mx</a>
+        </nav>
+        <p>© 2026 Korly</p>
+      </div>
+    </footer>
+
+    <script src="/calculadora/calculadora.js?v=20261016a" defer></script>
+  </body>
+</html>

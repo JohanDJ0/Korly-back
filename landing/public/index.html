@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Korly — Control de gastos por quincena: sabe cuánto puedes gastar hoy</title>
+    <title>Korly — Gestor de gastos por quincena en México</title>
     <meta
       name="description"
-      content="Korly es una app gratis para controlar tus gastos por quincena. Te dice con una sola cifra cuánto puedes gastar hoy, sin conectar tu banco. Hecha para México."
+      content="Korly es un gestor de gastos gratis para México: te dice con una sola cifra cuánto puedes gastar hoy hasta tu siguiente quincena. Sin conectar tu banco."
     />
     <link rel="canonical" href="https://korly.com.mx/" />
     <meta name="theme-color" content="#122420" />
@@ -34,7 +34,7 @@
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@600;700;800&family=Work+Sans:wght@400;500;600&display=swap"
       rel="stylesheet"
     />
-    <link rel="stylesheet" href="/styles.css?v=20261006d" />
+    <link rel="stylesheet" href="/styles.css?v=20261016a" />
 
     <script type="application/ld+json">
       {
@@ -47,12 +47,20 @@
             "applicationCategory": "FinanceApplication",
             "operatingSystem": "Web",
             "inLanguage": "es-MX",
-            "description": "App web gratuita para controlar tus gastos por quincena: te dice cuánto puedes gastar hoy sin conectar tu banco.",
+            "description": "Gestor de gastos web y gratuito para México: te dice cuánto puedes gastar hoy hasta tu siguiente quincena, sin conectar tu banco.",
+            "featureList": ["Cifra diaria: cuánto puedes gastar hoy", "Quincenas de calendario (1 al 15 y 16 al último día)", "Atajos para anotar gastos con un toque", "Gastos recurrentes y compras a meses sin intereses", "Metas de ahorro", "Recordatorio por correo", "Sin conectar tu banco"],
             "offers": { "@type": "Offer", "price": "0", "priceCurrency": "MXN" }
           },
+          { "@type": "Organization", "name": "Korly", "url": "https://korly.com.mx/", "logo": "https://korly.com.mx/assets/og-image.png", "email": "soporte@korly.com.mx" },
+          { "@type": "WebSite", "name": "Korly", "url": "https://korly.com.mx/", "inLanguage": "es-MX" },
           {
             "@type": "FAQPage",
             "mainEntity": [
+              {
+                "@type": "Question",
+                "name": "¿Qué es un gestor de gastos y cómo funciona Korly?",
+                "acceptedAnswer": { "@type": "Answer", "text": "Un gestor de gastos es una herramienta para anotar lo que gastas y saber cuánto dinero te queda. Korly es un gestor de gastos pensado para quien cobra por quincena: anotas con cuánto cuentas y tus gastos, y cada día te dice con una sola cifra cuánto puedes gastar hoy." }
+              },
               {
                 "@type": "Question",
                 "name": "¿Korly cuesta algo?",
@@ -99,6 +107,7 @@
         <nav class="main-nav" aria-label="Principal">
           <a href="#como-funciona">Cómo funciona</a>
           <a href="#beneficios">Beneficios</a>
+          <a href="/calculadora/">Calculadora</a>
           <a href="#planes">Planes</a>
           <a href="#preguntas">Preguntas</a>
         </nav>
@@ -113,7 +122,7 @@
       <section class="hero">
         <div class="wrap hero-grid">
           <div class="hero-copy">
-            <p class="eyebrow">Control de gastos por quincena</p>
+            <p class="eyebrow">Gestor de gastos por quincena</p>
             <h1>Sabe cuánto puedes <span class="hl">gastar hoy</span>.</h1>
             <p class="lead">
               Korly te dice, con una sola cifra, cuánto puedes gastar cada día hasta tu siguiente quincena. Sin conectar tu banco y sin hojas de cálculo.
@@ -667,10 +676,38 @@
         </div>
       </section>
 
+      <section class="section alt" id="aprende">
+        <div class="wrap">
+          <h2 class="center reveal">Aprende a controlar tu quincena</h2>
+          <p class="sub center reveal">Herramientas y guías gratis, sin necesidad de crear cuenta.</p>
+          <div class="grid">
+            <a class="card card-link reveal" href="/calculadora/">
+              <h3>Calculadora de gasto diario</h3>
+              <p>Pon tu dinero y los días que faltan para tu siguiente pago y sabe cuánto puedes gastar al día.</p>
+            </a>
+            <a class="card card-link reveal" href="/guias/como-controlar-tus-gastos-por-quincena/">
+              <h3>Cómo controlar tus gastos por quincena</h3>
+              <p>Siete pasos sencillos para llegar al siguiente pago sin sorpresas, en libreta, Excel o app.</p>
+            </a>
+            <a class="card card-link reveal" href="/guias/cuanto-puedo-gastar-al-dia-con-mi-sueldo-quincenal/">
+              <h3>¿Cuánto puedo gastar al día con mi sueldo quincenal?</h3>
+              <p>La fórmula explicada, con ejemplos y qué hacer con rentas y tarjetas.</p>
+            </a>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="preguntas">
         <div class="wrap narrow">
           <h2 class="center reveal">Preguntas frecuentes</h2>
           <div class="faq reveal">
+            <details>
+              <summary>¿Qué es un gestor de gastos y cómo funciona Korly?</summary>
+              <p>
+                Un gestor de gastos es una herramienta para anotar lo que gastas y saber cuánto dinero te queda. Korly es un gestor de gastos pensado para quien cobra por
+                quincena: anotas con cuánto cuentas y tus gastos, y cada día te dice con una sola cifra cuánto puedes gastar hoy.
+              </p>
+            </details>
             <details>
               <summary>¿Korly cuesta algo?</summary>
               <p>No. Korly es gratis hoy. Más adelante habrá un plan Pro opcional con funciones extra; lo que ya usas en el plan gratuito no se cobra.</p>
@@ -724,7 +761,9 @@
     <footer class="site-footer">
       <div class="wrap footer-row">
         <span class="brand brand-small"><img src="/assets/icon.svg" alt="" width="32" height="32" /><span class="brand-name">Korly</span></span>
-        <nav aria-label="Legal y contacto">
+        <nav aria-label="Recursos, legal y contacto">
+          <a href="/calculadora/">Calculadora</a>
+          <a href="/guias/">Guías</a>
           <a href="https://app.korly.com.mx/privacidad">Aviso de privacidad</a>
           <a href="https://app.korly.com.mx/terminos">Términos y condiciones</a>
           <a href="mailto:soporte@korly.com.mx">soporte@korly.com.mx</a>
@@ -733,6 +772,6 @@
       </div>
     </footer>
 
-    <script src="/main.js?v=20261006d" defer></script>
+    <script src="/main.js?v=20261016a" defer></script>
   </body>
 </html>

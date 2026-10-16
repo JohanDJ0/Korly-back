@@ -1,6 +1,6 @@
 # Página principal de Korly (korly.com.mx)
 
-Sitio estático de una sola página: qué es Korly, cómo funciona y botones hacia la app (`app.korly.com.mx`). Va **aparte de la app** (`frontend/`) a propósito: es HTML ya hecho, así que Google lee el contenido de inmediato (una app React lo pinta en el navegador y posiciona peor), carga muy rápido y no mezcla su despliegue con el de la app.
+Sitio estático: la página principal (qué es Korly, cómo funciona y botones hacia la app, `app.korly.com.mx`) y unas pocas páginas de contenido para buscadores (calculadora y guías). Va **aparte de la app** (`frontend/`) a propósito: es HTML ya hecho, así que Google lee el contenido de inmediato (una app React lo pinta en el navegador y posiciona peor), carga muy rápido y no mezcla su despliegue con el de la app.
 
 Sin framework ni paso de compilación: lo que está en esta carpeta es lo que se publica.
 
@@ -9,6 +9,8 @@ Estructura (solo lo que está en `public/` se publica; lo demás es configuraci�
 | Archivo | Para qué |
 |---|---|
 | `public/index.html` | Todo el contenido, las metaetiquetas de SEO y compartir (Open Graph), y los datos estructurados (`WebApplication` y `FAQPage`) |
+| `public/calculadora/index.html` + `calculadora.js` | Calculadora de gasto diario (`/calculadora/`). La cuenta es la misma de la app (`piso((dinero − fijos) ÷ días)`, días contando hoy). Todo en el navegador, no guarda nada. Probada desde `frontend/src/lib/calculadora-landing.test.ts` |
+| `public/guias/**/index.html` | Guías (`/guias/` y cada guía en su carpeta). **Cada página es `carpeta/index.html` y se publica con diagonal final** (`/guias/x/`): Cloudflare redirige `*.html` y esa es la forma de tener direcciones limpias |
 | `public/styles.css` | Estilos. La paleta y las tipografías son las de la app (`frontend/src/index.css`) |
 | `public/main.js` | Dibujo interactivo del héroe y aparición de secciones al desplazarse (la página se lee igual sin JavaScript) |
 | `public/assets/og-image.png` | Imagen que sale al compartir el link (1200×630) |
@@ -19,6 +21,16 @@ Estructura (solo lo que está en `public/` se publica; lo demás es configuraci�
 | `herramientas/og.html` | Fuente de la imagen de compartir (no se publica) |
 | `wrangler.jsonc` | Configuración de publicación en Cloudflare (no se publica) |
 | `worker.js` | Único código de servidor: redirige `www.korly.com.mx` a `korly.com.mx` (no se publica como archivo) |
+
+## Posicionamiento en buscadores (SEO)
+
+La app (`app.korly.com.mx`) está detrás de inicio de sesión, así que Google solo puede leer **este sitio**. Todo el trabajo de buscadores vive aquí.
+
+- **Cada página** lleva título (≤ 60 caracteres), descripción (≤ 160), `canonical`, Open Graph, una sola H1 y datos estructurados (`WebApplication`/`Organization`/`WebSite` en la principal; `Article`, `BreadcrumbList` y `FAQPage` en las guías; `WebApplication` en la calculadora). `frontend/src/lib/landing-seo.test.ts` lo vigila, junto con enlaces internos rotos, títulos repetidos y que el sitemap liste exactamente las páginas.
+- **Página nueva:** crear `public/<ruta>/index.html`, agregarla a `PAGINAS` en `landing-seo.test.ts`, a `sitemap.xml` (con su `lastmod`) y enlazarla desde la principal o el pie. Misma versión de `styles.css?v=` que la principal (la prueba lo exige).
+- **Contenido:** solo lo que la app hace hoy y ejemplos con cuentas correctas (los de las guías están probados contra la calculadora). Nada de promesas de ahorro.
+- **Después de publicar páginas nuevas:** pedir la indexación en Search Console (Inspección de URL) y revisar el sitemap a la semana.
+- Expectativa realista: "gestor de gastos" a secas es una búsqueda muy competida; lo alcanzable pronto son búsquedas específicas ("cuánto puedo gastar al día con mi sueldo quincenal"...). Se mide en Search Console → Rendimiento.
 
 ## Ver en local
 
