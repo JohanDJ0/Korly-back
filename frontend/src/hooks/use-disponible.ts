@@ -30,14 +30,14 @@ export interface DisponibleOk {
 export type Disponible = DisponibleSinIngreso | DisponibleOk;
 
 /**
- * Sin reintentos: un 404 (sin periodo activo) es un estado esperado del
- * dominio, no una falla transitoria de red — reintentarlo solo demora
- * mostrar el CTA de "crear periodo" (ver Home.tsx).
+ * Un 404 (sin periodo activo) es un estado esperado del dominio, no una falla
+ * transitoria de red: no se reintenta, para no demorar el CTA de "crear periodo"
+ * (ver Home.tsx). Un 5xx o un fallo de red sí se reintenta solo: lo decide el
+ * QueryClient de la app (`reintentarSiFallaElServidor`, lib/query-client.ts).
  */
 export function useDisponible() {
   return useQuery({
     queryKey: ['disponible'],
     queryFn: () => apiFetch<Disponible>('/periodos/activo/disponible'),
-    retry: false,
   });
 }

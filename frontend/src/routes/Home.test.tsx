@@ -155,6 +155,28 @@ describe('Home — los tres estados de la primera cifra', () => {
     expect(await screen.findByText(`Ya gastaste ${m(10000)} de tu objetivo de hoy de ${m(37917)}`)).toBeInTheDocument();
   });
 
+  it('si el servidor falla, junto al error hay un botón "Reintentar" que lo vuelve a pedir sin recargar la página', async () => {
+    let fallar = true;
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({
+        '/periodos/activo/disponible': () => {
+          if (fallar) throw new ApiError(500, 'ERROR_INTERNO', 'Ocurrió un error inesperado');
+          return disponibleOk();
+        },
+      })
+    );
+    const usuario = userEvent.setup();
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocurrió un error inesperado');
+    fallar = false;
+    await usuario.click(screen.getByRole('button', { name: 'Reintentar' }));
+
+    expect(await screen.findByText('Puedes gastar hoy')).toBeInTheDocument();
+    expect(screen.queryByText('Ocurrió un error inesperado')).not.toBeInTheDocument();
+  });
+
   it('un error inesperado del servidor se muestra tal cual, sin pantalla en blanco', async () => {
     servidor = instalarServidorFalso(apiFetch, rutasConPeriodo({ '/periodos/activo/disponible': () => { throw new ApiError(500, 'ERROR_INTERNO', 'El servidor no respondió'); } }));
     renderConProveedores(<Home />);

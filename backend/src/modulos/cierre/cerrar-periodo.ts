@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { periodos } from '../../db/schema/periodos.js';
 import { conTenant, type Ejecutor } from '../../shared/db.js';
 import { ErrorDominio } from '../../shared/errores.js';
@@ -81,13 +81,36 @@ export async function cerrarPeriodoManualmente(
  * (`cerrarPeriodoManualmente`, que no promueve nada por sí mismo,
  * siguiendo el mismo principio perezoso: se resuelve en el siguiente
  * toque real, no de forma eager dentro del cierre).
+ *
+ * **Una sola petición resuelve a la vez por tenant (hallazgo real, 2026-10-16, cuenta
+ * de producción).** El día que vence la quincena, la pantalla de Inicio pide varias
+ * cosas a la vez (periodo, cifra, resumen pendiente, historial...) y cada petición, en
+ * su propia transacción, veía el periodo vencido y trataba de cerrarlo: la primera lo
+ * lograba y las demás chocaban con el resumen que acababa de crear (índice único
+ * `resumenes_periodo_vigente_unico`) → "Ocurrió un error inesperado" hasta recargar.
+ * Ahora, si hay algo que resolver, la transacción toma un candado de asesoría
+ * (`pg_advisory_xact_lock`, se suelta solo al terminar la transacción y funciona con el
+ * pooler de Supabase) y **vuelve a leer** el estado: las que esperaban encuentran el
+ * trabajo ya hecho y siguen de largo. El camino normal (nada que resolver) no toma
+ * ningún candado, así que las peticiones en paralelo de un día cualquiera no se estorban.
  */
 export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<void> {
-  const [activo] = await tx
-    .select()
-    .from(periodos)
-    .where(and(eq(periodos.tenantId, tenantId), eq(periodos.estado, 'activo')))
-    .limit(1);
+  const leerActivo = async () => {
+    const [fila] = await tx
+      .select()
+      .from(periodos)
+      .where(and(eq(periodos.tenantId, tenantId), eq(periodos.estado, 'activo')))
+      .limit(1);
+    return fila;
+  };
+
+  let activo = await leerActivo();
+  const hayQueResolver = activo === undefined || activo.fechaFin < fechaISO(fechaReferencia);
+  if (hayQueResolver) {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`resolver-pendientes:${tenantId}`}, 0))`);
+    // Mientras esperábamos el candado otra petición pudo cerrar el periodo o promover el borrador: se lee de nuevo.
+    activo = await leerActivo();
+  }
 
   let hayActivo = activo !== undefined;
 

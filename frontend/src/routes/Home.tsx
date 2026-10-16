@@ -52,7 +52,7 @@ import { cn } from '@/lib/utils';
  */
 export function Home() {
   const formatearMonto = useFormatearMonto();
-  const { data, isLoading, error } = useDisponible();
+  const { data, isLoading, error, refetch, isFetching } = useDisponible();
   const { data: periodoActivo } = usePeriodoActivo();
   const { data: resumenPendiente } = useResumenPendiente();
   const crearPeriodo = useCrearPeriodo();
@@ -183,7 +183,15 @@ export function Home() {
 
           {isLoading && <CargandoKorly tamano={44} className="text-foreground mx-auto my-8" />}
 
-          {errorInesperado && <p className="text-destructive">{error.message}</p>}
+          {errorInesperado && (
+            // Sin recargar la página (en una app instalada en el teléfono no hay cómo): un botón que vuelve a pedirlo.
+            <div role="alert" className="border-destructive/40 bg-destructive/5 flex flex-col items-start gap-2.5 rounded-2xl border p-4">
+              <p className="text-destructive text-[14px]">{error.message}</p>
+              <Button type="button" variant="outline" size="sm" className="rounded-xl" disabled={isFetching} onClick={() => void refetch()}>
+                {isFetching ? 'Reintentando…' : 'Reintentar'}
+              </Button>
+            </div>
+          )}
 
           {sinPeriodoActivo && (
             <Card className="rounded-2xl">

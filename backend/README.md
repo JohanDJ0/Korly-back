@@ -2465,6 +2465,22 @@ Plantillas que cada persona arma para registrar con un toque un gasto que repite
   desplegar la pantalla.
 - **Migración en producción:** se aplica a mano (`npm run db:migrate`) **antes** de desplegar el código que la usa.
 
+## Cierre perezoso con peticiones simultáneas
+
+Hallazgo con la cuenta real (2026-10-16): el día en que vence la quincena, la primera vez que la persona entraba salía "Ocurrió un
+error inesperado" hasta recargar la página. Al entrar, Inicio pide varias cosas a la vez (periodo, cifra, resumen pendiente, historial)
+y cada petición, en su propia transacción, veía el periodo vencido y trataba de cerrarlo (`resolverPendientesTx`). La primera lo
+lograba; las demás chocaban con el resumen recién creado (índice único `resumenes_periodo_vigente_unico`) y devolvían 500. No se
+corrompía nada (las transacciones fallidas se revierten): solo el error.
+
+- **Arreglo (`cierre/cerrar-periodo.ts`):** si hay algo que resolver (periodo vencido o ningún activo), la transacción toma un candado
+  de asesoría por tenant (`pg_advisory_xact_lock`, se suelta al terminar la transacción; funciona con el pooler de Supabase) y
+  **vuelve a leer** el estado: las que esperaban encuentran el trabajo ya hecho. El camino normal no toma ningún candado.
+- **Prueba:** `test/integracion/cierre-concurrente.test.ts` (seis cuentas con la quincena vencida y seis consultas simultáneas cada una).
+  Sin el candado falla con "Failed query: insert into resumenes".
+- **En la app:** las consultas reintentan solas ante un 5xx o un fallo de red (`lib/query-client.ts`, dos veces; un 4xx como el 404 de
+  "sin periodo activo" no se reintenta) y la pantalla de Inicio muestra un botón "Reintentar" junto a un error inesperado.
+
 ## Aportes a metas y la cifra del día
 
 Hallazgo del usuario con su cuenta real (2026-10-11): aportar $500 a una meta con 7 días por delante mostraba "te excediste hoy

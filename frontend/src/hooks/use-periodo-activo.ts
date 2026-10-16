@@ -12,11 +12,10 @@ export interface Periodo {
   creadoEn: string;
 }
 
-/** Sin reintentos por el mismo motivo que use-disponible.ts: un 404 aquí es un estado esperado. */
+/** Un 404 aquí es un estado esperado y no se reintenta; un fallo del servidor sí (ver use-disponible.ts y lib/query-client.ts). */
 export function usePeriodoActivo() {
   return useQuery({
     queryKey: ['periodo-activo'],
     queryFn: () => apiFetch<Periodo>('/periodos/activo'),
-    retry: false,
   });
 }
