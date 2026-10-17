@@ -11,7 +11,8 @@
  *   npm run metricas -- --json                        salida para máquinas
  *
  * `--desde` es la forma de dejar fuera las cuentas de prueba: pon la fecha
- * en que arrancó el piloto. Corre con la conexión de administración
+ * en que arrancó el piloto. Solo cuenta a quien existe en Supabase Auth: las
+ * filas huérfanas (cuentas borradas directo en el panel) no entran. Corre con la conexión de administración
  * (`DATABASE_URL`), así que solo desde una máquina de confianza.
  */
 import 'dotenv/config';
@@ -40,7 +41,7 @@ function leerArgumentos(argv: string[]) {
 async function main() {
   const { desde, hasta, json } = leerArgumentos(process.argv.slice(2));
   const ahora = new Date();
-  const datos = await leerDatosMetricas({ desde, hasta, ahora });
+  const datos = await leerDatosMetricas({ desde, hasta, ahora, soloConCuentaEnAuth: true });
   const metricas = calcularMetricas(datos, ahora, { desde: desde ?? null, hasta: hasta ?? null });
 
   console.log(json ? JSON.stringify(metricas, null, 2) : formatearReporte(metricas));

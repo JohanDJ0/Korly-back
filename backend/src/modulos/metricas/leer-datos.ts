@@ -18,8 +18,25 @@ function inicioDelDiaEnMexico(dia: string): Date {
  * `desde` (inclusive) y `hasta` (exclusivo) son días de México y acotan la
  * cohorte por fecha de alta, para comparar tandas (p. ej. "solo quien entró
  * desde que arrancó el piloto", que deja fuera las cuentas de prueba).
+ *
+ * `soloConCuentaEnAuth` deja fuera los tenants sin cuenta en Supabase Auth: son filas huérfanas que deja borrar a un usuario
+ * directo en el panel de Supabase (la purga completa solo corre desde "Eliminar mi cuenta") y que inflarían el conteo. Solo
+ * tiene sentido contra la base real de Supabase; en una base sin el esquema `auth` falla con un mensaje claro.
  */
-export async function leerDatosMetricas(opciones: { desde?: string; hasta?: string; ahora?: Date } = {}): Promise<DatosTenant[]> {
+export async function leerDatosMetricas(
+  opciones: { desde?: string; hasta?: string; ahora?: Date; soloConCuentaEnAuth?: boolean } = {}
+): Promise<DatosTenant[]> {
+  if (opciones.soloConCuentaEnAuth) {
+    const [fila] = [...(await dbAdmin.execute(sql`select to_regclass('auth.users') is not null as hay`))] as { hay: boolean }[];
+    if (!fila?.hay) throw new Error('Esta base no tiene Supabase Auth (auth.users): no se puede filtrar por cuentas existentes.');
+  }
+  const conCuentaEnAuth = opciones.soloConCuentaEnAuth
+    ? sql`and exists (
+        select 1 from usuarios u
+        join identidades_externas ie on ie.usuario_id = u.id
+        join auth.users au on au.id::text = ie.id_en_proveedor
+        where u.tenant_id = t.id)`
+    : sql``;
   const desde = opciones.desde ? inicioDelDiaEnMexico(opciones.desde).toISOString() : null;
   const hasta = opciones.hasta ? inicioDelDiaEnMexico(opciones.hasta).toISOString() : null;
   const hace7Dias = new Date((opciones.ahora ?? new Date()).getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
@@ -38,6 +55,7 @@ export async function leerDatosMetricas(opciones: { desde?: string; hasta?: stri
     from tenants t
     where (${desde}::timestamptz is null or t.creado_en >= ${desde}::timestamptz)
       and (${hasta}::timestamptz is null or t.creado_en < ${hasta}::timestamptz)
+      ${conCuentaEnAuth}
   `);
 
   // Capturas a mano: un gasto que NO salió de un recurrente, o un cargo de tarjeta.
