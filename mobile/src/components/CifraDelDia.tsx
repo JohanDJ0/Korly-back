@@ -1,7 +1,8 @@
 import { StyleSheet, Text, View } from 'react-native';
 
-import type { DisponibleOk } from '@/hooks/datos';
-import { formatearMonto } from '@/lib/dinero';
+import { BotonOjito } from '@/components/ui';
+import type { DisponibleOk } from '@/hooks/use-disponible';
+import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { colores } from '@/lib/tema';
 
 /**
@@ -9,6 +10,7 @@ import { colores } from '@/lib/tema';
  * y "hoy" y "total" se pintan de rojo cada uno según SU propio signo.
  */
 export function CifraDelDia({ disponible }: { disponible: DisponibleOk }) {
+  const formatearMonto = useFormatearMonto();
   const totalNegativo = disponible.disponible.valorMinimo < 0;
   const teExcedisteHoy = disponible.cifraDiaria.valorMinimo < 0;
   const gastadoHoy = disponible.gastadoHoy.valorMinimo;
@@ -19,7 +21,10 @@ export function CifraDelDia({ disponible }: { disponible: DisponibleOk }) {
 
   return (
     <View style={estilos.tarjeta}>
-      <Text style={estilos.tenue}>{teExcedisteHoy ? 'Te excediste hoy por' : 'Puedes gastar hoy'}</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Text style={estilos.tenue}>{teExcedisteHoy ? 'Te excediste hoy por' : 'Puedes gastar hoy'}</Text>
+        <BotonOjito claro />
+      </View>
       <Text style={[estilos.cifra, teExcedisteHoy && { color: colores.heroRojo }]} adjustsFontSizeToFit numberOfLines={1}>
         {formatearMonto(cifra)}
       </Text>

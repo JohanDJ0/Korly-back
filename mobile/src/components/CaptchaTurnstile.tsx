@@ -1,4 +1,4 @@
-import { useImperativeHandle, useMemo, useRef, type Ref } from 'react';
+import { useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 
@@ -120,3 +120,20 @@ const estilos = StyleSheet.create({
   webview: { backgroundColor: 'transparent' },
   fallo: { color: colores.heroRojo, fontSize: 13, marginTop: 4 },
 });
+
+/**
+ * El captcha listo para un formulario: `elemento` se pinta donde va el widget, `token` se manda a Supabase y `reiniciar`
+ * se llama después de cada intento (el token es de un solo uso). Sin llave del sitio, `activo` es false y no pinta nada.
+ */
+export function useCaptcha() {
+  const clave = claveDeSitioTurnstile();
+  const control = useRef<ControlCaptcha>(null);
+  const [token, setToken] = useState<string | undefined>(undefined);
+  const [fallo, setFallo] = useState<string | undefined>(undefined);
+  function alRecibirToken(nuevo: string | undefined) {
+    setToken(nuevo);
+    if (nuevo) setFallo(undefined);
+  }
+  const elemento = clave ? <CaptchaTurnstile ref={control} clave={clave} onToken={alRecibirToken} onFallo={setFallo} fallo={fallo} /> : null;
+  return { activo: Boolean(clave), token, elemento, reiniciar: () => control.current?.reiniciar() };
+}

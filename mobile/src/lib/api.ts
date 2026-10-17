@@ -1,3 +1,7 @@
+import { File, Paths } from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+
+import { esErrorDeSesion, marcarSesionExpirada } from '@/lib/sesion-expirada';
 import { supabase } from '@/lib/supabase';
 
 const baseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
@@ -19,9 +23,10 @@ export class ApiError extends Error {
   }
 }
 
-/** Los dos códigos con los que el backend dice "esta sesión ya no sirve" (ver backend/src/shared/auth.ts). */
-function esErrorDeSesion(status: number, codigo: string | undefined): boolean {
-  return status === 401 && (codigo === 'TOKEN_INVALIDO' || codigo === 'NO_AUTENTICADO');
+/** La sesión ya no sirve: se cierra la local y se deja la marca para que Iniciar sesión explique por qué. */
+function cerrarSesionExpirada(): void {
+  marcarSesionExpirada();
+  void supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
 }
 
 /**
@@ -48,11 +53,43 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
   const cuerpo = await respuesta.json().catch(() => null);
 
   if (!respuesta.ok) {
-    if (esErrorDeSesion(respuesta.status, cuerpo?.codigo)) {
-      void supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
-    }
+    if (esErrorDeSesion(respuesta.status, cuerpo?.codigo)) cerrarSesionExpirada();
     throw new ApiError(respuesta.status, cuerpo?.codigo ?? 'ERROR_DESCONOCIDO', cuerpo?.mensaje ?? `Error ${respuesta.status}`);
   }
 
   return cuerpo as T;
+}
+
+/**
+ * Para endpoints que devuelven un archivo (hoy `/exportar/*.csv` y `/cuenta/datos`). En la web se descarga con un enlace
+ * sintético; en el teléfono no hay carpeta de "Descargas" a la que escribir directo, así que el archivo se guarda en la
+ * caché de la app y se abre el menú de compartir de Android (guardar en Drive, mandarlo por correo, etc.).
+ */
+export async function descargarArchivo(path: string, nombreArchivo: string): Promise<void> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  const headers = new Headers();
+  if (session) headers.set('Authorization', `Bearer ${session.access_token}`);
+
+  const respuesta = await fetch(`${baseUrl}${path}`, { headers });
+
+  if (!respuesta.ok) {
+    const cuerpo = await respuesta.json().catch(() => null);
+    if (esErrorDeSesion(respuesta.status, cuerpo?.codigo)) cerrarSesionExpirada();
+    throw new ApiError(respuesta.status, cuerpo?.codigo ?? 'ERROR_DESCONOCIDO', cuerpo?.mensaje ?? `Error ${respuesta.status}`);
+  }
+
+  const contenido = await respuesta.text();
+  const archivo = new File(Paths.cache, nombreArchivo);
+  if (archivo.exists) archivo.delete();
+  archivo.create();
+  archivo.write(contenido);
+
+  if (!(await Sharing.isAvailableAsync())) throw new ApiError(0, 'COMPARTIR_NO_DISPONIBLE', 'Este teléfono no permite compartir archivos.');
+  await Sharing.shareAsync(archivo.uri, {
+    mimeType: nombreArchivo.endsWith('.csv') ? 'text/csv' : 'application/json',
+    dialogTitle: 'Guardar o compartir el archivo',
+  });
 }

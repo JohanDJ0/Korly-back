@@ -1,4 +1,4 @@
-// Copia de frontend/src/lib/errores-auth.ts (sin cambios). Fase 3: pasa a un paquete compartido entre la web y la app.
+// Copia de frontend/src/lib/errores-auth.ts (sin cambios; regenerar con mobile/herramientas/copiar-de-la-web.mjs). Fase 3: paquete compartido.
 /**
  * Mensajes de error de Supabase Auth en español. Supabase los manda en inglés ("Invalid login credentials"); aquí se
  * traducen a algo que una persona entienda, por su `code` estable (supabase-js lo trae en `AuthError.code`) y, si no
