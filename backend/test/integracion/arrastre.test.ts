@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { resolverOcrearIdentidad } from '../../src/modulos/identidad/resolver-identidad.js';
 import { registrarIngreso } from '../../src/modulos/ingresos/registrar-ingreso.js';
 import { registrarGasto } from '../../src/modulos/gastos/registrar-gasto.js';
-import { crearPeriodo } from '../../src/modulos/periodos/crear-periodo.js';
+import { crearPeriodo, obtenerPeriodoActivo } from '../../src/modulos/periodos/crear-periodo.js';
 import { cerrarPeriodoManualmente } from '../../src/modulos/cierre/cerrar-periodo.js';
 import { decidirSobrante } from '../../src/modulos/cierre/decidir-sobrante.js';
 import { obtenerSaldoCuenta } from '../../src/modulos/ledger/registrar-movimiento.js';
@@ -97,9 +97,11 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
     const p2 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
     expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(0n);
 
-    // Se decide DESPUÉS de que p2 ya existe y está activo — nada lo
-    // reclama automáticamente en ese momento, solo al crear el próximo.
+    // Se decide DESPUÉS de que p2 ya existe y está activo: la siguiente lectura
+    // del periodo lo reclama hacia p2 (ver los tests de "decide después" abajo).
     await decidirSobrante(tenantId, p1.id, 'arrastrar');
+    await obtenerPeriodoActivo(tenantId, new Date('2026-08-16T12:00:00Z'));
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(1000n);
 
     await registrarGasto({
       tenantId,
@@ -109,13 +111,13 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
       fechaEfectiva: '2026-08-17',
       fechaReferencia: new Date('2026-08-17T00:00:00Z'),
     });
-    // p2 cierra con déficit (0 - 200): se arrastra automático.
+    // p2 cierra con 1000 heredados - 200 de gasto = 800 de sobrante.
     await cerrarPeriodoManualmente(tenantId, p2.id, new Date('2026-08-25T00:00:00Z'));
 
     const p3 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-09-01T00:00:00Z'));
 
-    // Reclama los dos: +1000 (de p1) y -200 (de p2) = 800.
-    expect(await obtenerSaldoCuenta(tenantId, p3.cuentaId)).toBe(800n);
+    // p1 ya se reclamó en p2; p3 solo hereda lo de p2 (800), sin duplicar los 1000.
+    expect(await obtenerSaldoCuenta(tenantId, p3.cuentaId)).toBe(0n);
   });
 
   it('un periodo que hereda un arrastre y luego cierra con su propia actividad calcula su sobrante correctamente (bug real, ver README)', async () => {
@@ -158,6 +160,60 @@ describe('materialización del arrastre (cuenta arrastre_pendiente)', () => {
     expect(resumen?.sobranteValorMinimo).toBe(1300n);
     // Y drenar debe dejar el periodo cerrado en exactamente 0 — nada
     // atorado para siempre en una cuenta que ya nunca se vuelve a tocar.
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(0n);
+  });
+
+  it('un sobrante decidido DESPUÉS de crear la quincena nueva llega a esa quincena en la siguiente lectura (bug real, 2026-10-16)', async () => {
+    const tenantId = await tenantNuevo();
+    const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: new Date('2026-08-01T00:00:00Z') });
+    await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
+
+    // Primero crea la quincena nueva y solo después decide qué hacer con el sobrante.
+    const p2 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(0n);
+    await decidirSobrante(tenantId, p1.id, 'arrastrar');
+
+    await obtenerPeriodoActivo(tenantId, new Date('2026-08-16T12:00:00Z'));
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(1000n);
+  });
+
+  it('reclamar es idempotente: leer el periodo varias veces no repite el arrastre', async () => {
+    const tenantId = await tenantNuevo();
+    const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: new Date('2026-08-01T00:00:00Z') });
+    await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
+    const p2 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+    await decidirSobrante(tenantId, p1.id, 'arrastrar');
+
+    for (let i = 0; i < 3; i++) await obtenerPeriodoActivo(tenantId, new Date('2026-08-16T12:00:00Z'));
+
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(1000n);
+  });
+
+  it('el barrido de 7 días también deja el sobrante en la quincena que ya estaba activa', async () => {
+    const tenantId = await tenantNuevo();
+    const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: new Date('2026-08-01T00:00:00Z') });
+    await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
+    const p2 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(0n);
+
+    // Nunca decidió: pasan más de 7 días desde el cierre y el barrido lo marca como arrastrado.
+    await obtenerPeriodoActivo(tenantId, new Date('2026-08-20T12:00:00Z'));
+
+    expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(1000n);
+  });
+
+  it('un sobrante que sigue pendiente (sin decidir y dentro del plazo) no se mueve al leer el periodo', async () => {
+    const tenantId = await tenantNuevo();
+    const p1 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-01T00:00:00Z'));
+    await registrarIngreso({ tenantId, periodoId: p1.id, monto: 1000n, moneda: 'MXN', fechaEfectiva: '2026-08-01', fechaReferencia: new Date('2026-08-01T00:00:00Z') });
+    await cerrarPeriodoManualmente(tenantId, p1.id, new Date('2026-08-10T00:00:00Z'));
+    const p2 = await crearPeriodo(tenantId, 'quincenal', new Date('2026-08-16T00:00:00Z'));
+
+    await obtenerPeriodoActivo(tenantId, new Date('2026-08-16T12:00:00Z'));
+
     expect(await obtenerSaldoCuenta(tenantId, p2.cuentaId)).toBe(0n);
   });
 

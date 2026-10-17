@@ -93,6 +93,17 @@ export async function cerrarPeriodoManualmente(
  * pooler de Supabase) y **vuelve a leer** el estado: las que esperaban encuentran el
  * trabajo ya hecho y siguen de largo. El camino normal (nada que resolver) no toma
  * ningún candado, así que las peticiones en paralelo de un día cualquiera no se estorban.
+ *
+ * **Un sobrante decidido como "arrastrar" se reclama hacia el periodo ACTIVO aquí mismo
+ * (hallazgo real, 2026-10-16, cuenta de producción).** `reclamarArrastresTx` solo corría al
+ * crear o promover un periodo, así que quien creaba la quincena nueva ANTES de decidir qué
+ * hacer con el sobrante (el orden más natural: Inicio ofrece "Empezar esta quincena" y el
+ * aviso del sobrante a la vez) lo veía "arrastrado" pero el dinero se quedaba en la cuenta
+ * `arrastre_pendiente` hasta la quincena siguiente: ni perdido ni duplicado, solo ausente.
+ * Lo mismo pasaba con el barrido de 7 días. Ahora, al final de cada resolución, lo que ya
+ * está decidido y sigue sin reclamar pasa al periodo activo. Es idempotente (el reclamo
+ * reserva cada fila con un UPDATE condicionado) y, de paso, repara solo los casos que ya
+ * se quedaron atorados: se aplican en la siguiente petición de esa persona.
  */
 export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fechaReferencia: Date = ahoraEnMexico()): Promise<void> {
   const leerActivo = async () => {
@@ -124,6 +135,11 @@ export async function resolverPendientesTx(tx: Ejecutor, tenantId: string, fecha
   }
 
   await resolverDecisionesVencidasTx(tx, tenantId, DIAS_DEFAULT_ARRASTRE, fechaReferencia);
+
+  // Lo decidido como "arrastrar" (por la persona o por el barrido) que aún no llegó a un periodo, pasa al activo.
+  // Si el activo se acaba de cerrar o no había, se vuelve a leer (puede haberse promovido un borrador).
+  const vigente = hayActivo ? activo : await leerActivo();
+  if (vigente) await reclamarArrastresTx(tx, tenantId, vigente.id, vigente.cuentaId, fechaReferencia);
 }
 
 /**
