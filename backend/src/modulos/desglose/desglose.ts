@@ -100,9 +100,9 @@ const ETIQUETA_PAGOS_TARJETA = 'Pagos de tarjeta';
  * **Los recurrentes van aparte** (pedido del usuario: fechados al inicio
  * del periodo inflaban siempre la semana 1, y de todos modos no son algo
  * que decidió gastar esa semana): no entran a `rubros` ni a `semanas`,
- * se listan en `recurrentes` y `totalVariable` es el resto. Un recurrente
- * que el usuario edita para un periodo se reemplaza por un gasto nuevo
- * sin `origenRecurrenteId` (editarGasto), y ese sí cuenta como variable.
+ * se listan en `recurrentes` y `totalVariable` es el resto. Un cobro de
+ * recurrente que el usuario edita (editarGasto) sigue siendo de ese
+ * recurrente: la fila corregida hereda `origenRecurrenteId` (desde 2026-10-16).
  *
  * **Fecha de las mensualidades de tarjeta:** se materializan fechadas al
  * inicio del periodo; aquí se ubican por su vencimiento real.

@@ -7,7 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { SelectorCategoria } from '@/components/SelectorCategoria';
+import { useActualizarRecurrente } from '@/hooks/use-actualizar-recurrente';
 import { useCrearRecurrente } from '@/hooks/use-crear-recurrente';
+import type { GastoRecurrente } from '@/hooks/use-recurrentes';
 
 const esquemaRecurrente = z
   .object({
@@ -26,14 +28,22 @@ type RecurrenteFormEntrada = z.input<typeof esquemaRecurrente>;
 type RecurrenteFormSalida = z.output<typeof esquemaRecurrente>;
 
 interface FormularioRecurrenteProps {
+  /** Con un recurrente se edita (todo precargado); sin él, se crea uno nuevo. */
+  recurrente?: GastoRecurrente;
   onCreado?: () => void;
   /** Ver el comentario en FormularioGasto.tsx — mismo hallazgo real, mismo criterio. */
   onCancelar?: () => void;
 }
 
-export function FormularioRecurrente({ onCreado, onCancelar }: FormularioRecurrenteProps) {
+/**
+ * Crear o editar un gasto recurrente. Editar cambia la plantilla: aplica desde el próximo cobro y lo ya cobrado no cambia
+ * (si hace falta, se corrige en Historial) — por eso el formulario lo dice al pie.
+ */
+export function FormularioRecurrente({ recurrente, onCreado, onCancelar }: FormularioRecurrenteProps) {
   const crearRecurrente = useCrearRecurrente();
-  const [categoriaId, setCategoriaIdState] = useState('');
+  const actualizarRecurrente = useActualizarRecurrente();
+  const mutacion = recurrente ? actualizarRecurrente : crearRecurrente;
+  const [categoriaId, setCategoriaIdState] = useState(recurrente?.categoriaId ?? '');
 
   const {
     register,
@@ -43,12 +53,28 @@ export function FormularioRecurrente({ onCreado, onCancelar }: FormularioRecurre
     formState: { errors },
   } = useForm<RecurrenteFormEntrada, unknown, RecurrenteFormSalida>({
     resolver: zodResolver(esquemaRecurrente),
-    defaultValues: { frecuencia: 'quincenal' },
+    defaultValues: recurrente
+      ? { descripcion: recurrente.descripcion, monto: recurrente.monto.valorMinimo / 100, frecuencia: recurrente.frecuencia, diaMes: recurrente.diaMes ?? undefined }
+      : { frecuencia: 'quincenal' },
   });
 
   const frecuencia = watch('frecuencia');
 
   function onSubmit(datos: RecurrenteFormSalida) {
+    if (recurrente) {
+      actualizarRecurrente.mutate(
+        {
+          recurrenteId: recurrente.id,
+          descripcion: datos.descripcion,
+          monto: { valorMinimo: Math.round(datos.monto * 100), moneda: recurrente.monto.moneda },
+          frecuencia: datos.frecuencia,
+          diaMes: datos.frecuencia === 'mensual' ? datos.diaMes : null,
+          categoriaId: categoriaId || null,
+        },
+        { onSuccess: () => onCreado?.() }
+      );
+      return;
+    }
     crearRecurrente.mutate(
       {
         descripcion: datos.descripcion,
@@ -106,10 +132,13 @@ export function FormularioRecurrente({ onCreado, onCancelar }: FormularioRecurre
         <SelectorCategoria id="categoria-recurrente" value={categoriaId} onChange={setCategoriaIdState} />
       </div>
 
-      {crearRecurrente.isError && <p className="text-sm text-destructive">{crearRecurrente.error.message}</p>}
+      {recurrente && (
+        <p className="text-muted-foreground text-[12.5px]">El cambio aplica desde el próximo cobro. Lo que ya se cobró no cambia; si hace falta, corrígelo en Historial.</p>
+      )}
+      {mutacion.isError && <p className="text-sm text-destructive">{mutacion.error.message}</p>}
       <div className="flex gap-2">
-        <Button type="submit" disabled={crearRecurrente.isPending}>
-          {crearRecurrente.isPending ? 'Guardando…' : 'Guardar'}
+        <Button type="submit" disabled={mutacion.isPending}>
+          {mutacion.isPending ? 'Guardando…' : 'Guardar'}
         </Button>
         {onCancelar && (
           <Button type="button" variant="ghost" onClick={onCancelar}>

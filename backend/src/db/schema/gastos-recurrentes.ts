@@ -12,9 +12,10 @@ export type FrecuenciaRecurrente = (typeof FRECUENCIAS_RECURRENTE)[number];
  * "gastos recurrentes/suscripciones" — brecha F2). Es una plantilla,
  * no un hecho del ledger (mismo estatus que `metas`/`categorias`): se
  * puede editar y pausar libremente, nunca genera un movimiento por sí
- * misma. `activo=false` es el "eliminar" de esta tabla — nunca hard
- * delete, porque los gastos ya materializados (`gastos.origenRecurrenteId`)
- * apuntan aquí y perderían su procedencia.
+ * misma. `activo=false` es "pausar"; "eliminar" marca `eliminadoEn` (y lo
+ * pausa) — nunca hard delete, porque los gastos ya materializados
+ * (`gastos.origenRecurrenteId`) apuntan aquí y perderían su procedencia.
+ * Un recurrente eliminado ya no se lista ni se cobra; lo ya cobrado se queda.
  *
  * `diaMes` solo tiene sentido para `'mensual'`: como los periodos son
  * quincenas ancladas a calendario (1-15, 16-fin — ADR-004), un cargo
@@ -35,6 +36,7 @@ export const gastosRecurrentes = pgTable(
     frecuencia: text('frecuencia').notNull().$type<FrecuenciaRecurrente>(),
     diaMes: smallint('dia_mes'),
     activo: boolean('activo').notNull().default(true),
+    eliminadoEn: timestamp('eliminado_en', { withTimezone: true }),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [

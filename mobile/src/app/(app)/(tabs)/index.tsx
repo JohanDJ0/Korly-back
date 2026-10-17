@@ -1,5 +1,5 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { AlertTriangle, CreditCard, Plus, Settings } from 'lucide-react-native';
+import { AlertTriangle, CalendarClock, CreditCard, Plus, Settings } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -18,9 +18,11 @@ import { useGastos } from '@/hooks/use-gastos';
 import { useGuia } from '@/hooks/use-guia';
 import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
+import { usePeriodos } from '@/hooks/use-periodos';
 import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
-import { formatearRangoFechas, quincenaDeHoy } from '@/lib/fechas';
+import { formatearRangoFechas, hoyISO, quincenaDeHoy } from '@/lib/fechas';
+import { avisoFinDeQuincena } from '@/lib/fin-de-quincena';
 import { pasoDeInicio, TEXTOS_GUIA } from '@/lib/guia';
 import { colores } from '@/lib/tema';
 
@@ -38,6 +40,10 @@ export default function Inicio() {
   const { data: periodoActivo } = usePeriodoActivo();
   const { data: resumenPendiente } = useResumenPendiente();
   const crearPeriodo = useCrearPeriodo();
+  const { data: periodos } = usePeriodos();
+  // Quien ya tuvo quincenas no necesita la bienvenida en "Empecemos": se le dice que la anterior se cerró sola.
+  const yaTuvoQuincenas = periodos?.some((p) => p.estado === 'cerrado' || p.estado === 'archivado') ?? false;
+  const avisoCierre = periodoActivo ? avisoFinDeQuincena(periodoActivo.fechaFin, hoyISO()) : null;
   const quincena = quincenaDeHoy();
   const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
   const [mostrarFormularioIngreso, setMostrarFormularioIngreso] = useState(false);
@@ -94,6 +100,17 @@ export default function Inicio() {
 
         {periodoActivo && <Text style={estilos.quincena}>Quincena · {formatearRangoFechas(periodoActivo.fechaInicio, periodoActivo.fechaFin)}</Text>}
 
+        {avisoCierre && (
+          // Hallazgo real: un usuario no sabía que la quincena se cierra sola (ver lib/fin-de-quincena.ts).
+          <View accessibilityRole="summary" style={estilos.avisoCierre}>
+            <CalendarClock size={16} color="#146155" style={{ marginTop: 2 }} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text style={{ fontSize: 13.5, fontWeight: '700', color: '#146155' }}>{avisoCierre.titulo}</Text>
+              <Text style={{ fontSize: 12.5, lineHeight: 18, color: '#146155' }}>{avisoCierre.texto}</Text>
+            </View>
+          </View>
+        )}
+
         {resumenPendiente && (
           // Hallazgo real de la web: sin este aviso, un sobrante sin decidir parecía dinero que había desaparecido.
           <View style={estilos.avisoDorado}>
@@ -132,10 +149,11 @@ export default function Inicio() {
 
         {sinPeriodoActivo && (
           <Tarjeta>
-            <Titulo>Empecemos</Titulo>
+            <Titulo>{yaTuvoQuincenas ? 'Empieza tu nueva quincena' : 'Empecemos'}</Titulo>
             <TextoTenue>
-              Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Hoy estás en la quincena del {formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}. No
-              importa si la quincena ya va a la mitad: puedes empezar hoy con lo que tengas.
+              {yaTuvoQuincenas
+                ? `Tu quincena anterior ya se cerró sola. Empieza la del ${formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}.${resumenPendiente ? ' Lo que te sobró lo decides en el aviso de arriba.' : ''}`
+                : `Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Hoy estás en la quincena del ${formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}. No importa si la quincena ya va a la mitad: puedes empezar hoy con lo que tengas.`}
             </TextoTenue>
             <Resaltado activo={pasoGuia === 'quincena'} radio={14}>
               <Boton onPress={() => crearPeriodo.mutate()} cargando={crearPeriodo.isPending}>
@@ -259,6 +277,7 @@ export default function Inicio() {
 const estilos = StyleSheet.create({
   encabezado: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   quincena: { fontSize: 13, color: colores.textoTenue, marginTop: -4 },
+  avisoCierre: { flexDirection: 'row', gap: 10, backgroundColor: '#eaf5f1', borderRadius: 16, paddingHorizontal: 14, paddingVertical: 12 },
   avisoDorado: { flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#F6DE9E', backgroundColor: '#FFF6E1', borderRadius: 16, padding: 12 },
   circuloDorado: { width: 30, height: 30, borderRadius: 15, backgroundColor: colores.dorado, alignItems: 'center', justifyContent: 'center' },
   avisoPrimario: { gap: 6, borderWidth: 1, borderColor: 'rgba(22,127,108,0.3)', backgroundColor: 'rgba(22,127,108,0.05)', borderRadius: 16, padding: 14 },

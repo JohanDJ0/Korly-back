@@ -23,7 +23,7 @@ const EXCLUIR = new Set(['use-turnstile.ts', 'use-guia.ts', 'use-formatear-monto
 const pares = readdirSync(resolve(raiz, 'frontend/src/hooks'))
   .filter((f) => f.endsWith('.ts') && !f.includes('.test.') && !EXCLUIR.has(f))
   .map((f) => [`hooks/${f}`, `hooks/${f}`]);
-pares.push(['lib/errores-auth.ts', 'lib/errores-auth.ts'], ['lib/fechas.ts', 'lib/fechas.ts'], ['lib/guia.ts', 'lib/guia.ts']);
+pares.push(['lib/errores-auth.ts', 'lib/errores-auth.ts'], ['lib/fechas.ts', 'lib/fechas.ts'], ['lib/guia.ts', 'lib/guia.ts'], ['lib/fin-de-quincena.ts', 'lib/fin-de-quincena.ts']);
 // Igual que en la web, salvo que aquí el `localStorage` lo instala expo-sqlite: esa línea se agrega al principio.
 pares.push(['stores/guia-store.ts', 'stores/guia-store.ts', "import 'expo-sqlite/localStorage/install';\n\n"]);
 

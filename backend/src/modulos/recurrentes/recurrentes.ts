@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, isNull } from 'drizzle-orm';
 import { gastos } from '../../db/schema/gastos.js';
 import { FRECUENCIAS_RECURRENTE, gastosRecurrentes, type FrecuenciaRecurrente } from '../../db/schema/gastos-recurrentes.js';
 import { periodos } from '../../db/schema/periodos.js';
@@ -201,7 +201,7 @@ export async function listarGastosRecurrentes(tenantId: string): Promise<GastoRe
     const filas = await tx
       .select(COLUMNAS_RECURRENTE)
       .from(gastosRecurrentes)
-      .where(eq(gastosRecurrentes.tenantId, tenantId))
+      .where(and(eq(gastosRecurrentes.tenantId, tenantId), isNull(gastosRecurrentes.eliminadoEn)))
       .orderBy(desc(gastosRecurrentes.activo), desc(gastosRecurrentes.creadoEn));
     return filas as GastoRecurrente[];
   });
@@ -213,7 +213,7 @@ async function obtenerGastoRecurrentePorIdTx(tx: Ejecutor, tenantId: string, id:
   const [fila] = await tx
     .select(COLUMNAS_RECURRENTE)
     .from(gastosRecurrentes)
-    .where(and(eq(gastosRecurrentes.tenantId, tenantId), eq(gastosRecurrentes.id, id)))
+    .where(and(eq(gastosRecurrentes.tenantId, tenantId), eq(gastosRecurrentes.id, id), isNull(gastosRecurrentes.eliminadoEn)))
     .limit(1);
   return (fila as GastoRecurrente) ?? null;
 }
@@ -285,7 +285,25 @@ export async function listarGastosRecurrentesActivosTx(tx: Ejecutor, tenantId: s
   const filas = await tx
     .select(COLUMNAS_RECURRENTE)
     .from(gastosRecurrentes)
-    .where(and(eq(gastosRecurrentes.tenantId, tenantId), eq(gastosRecurrentes.activo, true)))
+    .where(and(eq(gastosRecurrentes.tenantId, tenantId), eq(gastosRecurrentes.activo, true), isNull(gastosRecurrentes.eliminadoEn)))
     .orderBy(asc(gastosRecurrentes.creadoEn));
   return filas as GastoRecurrente[];
+}
+
+/**
+ * "Eliminar" un recurrente (pedido del usuario, 2026-10-16: tenía la renta duplicada y solo podía pausarla). La fila no
+ * se borra —los gastos ya cobrados apuntan a ella (`gastos.origenRecurrenteId`)—: se marca `eliminadoEn` y se pausa.
+ * Desde ahí ya no se lista, no se puede editar y no se vuelve a cobrar; lo que ya se cobró se queda en el historial.
+ */
+export async function eliminarGastoRecurrente(tenantId: string, id: string): Promise<void> {
+  await conTenant(tenantId, async (tx) => {
+    const existente = await obtenerGastoRecurrentePorIdTx(tx, tenantId, id);
+    if (!existente) {
+      throw new ErrorDominio('RECURRENTE_NO_ENCONTRADO', 'El gasto recurrente especificado no existe');
+    }
+    await tx
+      .update(gastosRecurrentes)
+      .set({ eliminadoEn: new Date(), activo: false })
+      .where(and(eq(gastosRecurrentes.tenantId, tenantId), eq(gastosRecurrentes.id, id)));
+  });
 }

@@ -1,11 +1,12 @@
 import { Plus } from 'lucide-react-native';
 import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import { SelectorCategoriaChips } from '@/components/SelectorCategoriaChips';
-import { Boton, Campo, Cargando, Encabezado, HojaInferior, Pantalla, Segmentado, Tarjeta, TextoError, TextoTenue } from '@/components/ui';
+import { Boton, Campo, Cargando, confirmar, Encabezado, HojaInferior, Pantalla, Segmentado, Tarjeta, TextoError, TextoTenue } from '@/components/ui';
 import { useActualizarRecurrente } from '@/hooks/use-actualizar-recurrente';
 import { useCrearRecurrente } from '@/hooks/use-crear-recurrente';
+import { useEliminarRecurrente } from '@/hooks/use-eliminar-recurrente';
 import { useFormatearMonto } from '@/hooks/use-formatear-monto';
 import { useRecurrentes, type FrecuenciaRecurrente, type GastoRecurrente } from '@/hooks/use-recurrentes';
 import { pesosACentavos } from '@/lib/dinero';
@@ -44,46 +45,77 @@ export default function Recurrentes() {
 
 const etiquetaFrecuencia = (r: GastoRecurrente) => (r.frecuencia === 'quincenal' ? 'Cada quincena' : `Mensual, día ${r.diaMes}`);
 
-/** Pausar/reanudar es el "eliminar" de esta plantilla: nunca se borra (backend/README.md, "Gastos recurrentes"). */
+/**
+ * Igual que frontend/src/components/FilaRecurrente.tsx: editar (aplica desde el próximo cobro), pausar/reanudar y eliminar
+ * (deja de cobrarse y de listarse; lo ya cobrado se queda en el historial).
+ */
 function FilaRecurrente({ recurrente }: { recurrente: GastoRecurrente }) {
   const formatearMonto = useFormatearMonto();
   const actualizarRecurrente = useActualizarRecurrente();
+  const eliminarRecurrente = useEliminarRecurrente();
+  const [editando, setEditando] = useState(false);
   const Icono = iconoCategoria(recurrente.descripcion);
+  const error = actualizarRecurrente.error ?? eliminarRecurrente.error;
 
   return (
-    <Tarjeta style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, opacity: recurrente.activo ? 1 : 0.55 }}>
-      <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: '#eaf5f1', alignItems: 'center', justifyContent: 'center' }}>
-        <Icono size={17} color="#146155" />
+    <Tarjeta style={{ padding: 14, gap: 8, opacity: recurrente.activo ? 1 : 0.55 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <View style={{ width: 38, height: 38, borderRadius: 11, backgroundColor: '#eaf5f1', alignItems: 'center', justifyContent: 'center' }}>
+          <Icono size={17} color="#146155" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 14.5, fontWeight: '700', color: colores.texto }}>{recurrente.descripcion}</Text>
+          <Text style={{ fontSize: 12.5, color: colores.textoTenue }}>
+            {formatearMonto(recurrente.monto)} — {etiquetaFrecuencia(recurrente)}
+            {!recurrente.activo ? ' — Pausado' : ''}
+          </Text>
+        </View>
       </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 14.5, fontWeight: '700', color: colores.texto }}>{recurrente.descripcion}</Text>
-        <Text style={{ fontSize: 12.5, color: colores.textoTenue }}>
-          {formatearMonto(recurrente.monto)} — {etiquetaFrecuencia(recurrente)}
-          {!recurrente.activo ? ' — Pausado' : ''}
-        </Text>
-        {actualizarRecurrente.isError && <TextoError>{actualizarRecurrente.error.message}</TextoError>}
+      {error && <TextoError>{error.message}</TextoError>}
+      <View style={{ flexDirection: 'row', gap: 8 }}>
+        <Boton chico variante="contorno" style={{ flex: 1 }} onPress={() => setEditando(true)}>
+          Editar
+        </Boton>
+        <Boton
+          chico
+          variante={recurrente.activo ? 'contorno' : 'primario'}
+          style={{ flex: 1 }}
+          cargando={actualizarRecurrente.isPending}
+          onPress={() => actualizarRecurrente.mutate({ recurrenteId: recurrente.id, activo: !recurrente.activo })}
+        >
+          {recurrente.activo ? 'Pausar' : 'Reanudar'}
+        </Boton>
       </View>
-      <Boton
-        chico
-        variante={recurrente.activo ? 'contorno' : 'primario'}
-        cargando={actualizarRecurrente.isPending}
-        onPress={() => actualizarRecurrente.mutate({ recurrenteId: recurrente.id, activo: !recurrente.activo })}
+      <Pressable
+        onPress={() =>
+          confirmar(`¿Eliminar "${recurrente.descripcion}"?`, 'Eliminar', () => eliminarRecurrente.mutate(recurrente.id), 'Ya no se cobrará en las siguientes quincenas. Lo que ya se cobró se queda en tu historial.')
+        }
+        disabled={eliminarRecurrente.isPending}
+        style={{ alignSelf: 'flex-start', paddingVertical: 4 }}
       >
-        {recurrente.activo ? 'Pausar' : 'Reanudar'}
-      </Boton>
+        <Text style={{ fontSize: 13, color: colores.peligro, fontWeight: '600' }}>Eliminar</Text>
+      </Pressable>
+      {editando && (
+        <HojaInferior titulo="Editar gasto recurrente" onCerrar={() => setEditando(false)}>
+          <FormularioRecurrente recurrente={recurrente} onCreado={() => setEditando(false)} />
+        </HojaInferior>
+      )}
     </Tarjeta>
   );
 }
 
 const MENSAJE_DIA = 'Indica el día del mes en que se cobra (de 1 a 31)';
 
-function FormularioRecurrente({ onCreado }: { onCreado: () => void }) {
+/** Crear o editar (con `recurrente`, todo precargado). Editar aplica desde el próximo cobro; lo ya cobrado no cambia. */
+function FormularioRecurrente({ recurrente, onCreado }: { recurrente?: GastoRecurrente; onCreado: () => void }) {
   const crearRecurrente = useCrearRecurrente();
-  const [descripcion, setDescripcion] = useState('');
-  const [monto, setMonto] = useState('');
-  const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrente>('quincenal');
-  const [diaMes, setDiaMes] = useState('');
-  const [categoriaId, setCategoriaId] = useState('');
+  const actualizarRecurrente = useActualizarRecurrente();
+  const mutacion = recurrente ? actualizarRecurrente : crearRecurrente;
+  const [descripcion, setDescripcion] = useState(recurrente?.descripcion ?? '');
+  const [monto, setMonto] = useState(recurrente ? String(recurrente.monto.valorMinimo / 100) : '');
+  const [frecuencia, setFrecuencia] = useState<FrecuenciaRecurrente>(recurrente?.frecuencia ?? 'quincenal');
+  const [diaMes, setDiaMes] = useState(recurrente?.diaMes ? String(recurrente.diaMes) : '');
+  const [categoriaId, setCategoriaId] = useState(recurrente?.categoriaId ?? '');
   const [errores, setErrores] = useState<{ descripcion?: string; monto?: string; diaMes?: string }>({});
 
   function guardar() {
@@ -96,6 +128,20 @@ function FormularioRecurrente({ onCreado }: { onCreado: () => void }) {
     };
     setErrores(nuevos);
     if (Object.values(nuevos).some(Boolean) || centavos === null) return;
+    if (recurrente) {
+      actualizarRecurrente.mutate(
+        {
+          recurrenteId: recurrente.id,
+          descripcion: descripcion.trim(),
+          monto: { valorMinimo: centavos, moneda: recurrente.monto.moneda },
+          frecuencia,
+          diaMes: frecuencia === 'mensual' ? dia : null,
+          categoriaId: categoriaId || null,
+        },
+        { onSuccess: onCreado }
+      );
+      return;
+    }
     crearRecurrente.mutate(
       { descripcion: descripcion.trim(), monto: { valorMinimo: centavos, moneda: 'MXN' }, frecuencia, diaMes: frecuencia === 'mensual' ? dia : undefined, categoriaId: categoriaId || undefined },
       { onSuccess: onCreado }
@@ -120,8 +166,9 @@ function FormularioRecurrente({ onCreado }: { onCreado: () => void }) {
         <Text style={{ fontSize: 14, fontWeight: '600', color: colores.texto }}>Categoría</Text>
         <SelectorCategoriaChips value={categoriaId} onChange={setCategoriaId} />
       </View>
-      {crearRecurrente.isError && <TextoError>{crearRecurrente.error.message}</TextoError>}
-      <Boton onPress={guardar} cargando={crearRecurrente.isPending}>
+      {recurrente && <TextoTenue>El cambio aplica desde el próximo cobro. Lo que ya se cobró no cambia; si hace falta, corrígelo en Historial.</TextoTenue>}
+      {mutacion.isError && <TextoError>{mutacion.error.message}</TextoError>}
+      <Boton onPress={guardar} cargando={mutacion.isPending}>
         Guardar
       </Boton>
     </>

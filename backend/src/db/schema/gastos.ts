@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { pgPolicy, pgTable, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { type AnyPgColumn, pgPolicy, pgTable, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 import { categorias } from './categorias.js';
 import { gastosRecurrentes } from './gastos-recurrentes.js';
 import { movimientos } from './ledger.js';
@@ -45,12 +45,18 @@ export const gastos = pgTable(
      * reintento.
      */
     origenRecurrenteId: uuid('origen_recurrente_id').references(() => gastosRecurrentes.id),
+    /**
+     * Si esta fila es la versión corregida de otro gasto (`editarGasto`), el gasto que corrige. Sirve para que un cobro
+     * de un recurrente que la persona edita (p. ej. la renta bajó) siga contando como recurrente: la fila nueva hereda
+     * `origenRecurrenteId`, y el índice único de abajo ignora las correcciones (la fila original sigue existiendo).
+     */
+    corrigeGastoId: uuid('corrige_gasto_id').references((): AnyPgColumn => gastos.id),
     creadoEn: timestamp('creado_en', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
     uniqueIndex('gastos_recurrente_periodo_unico')
       .on(t.origenRecurrenteId, t.periodoId)
-      .where(sql`${t.origenRecurrenteId} IS NOT NULL`),
+      .where(sql`${t.origenRecurrenteId} IS NOT NULL AND ${t.corrigeGastoId} IS NULL`),
     pgPolicy('gastos_aislamiento_tenant', {
       for: 'all',
       to: appBackend,

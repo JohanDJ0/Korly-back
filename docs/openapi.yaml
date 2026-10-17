@@ -1223,6 +1223,22 @@ paths:
           $ref: '#/components/responses/ErrorValidacion'
         '404':
           $ref: '#/components/responses/ErrorNoEncontrado'
+    delete:
+      tags: [Recurrentes]
+      summary: Eliminar un gasto recurrente
+      description: >
+        No borra la fila (los gastos ya cobrados apuntan a ella): la marca como eliminada y la pausa. Ya no se lista, no se
+        puede editar y no se vuelve a cobrar; lo que ya se cobró se queda en el historial.
+      parameters:
+        - name: recurrenteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204':
+          description: Recurrente eliminado
+        '404':
+          $ref: '#/components/responses/ErrorNoEncontrado'
 
   # ---------- TARJETAS ----------
   /tarjetas:

@@ -1,4 +1,4 @@
-import { AlertTriangle, CreditCard, Plus, Settings } from 'lucide-react';
+import { AlertTriangle, CalendarClock, CreditCard, Plus, Settings } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
@@ -22,10 +22,12 @@ import { useGastos } from '@/hooks/use-gastos';
 import { useGuia } from '@/hooks/use-guia';
 import { usePagosTarjetaPeriodo } from '@/hooks/use-pagos-tarjeta-periodo';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
+import { usePeriodos } from '@/hooks/use-periodos';
 import { useResumenPendiente } from '@/hooks/use-resumen-pendiente';
 import { ApiError } from '@/lib/api';
 import { useFormatearMonto } from '@/hooks/use-formatear-monto';
-import { formatearRangoFechas, quincenaDeHoy } from '@/lib/fechas';
+import { formatearRangoFechas, hoyISO, quincenaDeHoy } from '@/lib/fechas';
+import { avisoFinDeQuincena } from '@/lib/fin-de-quincena';
 import { pasoDeInicio, TEXTOS_GUIA } from '@/lib/guia';
 import { cn } from '@/lib/utils';
 
@@ -56,6 +58,10 @@ export function Home() {
   const { data: periodoActivo } = usePeriodoActivo();
   const { data: resumenPendiente } = useResumenPendiente();
   const crearPeriodo = useCrearPeriodo();
+  const { data: periodos } = usePeriodos();
+  // Quien ya tuvo quincenas no necesita la bienvenida en "Empecemos": se le dice que la anterior se cerró sola.
+  const yaTuvoQuincenas = periodos?.some((p) => p.estado === 'cerrado' || p.estado === 'archivado') ?? false;
+  const avisoCierre = periodoActivo ? avisoFinDeQuincena(periodoActivo.fechaFin, hoyISO()) : null;
   const quincena = quincenaDeHoy();
   const [mostrarFormularioGasto, setMostrarFormularioGasto] = useState(false);
   const [mostrarFormularioIngreso, setMostrarFormularioIngreso] = useState(false);
@@ -132,6 +138,18 @@ export function Home() {
         </p>
       )}
 
+      {avisoCierre && (
+        // Hallazgo real: un usuario no sabía que la quincena se cierra sola y se enredó al intentar empezar la siguiente
+        // un día antes. Desde tres días antes se explica qué va a pasar (ver lib/fin-de-quincena.ts).
+        <div role="status" className="bg-secondary text-secondary-foreground mx-5 mb-2 flex gap-2.5 rounded-2xl px-3.5 py-3 sm:mx-0 sm:mb-5">
+          <CalendarClock size={16} className="mt-0.5 shrink-0" />
+          <div className="flex flex-col gap-0.5">
+            <p className="text-[13.5px] font-semibold">{avisoCierre.titulo}</p>
+            <p className="text-[12.5px] leading-snug">{avisoCierre.texto}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col gap-3.5 px-5 pt-2 pb-4 sm:px-0 sm:pt-0 lg:grid lg:grid-cols-[1fr_360px] lg:items-start lg:gap-8 xl:grid-cols-[1fr_420px] xl:gap-10">
         <div className="flex flex-col gap-3.5">
           {
@@ -196,10 +214,19 @@ export function Home() {
           {sinPeriodoActivo && (
             <Card className="rounded-2xl">
               <CardHeader>
-                <CardTitle>Empecemos</CardTitle>
+                <CardTitle>{yaTuvoQuincenas ? 'Empieza tu nueva quincena' : 'Empecemos'}</CardTitle>
                 <CardDescription>
-                  Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Hoy estás en la quincena del{' '}
-                  {formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}. No importa si la quincena ya va a la mitad: puedes empezar hoy con lo que tengas.
+                  {yaTuvoQuincenas ? (
+                    <>
+                      Tu quincena anterior ya se cerró sola. Empieza la del {formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}.
+                      {resumenPendiente ? ' Lo que te sobró lo decides en el aviso de arriba.' : ''}
+                    </>
+                  ) : (
+                    <>
+                      Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Hoy estás en la quincena del{' '}
+                      {formatearRangoFechas(quincena.fechaInicio, quincena.fechaFin)}. No importa si la quincena ya va a la mitad: puedes empezar hoy con lo que tengas.
+                    </>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>

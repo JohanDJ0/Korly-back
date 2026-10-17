@@ -1384,9 +1384,11 @@ Extensión sobre `docs/openapi.yaml` (documento-maestro-v2.md §12,
 ser la de mejor RICE entre las brechas documentadas). Tabla nueva
 `gastos_recurrentes`: es una **plantilla**, no un hecho del ledger —
 mismo estatus que `metas`/`categorias` (mutable, se puede editar
-libremente). `activo=false` (pausar) es el "eliminar" de esta tabla:
-nunca hard delete, porque los gastos ya materializados guardan
-`gastos.origenRecurrenteId` apuntando aquí y perderían su procedencia.
+libremente). `activo=false` es pausar; eliminar (desde 2026-10-16, migración
+0029) marca `eliminado_en` y lo pausa: nunca hard delete, porque los gastos
+ya materializados guardan `gastos.origenRecurrenteId` apuntando aquí y
+perderían su procedencia. Un recurrente eliminado ya no se lista, no se
+edita y no se vuelve a cobrar; lo ya cobrado se queda en el historial.
 
 **Frecuencias:** `'quincenal'` (se materializa en cada periodo) o
 `'mensual'` con un `diaMes` (1-31) fijo. Como los periodos son
@@ -1409,8 +1411,8 @@ periodo, con `origenRecurrenteId` para trazabilidad — expuesto en
 distinga un cargo automático de uno capturado a mano.
 
 Un índice único parcial `(origenRecurrenteId, periodoId)` en `gastos`
-impide duplicar la materialización de un mismo recurrente para el
-mismo periodo — existe como invariante de base de datos (defensa en
+(sin contar las correcciones, ver abajo) impide duplicar la
+materialización de un mismo recurrente para el mismo periodo — existe como invariante de base de datos (defensa en
 profundidad), aunque en el camino real no hay ningún escenario que lo
 dispare: `materializarRecurrentesTx` corre una sola vez, dentro de la
 misma transacción que crea o promueve el periodo, nunca dos veces para
@@ -1418,10 +1420,18 @@ el mismo `periodo.id`.
 
 **Endpoints:** `GET/POST /gastos-recurrentes`, `PATCH
 /gastos-recurrentes/{id}` (edita cualquier campo, incluido `activo`
-para pausar/reanudar — no hay `DELETE`). Editar el monto o la
-frecuencia de un recurrente solo afecta materializaciones futuras: los
-gastos ya generados son filas de `gastos` independientes e inmutables,
-igual que cualquier otro gasto.
+para pausar/reanudar) y `DELETE /gastos-recurrentes/{id}` (204; lo marca
+como eliminado). Editar el monto o la frecuencia de un recurrente solo
+afecta materializaciones futuras: los gastos ya generados son filas de
+`gastos` independientes e inmutables, igual que cualquier otro gasto.
+
+**Corregir un cobro ya aplicado** (p. ej. la renta bajó, 2026-10-16):
+`editarGasto` sobre un gasto con `origenRecurrenteId` crea la fila
+corregida con el mismo `origenRecurrenteId` y `corrige_gasto_id`
+apuntando al original. Así sigue siendo "automático" (`esRecurrente`),
+sigue fuera de "gastado hoy" y sigue en "Recurrentes" del desglose. El
+índice único ignora las filas con `corrige_gasto_id`, porque la original
+sigue existiendo (neutralizada por su reversión).
 
 Validado contra Postgres real (`test/integracion/recurrentes.test.ts`):
 validaciones de entrada, BOLA en categoría y en el propio recurrente,

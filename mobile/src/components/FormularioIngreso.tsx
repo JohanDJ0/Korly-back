@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { CampoFecha } from '@/components/CampoFecha';
 import { Boton, Campo, TextoError } from '@/components/ui';
@@ -7,6 +7,7 @@ import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { useRegistrarIngreso } from '@/hooks/use-registrar-ingreso';
 import { pesosACentavos } from '@/lib/dinero';
 import { formatearRangoFechas, hoyISO } from '@/lib/fechas';
+import { NOTA_INGRESO_FIN_DE_QUINCENA, quincenaPorTerminar } from '@/lib/fin-de-quincena';
 
 /**
  * Igual que frontend/src/components/FormularioIngreso.tsx. `primerIngreso`: la tarjeta "Registra tu ingreso" pregunta por
@@ -42,6 +43,10 @@ export function FormularioIngreso({ periodoId, onRegistrado, primerIngreso = fal
         onCambio={setFecha}
         ayuda={periodo ? `Es solo la fecha en que te llegó el dinero. Tu quincena es del ${formatearRangoFechas(periodo.fechaInicio, periodo.fechaFin)} y no cambia por esta fecha.` : undefined}
       />
+      {periodo && quincenaPorTerminar(periodo.fechaFin, hoyISO()) && (
+        // En los últimos días: un pago adelantado de la quincena siguiente registrado hoy inflaría la cifra de estos días.
+        <Text style={{ backgroundColor: '#eaf5f1', color: '#146155', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8, fontSize: 12.5, lineHeight: 18 }}>{NOTA_INGRESO_FIN_DE_QUINCENA}</Text>
+      )}
       {registrarIngreso.isError && <TextoError>{registrarIngreso.error.message}</TextoError>}
       <Boton onPress={enviar} cargando={registrarIngreso.isPending}>
         Registrar ingreso

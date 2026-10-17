@@ -86,7 +86,8 @@ export const TEXTOS_GUIA = {
       'Te decimos cuánto puedes gastar hoy. Solo necesitas dos datos: cuánto recibes y en qué gastas. Puedes empezar cuando quieras, aunque la quincena ya vaya a la mitad. Te acompañamos en el primer paso.',
   },
   quincena: {
-    texto: 'Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Cada quincena tiene sus propios ingresos y gastos.',
+    texto:
+      'Korly lleva tu dinero por quincenas del calendario: del 1 al 15 y del 16 al último día del mes. Cada quincena tiene sus propios ingresos y gastos. Al terminar, se cierra sola y ese día te pedimos empezar la siguiente.',
   },
   ingreso: {
     texto:

@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { actualizarGastoRecurrente, crearGastoRecurrente, listarGastosRecurrentes, type GastoRecurrente } from './recurrentes.js';
+import { actualizarGastoRecurrente, crearGastoRecurrente, eliminarGastoRecurrente, listarGastosRecurrentes, type GastoRecurrente } from './recurrentes.js';
 import { ErrorDominio } from '../../shared/errores.js';
 import { montoADto, montoDesdeDto, type MontoDto } from '../../shared/http.js';
 
@@ -83,5 +83,10 @@ export async function rutasRecurrentes(app: FastifyInstance): Promise<void> {
       activo: body.activo,
     });
     reply.send(recurrenteADto(recurrente));
+  });
+
+  app.delete<{ Params: { recurrenteId: string } }>('/gastos-recurrentes/:recurrenteId', async (request, reply) => {
+    await eliminarGastoRecurrente(request.identidad.tenantId, request.params.recurrenteId);
+    reply.code(204).send();
   });
 }

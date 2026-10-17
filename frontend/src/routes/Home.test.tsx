@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { apiFetch } = vi.hoisted(() => ({ apiFetch: vi.fn() }));
 vi.mock('@/lib/api', async (original) => ({ ...(await original<typeof import('@/lib/api')>()), apiFetch }));
@@ -64,6 +64,7 @@ function rutasConPeriodo(extra: Rutas = {}): Rutas {
   return {
     '/periodos/activo/disponible': disponibleOk(),
     '/periodos/activo': periodo,
+    '/periodos': [periodo],
     '/resumenes/pendiente': null,
     '/periodos/p1/pagos-tarjeta': [],
     '/periodos/p1/aportes-meta': [],
@@ -566,5 +567,55 @@ describe('Home — privacidad de montos (el ojito)', () => {
 
     await usuario.click(screen.getAllByRole('button', { name: 'Mostrar montos' })[0]!);
     expect(screen.getAllByText(m(37917)).length).toBeGreaterThan(0);
+  });
+});
+
+describe('Home — la quincena se cierra sola (hallazgo real: un usuario no lo sabía y se enredó al empezar la siguiente)', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const elDia = (fecha: string) => vi.useFakeTimers({ toFake: ['Date'], now: new Date(`${fecha}T12:00:00`) });
+
+  it('desde tres días antes avisa cuándo termina, que se cierra sola y que el día siguiente se empieza la nueva', async () => {
+    elDia('2026-10-14');
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo());
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByText('Tu quincena termina mañana.')).toBeInTheDocument();
+    expect(screen.getByText(/se cierra sola al terminar el día\. El 16 te pediremos empezar la nueva quincena/)).toBeInTheDocument();
+  });
+
+  it('en esos días, el formulario de ingreso avisa que un pago de la quincena siguiente se registra al empezarla', async () => {
+    elDia('2026-10-14');
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo());
+    const usuario = userEvent.setup();
+    renderConProveedores(<Home />);
+
+    await usuario.click(await screen.findByRole('button', { name: 'Registrar ingreso' }));
+
+    const hoja = screen.getByRole('dialog', { name: 'Nuevo ingreso' });
+    expect(within(hoja).getByText(/Regístralo cuando la empieces/)).toBeInTheDocument();
+  });
+
+  it('a mitad de la quincena no hay aviso', async () => {
+    elDia('2026-10-05');
+    servidor = instalarServidorFalso(apiFetch, rutasConPeriodo());
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByText('Puedes gastar hoy')).toBeInTheDocument();
+    expect(screen.queryByText(/Tu quincena (termina|está por terminar)|último día de tu quincena/)).not.toBeInTheDocument();
+  });
+
+  it('quien ya tuvo quincenas ve "Empieza tu nueva quincena" (no la bienvenida) y se le recuerda decidir el sobrante', async () => {
+    elDia('2026-10-16');
+    const cerrado = { ...periodo, estado: 'cerrado' };
+    servidor = instalarServidorFalso(
+      apiFetch,
+      rutasConPeriodo({ '/periodos/activo/disponible': sinPeriodo, '/periodos/activo': sinPeriodo, '/periodos': [cerrado], '/resumenes/pendiente': { periodoId: 'p1', sobrante: pesos(4500) } })
+    );
+    renderConProveedores(<Home />);
+
+    expect(await screen.findByText('Empieza tu nueva quincena')).toBeInTheDocument();
+    expect(screen.getByText(/Tu quincena anterior ya se cerró sola\. Empieza la del 16 de octubre – 31 de octubre\. Lo que te sobró lo decides en el aviso de arriba\./)).toBeInTheDocument();
+    expect(screen.queryByText('Empecemos')).not.toBeInTheDocument();
   });
 });

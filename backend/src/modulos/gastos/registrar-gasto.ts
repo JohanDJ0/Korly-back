@@ -114,13 +114,13 @@ async function cargarGastoParaCorreccionTx(
   tx: Ejecutor,
   tenantId: string,
   gastoId: string
-): Promise<{ movimientoId: string; periodoId: string }> {
+): Promise<{ movimientoId: string; periodoId: string; origenRecurrenteId: string | null }> {
   if (!esUuidValido(gastoId)) {
     throw new ErrorDominio('GASTO_NO_ENCONTRADO', 'El gasto especificado no existe');
   }
 
   const [gasto] = await tx
-    .select({ movimientoId: gastos.movimientoId, periodoId: gastos.periodoId })
+    .select({ movimientoId: gastos.movimientoId, periodoId: gastos.periodoId, origenRecurrenteId: gastos.origenRecurrenteId })
     .from(gastos)
     .where(and(eq(gastos.tenantId, tenantId), eq(gastos.id, gastoId)))
     .limit(1);
@@ -231,6 +231,11 @@ export interface GastoEditado {
  * `gastos` es la que representa el gasto corregido de aquí en adelante;
  * la original se queda en el historial, intacta pero neutralizada.
  *
+ * **Un cobro de un recurrente sigue siéndolo al corregirse** (pedido del usuario, 2026-10-16: "la renta bajó"): la fila
+ * nueva hereda `origenRecurrenteId` y apunta al gasto que corrige (`corrigeGastoId`), así que sigue fuera de "gastado
+ * hoy", sigue en "Recurrentes" del desglose y sigue marcado como automático. El índice único de "un cobro por quincena"
+ * ignora las correcciones (la fila original sigue existiendo, neutralizada).
+ *
  * `ajusteGenerado` se deriva comparando el periodo activo actual contra
  * el periodo original del gasto: si coinciden, el original seguía activo
  * (edición "de siempre"); si difieren, el original ya había cerrado y
@@ -283,7 +288,14 @@ export async function editarGasto(entrada: EditarGastoEntrada): Promise<GastoEdi
 
     const [gastoNuevo] = await tx
       .insert(gastos)
-      .values({ tenantId: entrada.tenantId, periodoId: periodoActivo.id, movimientoId, categoriaId })
+      .values({
+        tenantId: entrada.tenantId,
+        periodoId: periodoActivo.id,
+        movimientoId,
+        categoriaId,
+        origenRecurrenteId: gastoOriginal.origenRecurrenteId,
+        corrigeGastoId: entrada.gastoId,
+      })
       .returning({ id: gastos.id });
     if (!gastoNuevo) throw new Error('No se pudo registrar el gasto corregido');
 
@@ -313,7 +325,7 @@ export interface GastoDetallado {
    * el hecho, no cómo mostrarlo.
    */
   revertido: boolean;
-  /** true si lo generó `materializarRecurrentesTx`, no una captura manual — ver modulos/recurrentes. */
+  /** true si lo generó `materializarRecurrentesTx` (o es la corrección de un cobro así), no una captura manual — ver modulos/recurrentes. */
   esRecurrente: boolean;
 }
 

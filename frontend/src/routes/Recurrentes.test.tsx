@@ -243,3 +243,51 @@ describe('Recurrentes — crear uno', () => {
     expect(screen.getByRole('dialog', { name: 'Nuevo gasto recurrente' })).toBeInTheDocument();
   });
 });
+
+describe('Recurrentes — editar y eliminar (pedido real: una renta duplicada y una que bajó)', () => {
+  it('"Editar" abre la hoja con todo precargado, avisa que aplica desde el próximo cobro y manda solo el PATCH', async () => {
+    servidor = instalarServidorFalso(apiFetch, rutas({ 'PATCH /gastos-recurrentes/r1': { ...netflix, monto: pesos(19900) } }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<Recurrentes />);
+    await screen.findByText('Netflix');
+
+    await usuario.click(screen.getAllByRole('button', { name: 'Editar' })[0]!);
+    const hoja = screen.getByRole('dialog', { name: 'Editar gasto recurrente' });
+    expect(within(hoja).getByLabelText('Descripción')).toHaveValue('Netflix');
+    expect(within(hoja).getByLabelText('Día del mes en que se cobra')).toHaveValue(15);
+    expect(within(hoja).getByText(/El cambio aplica desde el próximo cobro/)).toBeInTheDocument();
+
+    const monto = within(hoja).getByLabelText('Monto');
+    await usuario.clear(monto);
+    await usuario.type(monto, '199');
+    await usuario.click(within(hoja).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => expect(servidor.llamadasA('PATCH', '/gastos-recurrentes/r1')).toHaveLength(1));
+    expect(servidor.llamadasA('PATCH', '/gastos-recurrentes/r1')[0]?.cuerpo).toEqual({
+      descripcion: 'Netflix',
+      monto: { valorMinimo: 19900, moneda: 'MXN' },
+      frecuencia: 'mensual',
+      diaMes: 15,
+      categoriaId: null,
+    });
+    expect(servidor.llamadasA('POST', '/gastos-recurrentes')).toHaveLength(0);
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Editar gasto recurrente' })).not.toBeInTheDocument());
+  });
+
+  it('"Eliminar" pide confirmar, explica que lo ya cobrado se queda y luego manda el DELETE', async () => {
+    let lista = [netflix, renta, gym];
+    servidor = instalarServidorFalso(apiFetch, rutas({ '/gastos-recurrentes': () => lista, 'DELETE /gastos-recurrentes/r2': () => { lista = [netflix, gym]; return undefined; } }));
+    const usuario = userEvent.setup();
+    renderConProveedores(<Recurrentes />);
+    await screen.findByText('Renta');
+
+    await usuario.click(screen.getAllByRole('button', { name: 'Eliminar' })[1]!);
+    expect(screen.getByText('¿Eliminar "Renta"? Ya no se cobrará en las siguientes quincenas. Lo que ya se cobró se queda en tu historial.')).toBeInTheDocument();
+    expect(servidor.llamadasA('DELETE', '/gastos-recurrentes/r2')).toHaveLength(0);
+
+    await usuario.click(screen.getByRole('button', { name: 'Sí, confirmar' }));
+
+    await waitFor(() => expect(servidor.llamadasA('DELETE', '/gastos-recurrentes/r2')).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByText('Renta')).not.toBeInTheDocument());
+  });
+});

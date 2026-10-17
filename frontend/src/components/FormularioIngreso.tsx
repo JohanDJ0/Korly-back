@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { useRegistrarIngreso } from '@/hooks/use-registrar-ingreso';
 import { usePeriodoActivo } from '@/hooks/use-periodo-activo';
 import { formatearRangoFechas, hoyISO } from '@/lib/fechas';
+import { NOTA_INGRESO_FIN_DE_QUINCENA, quincenaPorTerminar } from '@/lib/fin-de-quincena';
 
 const esquemaIngreso = z.object({
   monto: z.coerce.number().positive('El monto debe ser mayor a cero'),
@@ -80,6 +81,10 @@ export function FormularioIngreso({ periodoId, onRegistrado, primerIngreso = fal
         )}
         {errors.fechaEfectiva && <p className="text-sm text-destructive">{errors.fechaEfectiva.message}</p>}
       </div>
+      {periodo && quincenaPorTerminar(periodo.fechaFin, hoyISO()) && (
+        // En los últimos días: un pago adelantado de la quincena siguiente registrado hoy inflaría la cifra de estos días.
+        <p className="bg-secondary text-secondary-foreground rounded-xl px-3 py-2 text-[12.5px]">{NOTA_INGRESO_FIN_DE_QUINCENA}</p>
+      )}
       {registrarIngreso.isError && <p className="text-sm text-destructive">{registrarIngreso.error.message}</p>}
       <Button type="submit" disabled={registrarIngreso.isPending}>
         {registrarIngreso.isPending ? 'Guardando…' : 'Registrar ingreso'}

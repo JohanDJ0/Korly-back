@@ -1,14 +1,25 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { apiFetch } from '@/lib/api';
-import type { GastoRecurrente } from '@/hooks/use-recurrentes';
+import type { MontoDto } from '@/lib/dinero';
+import type { FrecuenciaRecurrente, GastoRecurrente } from '@/hooks/use-recurrentes';
 
 interface ActualizarRecurrenteInput {
   recurrenteId: string;
   activo?: boolean;
+  descripcion?: string;
+  monto?: MontoDto;
+  /** `null` le quita la categoría. */
+  categoriaId?: string | null;
+  frecuencia?: FrecuenciaRecurrente;
+  /** Solo con frecuencia mensual; `null` al pasar a quincenal. */
+  diaMes?: number | null;
 }
 
-/** Usado hoy solo para pausar/reanudar (ver FilaRecurrente.tsx) — el PATCH del backend admite más campos, sin cliente todavía que los use. */
+/**
+ * Pausar/reanudar y editar un recurrente (ver FilaRecurrente.tsx). Editar cambia la plantilla: aplica desde el próximo
+ * cobro y no toca los gastos ya cobrados (backend, `actualizarGastoRecurrente`).
+ */
 export function useActualizarRecurrente() {
   const queryClient = useQueryClient();
 
