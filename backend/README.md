@@ -1745,6 +1745,13 @@ limitación conocida que recurrentes: si el periodo al que le tocaba
 una mensualidad nunca se activa, queda pendiente hasta que sí se
 active uno cuya ventana la cubra.
 
+**Mensualidad que vence en la quincena ya activa (2026-10-17):** con menos
+de ~16 días para pagar después del corte, la primera mensualidad puede
+vencer dentro de la quincena en curso, que ya no se vuelve a activar.
+`registrarCargoTarjeta` la aplica al registrar la compra (mismo criterio
+que un recurrente creado a mitad de quincena); antes se quedaba pendiente
+para siempre y la deuda no bajaba.
+
 **Encaje con el resto del sistema, todo verificado, no supuesto:**
 `obtenerSaldoCuenta` ya suma TODOS los asientos de una cuenta sin
 importar el tipo, así que `disponible` refleja un `pago_tarjeta`

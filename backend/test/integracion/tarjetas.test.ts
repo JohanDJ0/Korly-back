@@ -423,6 +423,36 @@ describe('tarjetas de crédito y MSI', () => {
       expect(pagosEnJulio).toEqual([]);
     });
 
+    it('una mensualidad que vence dentro de la quincena YA activa se aplica al registrar la compra (hallazgo 2026-10-17)', async () => {
+      const tenantId = await tenantNuevo();
+      // Corte día 3 y 5 días para pagar: una compra del 2 de agosto vence el 8, dentro de la quincena 1-15 ya activa.
+      const tarjeta = await crearTarjeta(tenantId, 'Tarjeta de pocos días', 1000000n, 'MXN', 3, 5);
+      const hoy = new Date('2026-08-02T12:00:00Z');
+      const periodo = await crearPeriodo(tenantId, 'quincenal', hoy);
+
+      await registrarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, descripcion: 'Audífonos', montoTotalValorMinimo: 60000n, moneda: 'MXN', numeroPlazos: 3, fechaCompra: '2026-08-02', fechaReferencia: hoy });
+
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(-20000n); // la primera mensualidad ya salió de esta quincena
+      expect(await obtenerSaldoCuenta(tenantId, tarjeta.cuentaId)).toBe(-40000n); // 60000 de deuda - 20000 ya pagado
+      expect(await listarPagosTarjetaDePeriodo(tenantId, periodo.id)).toEqual([
+        { tarjetaNombre: 'Tarjeta de pocos días', cargoDescripcion: 'Audífonos', numeroPago: 1, numeroPlazos: 3, montoValorMinimo: 20000n, moneda: 'MXN' },
+      ]);
+      const [cargo] = await listarCargosTarjeta(tenantId, tarjeta.id);
+      expect(cargo?.mensualidades.map((m) => m.pagado)).toEqual([true, false, false]);
+    });
+
+    it('con los 20 días habituales nada vence en la quincena de la compra: registrar no toca el disponible', async () => {
+      const tenantId = await tenantNuevo();
+      const tarjeta = await tarjetaDePrueba(tenantId); // corte 15, 20 días
+      const hoy = new Date('2026-08-02T12:00:00Z');
+      const periodo = await crearPeriodo(tenantId, 'quincenal', hoy);
+
+      await registrarCargoTarjeta({ tenantId, tarjetaId: tarjeta.id, descripcion: 'Laptop', montoTotalValorMinimo: 600000n, moneda: 'MXN', numeroPlazos: 6, fechaCompra: '2026-08-02', fechaReferencia: hoy });
+
+      expect(await obtenerSaldoCuenta(tenantId, periodo.cuentaId)).toBe(0n);
+      expect(await listarPagosTarjetaDePeriodo(tenantId, periodo.id)).toEqual([]);
+    });
+
     it('un periodo en borrador (ya hay uno activo) no materializa todavía', async () => {
       const tenantId = await tenantNuevo();
       const tarjeta = await tarjetaDePrueba(tenantId);

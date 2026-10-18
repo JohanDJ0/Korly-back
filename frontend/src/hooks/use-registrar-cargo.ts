@@ -18,7 +18,11 @@ interface CargoRegistrado {
   mensualidades: MensualidadCargo[];
 }
 
-/** Invalida tarjetas (el crédito disponible bajó) y el detalle de cargos de ESA tarjeta — nunca el disponible del periodo: el cargo no lo toca (solo las mensualidades al vencer, ver backend/README.md). */
+/**
+ * Invalida tarjetas (el crédito disponible bajó) y el detalle de cargos de ESA tarjeta. Normalmente el cargo no toca el
+ * disponible (solo las mensualidades al vencer), pero si una mensualidad vence dentro de la quincena activa el backend la
+ * aplica al registrar (registrar-cargo.ts): por eso también se refrescan el disponible, el desglose y los pagos aplicados.
+ */
 export function useRegistrarCargo() {
   const queryClient = useQueryClient();
 
@@ -28,6 +32,9 @@ export function useRegistrarCargo() {
     onSuccess: (_datos, { tarjetaId }) => {
       void queryClient.invalidateQueries({ queryKey: ['tarjetas'] });
       void queryClient.invalidateQueries({ queryKey: ['cargos-tarjeta', tarjetaId] });
+      void queryClient.invalidateQueries({ queryKey: ['disponible'] });
+      void queryClient.invalidateQueries({ queryKey: ['desglose'] });
+      void queryClient.invalidateQueries({ queryKey: ['pagos-tarjeta-periodo'] });
     },
   });
 }

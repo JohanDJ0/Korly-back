@@ -1,6 +1,7 @@
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray } from 'drizzle-orm';
 import { cargosTarjeta, pagosTarjeta } from '../../db/schema/cargos-tarjeta.js';
 import { asientos, movimientos } from '../../db/schema/ledger.js';
+import { periodos } from '../../db/schema/periodos.js';
 import { tarjetas } from '../../db/schema/tarjetas.js';
 import { obtenerCategoriaPorIdTx } from '../categorias/categorias.js';
 import { registrarMovimientoTx, revertirMovimientoTx } from '../ledger/registrar-movimiento.js';
@@ -11,6 +12,7 @@ import { ErrorDominio } from '../../shared/errores.js';
 import { ahoraEnMexico, esFechaIsoValida, fechaISO } from '../../shared/fechas.js';
 import { esUuidValido } from '../../shared/validacion.js';
 import { calcularVencimientoMensualidad } from './calcular-ciclo.js';
+import { materializarPagosTarjetaTx } from './materializar-pagos-tarjeta.js';
 
 async function resolverCategoriaIdTx(tx: Ejecutor, tenantId: string, categoriaId: string | null | undefined): Promise<string | null> {
   if (categoriaId === undefined || categoriaId === null) return null;
@@ -52,6 +54,8 @@ export interface RegistrarCargoEntrada {
   categoriaId?: string | null;
   /** 'YYYY-MM-DD'. Por defecto, la fecha actual la resuelve el caller — mismo criterio que registrarGasto. */
   fechaCompra?: string;
+  /** Cuándo ocurre el registro (para saber si la quincena activa sigue vigente). Por defecto, ahora en México. */
+  fechaReferencia?: Date;
 }
 
 export interface CargoRegistrado {
@@ -68,6 +72,12 @@ export interface CargoRegistrado {
  * de ningún periodo todavía — eso ocurre después, una por una, cuando
  * a cada una le toca (`materializar-pagos-tarjeta.ts`, mismo mecanismo
  * que `materializarRecurrentesTx`).
+ *
+ * **Hallazgo (2026-10-17):** las mensualidades solo se materializaban al activarse un periodo, así que una cuya fecha
+ * límite cayera en la quincena YA activa (tarjetas con menos de ~16 días para pagar después del corte) nunca se aplicaba:
+ * la deuda no bajaba y el disponible quedaba inflado. Ahora, al registrar la compra, lo que vence dentro de la quincena
+ * activa se aplica en ese momento — mismo criterio que `crearGastoRecurrente` con un recurrente que le toca al periodo
+ * activo. Sin resolver el cierre perezoso aquí (solo cuenta un activo cuya ventana siga vigente).
  *
  * El límite de crédito SÍ se bloquea (a diferencia del "presupuesto",
  * que nunca bloquea): es un tope físico real, no una guía — decisión
@@ -158,6 +168,14 @@ export async function registrarCargoTarjeta(entrada: RegistrarCargoEntrada): Pro
       });
       mensualidades.push({ numeroPago, montoValorMinimo, fechaVencimiento });
     }
+
+    const hoy = fechaISO(entrada.fechaReferencia ?? ahoraEnMexico());
+    const [periodoActivo] = await tx
+      .select({ id: periodos.id, cuentaId: periodos.cuentaId, fechaInicio: periodos.fechaInicio, fechaFin: periodos.fechaFin })
+      .from(periodos)
+      .where(and(eq(periodos.tenantId, entrada.tenantId), eq(periodos.estado, 'activo'), gte(periodos.fechaFin, hoy)))
+      .limit(1);
+    if (periodoActivo) await materializarPagosTarjetaTx(tx, entrada.tenantId, periodoActivo);
 
     return { id: cargo.id, movimientoId, mensualidades };
   });
