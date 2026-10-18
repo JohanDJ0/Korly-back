@@ -11,7 +11,14 @@ const RAIZ = resolve(process.cwd(), '../landing/public');
 const ORIGEN = 'https://korly.com.mx';
 
 /** Página (ruta publicada) → archivo en disco. Las rutas con diagonal final se sirven desde su index.html. */
-const PAGINAS = ['/', '/calculadora/', '/guias/', '/guias/como-controlar-tus-gastos-por-quincena/', '/guias/cuanto-puedo-gastar-al-dia-con-mi-sueldo-quincenal/'];
+const PAGINAS = [
+  '/',
+  '/calculadora/',
+  '/guias/',
+  '/guias/como-controlar-tus-gastos-por-quincena/',
+  '/guias/cuanto-puedo-gastar-al-dia-con-mi-sueldo-quincenal/',
+  '/guias/tarjetas-de-credito-y-meses-sin-intereses/',
+];
 const archivoDe = (ruta: string) => resolve(RAIZ, ruta.replace(/^\//, ''), ruta.endsWith('/') ? 'index.html' : '');
 const leer = (ruta: string) => readFileSync(archivoDe(ruta), 'utf8');
 const etiqueta = (html: string, patron: RegExp) => patron.exec(html)?.[1];
