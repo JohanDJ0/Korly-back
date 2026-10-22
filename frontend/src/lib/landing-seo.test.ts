@@ -18,6 +18,7 @@ const PAGINAS = [
   '/guias/como-controlar-tus-gastos-por-quincena/',
   '/guias/cuanto-puedo-gastar-al-dia-con-mi-sueldo-quincenal/',
   '/guias/tarjetas-de-credito-y-meses-sin-intereses/',
+  '/guias/como-hacer-un-presupuesto-quincenal/',
 ];
 const archivoDe = (ruta: string) => resolve(RAIZ, ruta.replace(/^\//, ''), ruta.endsWith('/') ? 'index.html' : '');
 const leer = (ruta: string) => readFileSync(archivoDe(ruta), 'utf8');
